@@ -1,8 +1,20 @@
-from health_agent.models import AnalysisPayload, ArchTestResult, Narrative, ScoreResult
+from health_agent.drift import drift_narrative
+from health_agent.models import (
+    AnalysisPayload,
+    ArchTestResult,
+    HealthRead,
+    Narrative,
+    ScoreResult,
+)
 
 
 class Reasoner:
-    def reason(self, payload: AnalysisPayload, scores: ScoreResult) -> list[Narrative]:
+    def reason(
+        self,
+        payload: AnalysisPayload,
+        scores: ScoreResult,
+        prior_reads: list[HealthRead] | None = None,
+    ) -> list[Narrative]:
         raise NotImplementedError
 
 
@@ -10,6 +22,10 @@ def _runtime_note(payload: AnalysisPayload) -> str:
     if payload.runtime.illustrative:
         return " Runtime signals are illustrative and were not scored."
     return ""
+
+
+def _all_rules_passed(payload: AnalysisPayload) -> bool:
+    return all(item.passed for item in payload.archTests)
 
 
 def _failed_rules(payload: AnalysisPayload) -> dict[str, ArchTestResult]:
@@ -86,27 +102,33 @@ def _boundary_narrative(
 class StubReasoner(Reasoner):
     """Deterministic stand-in so local tests need no model credentials."""
 
-    def reason(self, payload: AnalysisPayload, scores: ScoreResult) -> list[Narrative]:
+    def reason(
+        self,
+        payload: AnalysisPayload,
+        scores: ScoreResult,
+        prior_reads: list[HealthRead] | None = None,
+    ) -> list[Narrative]:
+        priors = prior_reads or []
         narratives: list[Narrative] = []
+        rules_hold = _all_rules_passed(payload)
         for characteristic in scores.characteristics:
-            if characteristic.score == 100:
-                narratives.append(
-                    Narrative(
-                        id=characteristic.id,
-                        reasoning=(
-                            f"{characteristic.id} is 100. No deterministic findings applied."
-                            + _runtime_note(payload)
-                        ),
-                        recommendations=[],
-                    )
-                )
-                continue
-            if characteristic.id == "boundary-integrity":
+            if characteristic.id == "boundary-integrity" and not rules_hold:
                 narratives.append(
                     _boundary_narrative(
                         payload,
                         characteristic.score,
                         characteristic.signalsUsed,
+                    )
+                )
+                continue
+            if characteristic.score == 100 or rules_hold:
+                narratives.append(
+                    drift_narrative(
+                        characteristic.id,
+                        characteristic.score,
+                        payload,
+                        priors,
+                        _runtime_note(payload),
                     )
                 )
                 continue

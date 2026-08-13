@@ -11,6 +11,7 @@ from health_agent.persist import (
     connect,
     insert_health_read,
     load_active_decisions,
+    load_recent_reads,
     migrate,
 )
 from health_agent.run import produce_health_read
@@ -43,7 +44,8 @@ class PushHandler(BaseHTTPRequestHandler):
             with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
                 handle.write(json.dumps(decisions))
                 decisions_path = Path(handle.name)
-            read = produce_health_read(path, decisions_path)
+            prior_reads = load_recent_reads(conn)
+            read = produce_health_read(path, decisions_path, prior_reads=prior_reads)
             payload = json.loads(data)
             insert_health_read(conn, read, str(payload.get("commitMessage", "")))
             conn.close()

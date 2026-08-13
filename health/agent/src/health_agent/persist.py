@@ -5,7 +5,7 @@ import os
 
 import psycopg
 
-from health_agent.models import HealthRead
+from health_agent.models import CharacteristicRead, HealthRead
 from health_agent.score_bridge import repo_root
 
 
@@ -120,3 +120,49 @@ def count_runs(conn: psycopg.Connection) -> int:
     if row is None:
         return 0
     return int(row[0])
+
+
+def load_recent_reads(conn: psycopg.Connection, limit: int = 8) -> list[HealthRead]:
+    runs = conn.execute(
+        """
+        select run_id, commit_sha, overall_score
+        from health_run
+        order by created_at asc
+        limit %s
+        """,
+        (limit,),
+    ).fetchall()
+    reads: list[HealthRead] = []
+    for run_id, commit_sha, overall in runs:
+        rows = conn.execute(
+            """
+            select characteristic, score, reasoning, recommendations, signals_used
+            from health_characteristic
+            where run_id = %s
+            order by characteristic
+            """,
+            (run_id,),
+        ).fetchall()
+        characteristics: list[CharacteristicRead] = []
+        for row in rows:
+            recommendations = row[3] if isinstance(row[3], list) else json.loads(row[3] or "[]")
+            signals = row[4] if isinstance(row[4], list) else json.loads(row[4] or "[]")
+            characteristics.append(
+                CharacteristicRead(
+                    id=row[0],
+                    score=int(row[1]),
+                    reasoning=row[2] or "",
+                    recommendations=recommendations,
+                    signalsUsed=signals,
+                )
+            )
+        if characteristics:
+            reads.append(
+                HealthRead(
+                    runId=str(run_id),
+                    commitSha=str(commit_sha),
+                    overall=int(overall),
+                    characteristics=characteristics,
+                )
+            )
+    return reads

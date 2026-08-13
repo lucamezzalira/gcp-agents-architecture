@@ -61,11 +61,25 @@ function runDepcruise(): DepcruiseJson {
       join(here, ".dependency-cruiser.js"),
       "--output-type",
       "json",
-      join(repoRoot, "services"),
+      "services",
     ],
-    { cwd: here, encoding: "utf8" },
+    { cwd: repoRoot, encoding: "utf8" },
   );
   return JSON.parse(raw) as DepcruiseJson;
+}
+
+function recentCommits(): Array<{ sha: string; message: string }> {
+  const raw = git(["log", "-8", "--format=%H%x09%s"]);
+  if (raw.length === 0) {
+    return [];
+  }
+  return raw.split("\n").flatMap((line) => {
+    const tab = line.indexOf("\t");
+    if (tab < 0) {
+      return [];
+    }
+    return [{ sha: line.slice(0, tab), message: line.slice(tab + 1) }];
+  });
 }
 
 function runJscpd(): JscpdJson {
@@ -93,6 +107,24 @@ function runJscpd(): JscpdJson {
   } catch {
     return { statistics: { total: { percentage: 0 } }, duplicates: [] };
   }
+}
+
+function scoredOrphan(
+  source: string,
+  referenced: Set<string>,
+  dependencies: Array<{ circular?: boolean; resolved?: string }> | undefined,
+): boolean {
+  const normalised = source.replace(/\\/g, "/");
+  if (!normalised.includes("/src/")) {
+    return false;
+  }
+  if (normalised.includes(".test.")) {
+    return false;
+  }
+  if ((dependencies?.length ?? 0) > 0) {
+    return false;
+  }
+  return !referenced.has(source);
 }
 
 function cyclesFrom(depcruise: DepcruiseJson): Array<{ path: string[] }> {
@@ -127,11 +159,12 @@ async function main(): Promise<void> {
     ),
   );
   const orphans = modules
-    .filter(
-      (module) =>
-        (module.dependencies?.length ?? 0) === 0 && !referenced.has(module.source),
-    )
+    .filter((module) => scoredOrphan(module.source, referenced, module.dependencies))
     .map((module) => module.source);
+  const dependencyCount = modules.reduce(
+    (sum, module) => sum + (module.dependencies?.length ?? 0),
+    0,
+  );
 
   const payload = analysisPayloadSchema.parse({
     runId: git(["rev-parse", "HEAD"]) || "local",
@@ -148,8 +181,8 @@ async function main(): Promise<void> {
         to: item.to,
       })),
       metrics: {
-        modules: depcruise.summary?.total?.modules ?? modules.length,
-        dependencies: depcruise.summary?.total?.dependencies ?? 0,
+        modules: modules.length,
+        dependencies: dependencyCount,
       },
     },
     duplication: {
@@ -169,6 +202,7 @@ async function main(): Promise<void> {
         { name: "error-rate", value: 0.01, unit: "ratio" },
       ],
     },
+    recentCommits: recentCommits(),
   });
 
   writeFileSync(outPath, JSON.stringify(payload, null, 2) + "\n");

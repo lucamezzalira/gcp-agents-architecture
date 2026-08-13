@@ -17,6 +17,34 @@ class RuntimePayload(BaseModel):
     signals: list[dict[str, str | float | int]]
 
 
+class Clone(BaseModel):
+    files: list[str]
+    lines: int = 0
+    tokens: int = 0
+
+
+class DuplicationPayload(BaseModel):
+    clones: list[Clone] = []
+    percentage: float = 0
+
+
+class DependencyMetrics(BaseModel):
+    modules: int = 0
+    dependencies: int = 0
+
+
+class DependencyCruiserPayload(BaseModel):
+    cycles: list[dict[str, object]] = []
+    orphans: list[str] = []
+    violations: list[dict[str, object]] = []
+    metrics: DependencyMetrics = DependencyMetrics()
+
+
+class RecentCommit(BaseModel):
+    sha: str
+    message: str
+
+
 class AnalysisPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -26,6 +54,9 @@ class AnalysisPayload(BaseModel):
     timestamp: str
     archTests: list[ArchTestResult]
     runtime: RuntimePayload
+    dependencyCruiser: DependencyCruiserPayload = DependencyCruiserPayload()
+    duplication: DuplicationPayload = DuplicationPayload()
+    recentCommits: list[RecentCommit] = []
 
 
 class CharacteristicScore(BaseModel):

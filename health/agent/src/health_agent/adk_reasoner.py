@@ -15,7 +15,12 @@ from health_agent.reasoner import Reasoner
 class AdkReasoner(Reasoner):
     """Uses the ADK agent for prose. Scores still come from health/scoring."""
 
-    def reason(self, payload: AnalysisPayload, scores: ScoreResult) -> list[Narrative]:
+    def reason(
+        self,
+        payload: AnalysisPayload,
+        scores: ScoreResult,
+        prior_reads: list | None = None,
+    ) -> list[Narrative]:
         facts = {
             "overall": scores.overall,
             "characteristics": [
@@ -37,13 +42,24 @@ class AdkReasoner(Reasoner):
                 if not item.passed
             ],
             "commitMessage": payload.commitMessage,
+            "recentCommits": [item.message for item in payload.recentCommits],
+            "duplication": {
+                "percentage": payload.duplication.percentage,
+                "clones": [item.files for item in payload.duplication.clones],
+            },
+            "couplingMetrics": {
+                "modules": payload.dependencyCruiser.metrics.modules,
+                "dependencies": payload.dependencyCruiser.metrics.dependencies,
+            },
+            "priorOverall": [item.overall for item in (prior_reads or [])][-6:],
             "runtimeIllustrative": payload.runtime.illustrative,
         }
         prompt = (
             f"{INSTRUCTION}\n\n"
             "These scores are facts. Copy each id. Do not change a score.\n"
             "Return JSON: {\"narratives\": [{\"id\": \"\", \"reasoning\": \"\", \"recommendations\": []}]}\n"
-            "Empty recommendations when score is 100.\n\n"
+            "Empty recommendations when score is 100. Reasoning may still "
+            "describe drift when rules pass.\n\n"
             f"{json.dumps(facts)}"
         )
         session_service = InMemorySessionService()

@@ -58,6 +58,9 @@ export const analysisPayloadSchema = z.object({
   dependencyCruiser: dependencyCruiserSchema,
   duplication: duplicationSchema,
   runtime: runtimeSchema,
+  recentCommits: z
+    .array(z.object({ sha: z.string(), message: z.string() }))
+    .default([]),
 });
 
 export const acceptedDecisionSchema = z.object({
