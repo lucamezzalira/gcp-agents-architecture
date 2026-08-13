@@ -1,8 +1,9 @@
 resource "google_cloud_run_v2_service" "checkout" {
-  count    = var.checkout_image == "" ? 0 : 1
-  name     = "checkout"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  count               = var.checkout_image == "" ? 0 : 1
+  name                = "checkout"
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.checkout.email
@@ -18,10 +19,6 @@ resource "google_cloud_run_v2_service" "checkout" {
           memory = "512Mi"
         }
         cpu_idle = true
-      }
-      env {
-        name  = "PORT"
-        value = "8080"
       }
       env {
         name  = "BODY_BUCKET"
@@ -42,10 +39,11 @@ resource "google_cloud_run_v2_service" "checkout" {
 }
 
 resource "google_cloud_run_v2_service" "notification" {
-  count    = var.notification_image == "" ? 0 : 1
-  name     = "notification"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  count               = var.notification_image == "" ? 0 : 1
+  name                = "notification"
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   template {
     service_account = google_service_account.notification.email
@@ -61,10 +59,6 @@ resource "google_cloud_run_v2_service" "notification" {
           memory = "512Mi"
         }
         cpu_idle = true
-      }
-      env {
-        name  = "PORT"
-        value = "8080"
       }
       env {
         name  = "BODY_BUCKET"

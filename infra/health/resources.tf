@@ -131,7 +131,7 @@ resource "google_secret_manager_secret" "database_url" {
 resource "google_secret_manager_secret_version" "database_url" {
   secret = google_secret_manager_secret.database_url.id
   secret_data = format(
-    "postgresql://health:%s@/%s?host=/cloudsql/%s",
+    "postgresql://health:%s@localhost/%s?host=/cloudsql/%s",
     random_password.sql.result,
     google_sql_database.health.name,
     google_sql_database_instance.health.connection_name,

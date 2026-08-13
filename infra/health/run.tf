@@ -1,8 +1,9 @@
 resource "google_cloud_run_v2_service" "dashboard" {
-  count    = var.dashboard_image == "" ? 0 : 1
-  name     = "health-dashboard"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  count               = var.dashboard_image == "" ? 0 : 1
+  name                = "health-dashboard"
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.dashboard.email
@@ -33,10 +34,6 @@ resource "google_cloud_run_v2_service" "dashboard" {
         value = "0.0.0.0"
       }
       env {
-        name  = "PORT"
-        value = "8080"
-      }
-      env {
         name = "DATABASE_URL"
         value_source {
           secret_key_ref {
@@ -64,10 +61,11 @@ resource "google_cloud_run_v2_service_iam_member" "dashboard_public" {
 }
 
 resource "google_cloud_run_v2_service" "mcp" {
-  count    = var.mcp_image == "" ? 0 : 1
-  name     = "health-mcp"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  count               = var.mcp_image == "" ? 0 : 1
+  name                = "health-mcp"
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   template {
     service_account = google_service_account.mcp.email
@@ -98,10 +96,6 @@ resource "google_cloud_run_v2_service" "mcp" {
         value = "1"
       }
       env {
-        name  = "PORT"
-        value = "8080"
-      }
-      env {
         name = "DATABASE_URL"
         value_source {
           secret_key_ref {
@@ -121,10 +115,11 @@ resource "google_cloud_run_v2_service" "mcp" {
 }
 
 resource "google_cloud_run_v2_service" "agent" {
-  count    = var.agent_image == "" ? 0 : 1
-  name     = "health-agent"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  count               = var.agent_image == "" ? 0 : 1
+  name                = "health-agent"
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   template {
     service_account = google_service_account.agent.email
@@ -146,10 +141,6 @@ resource "google_cloud_run_v2_service" "agent" {
           memory = "512Mi"
         }
         cpu_idle = true
-      }
-      env {
-        name  = "PORT"
-        value = "8080"
       }
       env {
         name  = "HEALTH_REASONER"

@@ -38,8 +38,47 @@ export function databaseUrl(): string {
   );
 }
 
+export type PostgresTarget =
+  | { kind: "url"; url: string }
+  | {
+      kind: "socket";
+      host: string;
+      database: string;
+      username: string;
+      password: string;
+    };
+
+export function postgresTarget(url: string): PostgresTarget {
+  const socketMatch = url.match(/[?&]host=(\/[^&]*)/);
+  if (socketMatch === null || socketMatch[1] === undefined) {
+    return { kind: "url", url };
+  }
+  const parsed = new URL(url.replace("@/", "@unused/"));
+  return {
+    kind: "socket",
+    host: decodeURIComponent(socketMatch[1]),
+    database: decodeURIComponent(parsed.pathname.replace(/^\//, "")),
+    username: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+  };
+}
+
+function sqlClient(url: string) {
+  const target = postgresTarget(url);
+  if (target.kind === "url") {
+    return postgres(target.url, { max: 4 });
+  }
+  return postgres({
+    host: target.host,
+    database: target.database,
+    username: target.username,
+    password: target.password,
+    max: 4,
+  });
+}
+
 export function createPostgresStore(url = databaseUrl()): HealthStore {
-  const sql = postgres(url, { max: 4 });
+  const sql = sqlClient(url);
 
   return {
     async loadLatest(): Promise<LatestHealth | undefined> {

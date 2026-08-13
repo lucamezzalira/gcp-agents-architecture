@@ -12,6 +12,7 @@
     "@astrojs/node": "^9.4.4",
     "astro": "^5.14.0",
     "postgres": "^3.4.7",
+    "send": "^1.2.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
