@@ -3,5 +3,7 @@ dist
 .turbo
 .git
 .venv
+**/.venv
 .local
 .astro
+.terraform

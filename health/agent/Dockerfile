@@ -10,7 +10,8 @@ COPY health/agent ./health/agent
 COPY pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --filter @health/scoring...
 WORKDIR /repo/health/agent
-RUN python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e ".[adk]"
+# Stub reasoner only. Skip google-adk so pip does not backtrack on Python 3.11 (node:24-bookworm).
+RUN rm -rf .venv && python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e .
 ENV PORT=8080
 ENV HEALTH_REASONER=stub
 EXPOSE 8080
