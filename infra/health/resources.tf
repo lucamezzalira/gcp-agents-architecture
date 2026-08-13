@@ -5,6 +5,10 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 resource "google_artifact_registry_repository" "health" {
   #checkov:skip=CKV_GCP_84:Google-managed encryption is enough for this demo
   location      = var.region

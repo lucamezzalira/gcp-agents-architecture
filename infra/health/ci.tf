@@ -56,3 +56,18 @@ output "artifact_registry" {
 output "dashboard_uri" {
   value = try(google_cloud_run_v2_service.dashboard[0].uri, "")
 }
+
+output "mcp_uri" {
+  value = try(google_cloud_run_v2_service.mcp[0].uri, "")
+}
+
+output "wif_provider" {
+  value = try(
+    "projects/${data.google_project.this.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.github[0].workload_identity_pool_id}/providers/${google_iam_workload_identity_pool_provider.github[0].workload_identity_pool_provider_id}",
+    "",
+  )
+}
+
+output "health_ci_sa" {
+  value = try(google_service_account.ci[0].email, "")
+}

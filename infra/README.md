@@ -29,7 +29,7 @@ terraform apply
 
 Then pass `services_ci_sa_email` into the health root so CI can publish payloads.
 
-After WIF exists, set GitHub Actions variables `WIF_PROVIDER`, `HEALTH_CI_SA`, and `ANALYSIS_TOPIC` so the `publish-health` job can post `AnalysisPayload` JSON.
+After WIF exists, set GitHub Actions variables `WIF_PROVIDER`, `HEALTH_CI_SA`, and `ANALYSIS_TOPIC` from `terraform output` on `infra/health` so the `publish-health` job can post `AnalysisPayload` JSON.
 
 Lint (no apply):
 
@@ -43,4 +43,4 @@ checkov -d infra --framework terraform --compact
 
 Agent Runtime, Agent Identity and Memory Bank are not in these files. The agent Cloud Run service runs `health_agent.push_server` with `HEALTH_REASONER=adk` and writes the same Postgres tables. Attach Runtime later without changing the scoring path.
 
-MCP is stdio locally (`pnpm mcp`). Cloud Run sets `MCP_HTTP=1` and serves Streamable HTTP.
+MCP Cloud Run is Streamable HTTP at `/mcp`. Cursor connects to that URL.

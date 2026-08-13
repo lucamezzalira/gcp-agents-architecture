@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -25,7 +26,11 @@ jobs:
       - run: pnpm arch
       - run: health/agent/.venv/bin/pytest health/agent
       - run: pnpm collect
-        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: analysis-payload
+          path: analysis/payload.json
 
   publish-health:
     if: github.ref == 'refs/heads/main' && vars.WIF_PROVIDER != ''
@@ -35,17 +40,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: analysis-payload
+          path: analysis
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.HEALTH_CI_SA }}
       - uses: google-github-actions/setup-gcloud@v2
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install
-      - run: pnpm collect
-      - run: gcloud pubsub topics publish "${{ vars.ANALYSIS_TOPIC }}" --message "$(cat analysis/payload.json)"
+      - run: gcloud pubsub topics publish "${{ vars.ANALYSIS_TOPIC }}" --message "$(jq -c . analysis/payload.json)"

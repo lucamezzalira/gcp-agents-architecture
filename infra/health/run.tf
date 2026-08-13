@@ -65,7 +65,7 @@ resource "google_cloud_run_v2_service" "mcp" {
   name                = "health-mcp"
   location            = var.region
   deletion_protection = false
-  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.mcp.email
@@ -92,10 +92,6 @@ resource "google_cloud_run_v2_service" "mcp" {
         container_port = 8080
       }
       env {
-        name  = "MCP_HTTP"
-        value = "1"
-      }
-      env {
         name = "DATABASE_URL"
         value_source {
           secret_key_ref {
@@ -114,12 +110,20 @@ resource "google_cloud_run_v2_service" "mcp" {
   depends_on = [google_project_service.apis]
 }
 
+resource "google_cloud_run_v2_service_iam_member" "mcp_public" {
+  count    = var.mcp_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.mcp[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
 resource "google_cloud_run_v2_service" "agent" {
   count               = var.agent_image == "" ? 0 : 1
   name                = "health-agent"
   location            = var.region
   deletion_protection = false
-  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.agent.email
@@ -173,6 +177,12 @@ resource "google_cloud_run_v2_service_iam_member" "agent_pubsub" {
   member   = "serviceAccount:${google_service_account.agent.email}"
 }
 
+resource "google_service_account_iam_member" "agent_pubsub_token" {
+  service_account_id = google_service_account.agent.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
 resource "google_pubsub_subscription" "analysis_push" {
   count = var.agent_image == "" ? 0 : 1
   name  = "analysis-payloads-agent"
@@ -181,6 +191,7 @@ resource "google_pubsub_subscription" "analysis_push" {
     push_endpoint = google_cloud_run_v2_service.agent[0].uri
     oidc_token {
       service_account_email = google_service_account.agent.email
+      audience              = google_cloud_run_v2_service.agent[0].uri
     }
   }
   retry_policy {
