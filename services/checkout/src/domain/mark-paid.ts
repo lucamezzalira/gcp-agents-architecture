@@ -1,6 +1,7 @@
 import type { BodyStore } from "./body-store.js";
 import type { InstructionPublisher } from "./instruction-publisher.js";
 import type { Logger } from "./logger.js";
+import type { Mailer } from "./mailer.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
@@ -10,16 +11,29 @@ import {
   confirmationBodyRef,
   renderConfirmation,
 } from "./render-confirmation.js";
+import { renderExpeditedConfirmation } from "./render-expedited-confirmation.js";
 import type { SendInstruction } from "./send-instruction.js";
 
-export type MarkPaidResult = { status: "paid"; instruction: SendInstruction };
+export type MarkPaidResult = {
+  status: "paid";
+  dispatch: "queued" | "direct";
+  instruction?: SendInstruction;
+};
 
 export type MarkPaidDeps = {
   orderStore: OrderStore;
   bodyStore: BodyStore;
   publisher: InstructionPublisher;
+  mailer: Mailer;
   logger: Logger;
 };
+
+function confirmationHtml(order: Order): string {
+  if (order.shippingTier === "expedited") {
+    return renderExpeditedConfirmation(order);
+  }
+  return renderConfirmation(order);
+}
 
 export async function markPaid(
   orderId: string,
@@ -47,11 +61,22 @@ export async function markPaid(
     throw error;
   }
   await deps.orderStore.save(paid);
-  log.info("mark-paid.paid");
+  log.info("mark-paid.paid", { shippingTier: paid.shippingTier });
 
-  const html = renderConfirmation(paid);
+  const html = confirmationHtml(paid);
   const bodyRef = confirmationBodyRef(paid.id);
   await deps.bodyStore.put(bodyRef, html);
+
+  if (paid.shippingTier === "expedited") {
+    // Expedited customers should not wait behind the notification queue.
+    await deps.mailer.send({
+      to: paid.email,
+      subject: `Order ${paid.id} confirmed`,
+      html,
+    });
+    log.info("confirmation.sent-direct");
+    return { status: "paid", dispatch: "direct" };
+  }
 
   const instruction: SendInstruction = {
     messageId: `checkout:${paid.id}:paid`,
@@ -61,5 +86,5 @@ export async function markPaid(
   };
   await deps.publisher.publish(instruction);
   log.info("instruction.published");
-  return { status: "paid", instruction };
+  return { status: "paid", dispatch: "queued", instruction };
 }

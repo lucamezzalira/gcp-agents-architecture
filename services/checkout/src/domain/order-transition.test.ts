@@ -15,6 +15,7 @@ function orderAt(status: OrderStatus): Order {
     id: "ord-1",
     email: "buyer@example.com",
     status,
+    shippingTier: "standard",
   };
 }
 

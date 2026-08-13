@@ -52,6 +52,30 @@ describe("checkout HTTP", () => {
     expect(await app.bodyStore.get(bodyRef)).toContain("48 hours");
   });
 
+  it("sends expedited confirmations directly and does not publish a send instruction", async () => {
+    const created = await app.server.inject({
+      method: "POST",
+      url: "/orders",
+      payload: {
+        id: "ord-exp",
+        email: "buyer@example.com",
+        shippingTier: "expedited",
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ shippingTier: "expedited" });
+
+    const paid = await app.server.inject({
+      method: "POST",
+      url: "/orders/ord-exp/pay",
+    });
+    expect(paid.statusCode).toBe(200);
+    expect(paid.json()).toMatchObject({ status: "paid", dispatch: "direct" });
+    expect(app.publisher.published).toHaveLength(0);
+    expect(app.emailProvider.calls).toHaveLength(1);
+    expect(app.emailProvider.calls[0]?.html).toContain("24 hours");
+  });
+
   it("returns 409 when paying an already-paid order", async () => {
     await app.server.inject({
       method: "POST",

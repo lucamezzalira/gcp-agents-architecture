@@ -3,7 +3,12 @@ import { markPaid } from "./domain/mark-paid.js";
 import type { BodyStore } from "./domain/body-store.js";
 import type { InstructionPublisher } from "./domain/instruction-publisher.js";
 import { silentLogger, type Logger } from "./domain/logger.js";
+import type { Mailer } from "./domain/mailer.js";
 import type { OrderStore } from "./domain/order-store.js";
+import {
+  DirectEmailProvider,
+  InMemoryEmailProvider,
+} from "./infrastructure/email-provider.js";
 import { FileBodyStore } from "./infrastructure/file-body-store.js";
 import { FirestoreOrderStore } from "./infrastructure/firestore-order-store.js";
 import { GcsBodyStore } from "./infrastructure/gcs-body-store.js";
@@ -21,12 +26,14 @@ export type CheckoutApp = {
   orderStore: InMemoryOrderStore;
   bodyStore: InMemoryBodyStore;
   publisher: InMemoryInstructionPublisher;
+  emailProvider: InMemoryEmailProvider;
 };
 
 function buildServer(
   orderStore: OrderStore,
   bodyStore: BodyStore,
   publisher: InstructionPublisher,
+  mailer: Mailer,
   logger: Logger,
 ): FastifyInstance {
   const server = Fastify();
@@ -36,7 +43,14 @@ function buildServer(
     async (order) => {
       await orderStore.save(order);
     },
-    (orderId) => markPaid(orderId, { orderStore, bodyStore, publisher, logger }),
+    (orderId) =>
+      markPaid(orderId, {
+        orderStore,
+        bodyStore,
+        publisher,
+        mailer,
+        logger,
+      }),
     logger,
   );
   return server;
@@ -46,11 +60,19 @@ export function createApp(logger: Logger = silentLogger()): CheckoutApp {
   const orderStore = new InMemoryOrderStore();
   const bodyStore = new InMemoryBodyStore();
   const publisher = new InMemoryInstructionPublisher();
+  const emailProvider = new InMemoryEmailProvider();
   return {
-    server: buildServer(orderStore, bodyStore, publisher, logger),
+    server: buildServer(
+      orderStore,
+      bodyStore,
+      publisher,
+      emailProvider,
+      logger,
+    ),
     orderStore,
     bodyStore,
     publisher,
+    emailProvider,
   };
 }
 
@@ -62,7 +84,13 @@ export function createLocalApp(): FastifyInstance {
   const publisher = new HttpInstructionPublisher(
     process.env.NOTIFICATION_URL ?? "http://127.0.0.1:3001/instructions",
   );
-  return buildServer(orderStore, bodyStore, publisher, new JsonLogger());
+  return buildServer(
+    orderStore,
+    bodyStore,
+    publisher,
+    new DirectEmailProvider(),
+    new JsonLogger(),
+  );
 }
 
 export function createCloudApp(): FastifyInstance {
@@ -71,7 +99,13 @@ export function createCloudApp(): FastifyInstance {
   const publisher = PubSubInstructionPublisher.fromTopicName(
     requireEnv("SEND_INSTRUCTIONS_TOPIC"),
   );
-  return buildServer(orderStore, bodyStore, publisher, new JsonLogger());
+  return buildServer(
+    orderStore,
+    bodyStore,
+    publisher,
+    new DirectEmailProvider(),
+    new JsonLogger(),
+  );
 }
 
 export function createRuntimeApp(): FastifyInstance {

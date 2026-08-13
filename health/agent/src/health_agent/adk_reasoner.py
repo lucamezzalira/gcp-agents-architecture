@@ -27,7 +27,16 @@ class AdkReasoner(Reasoner):
                 }
                 for item in scores.characteristics
             ],
-            "failedRules": [item.ruleId for item in payload.archTests if not item.passed],
+            "failedRules": [
+                {
+                    "ruleId": item.ruleId,
+                    "files": [violation.file for violation in item.violations],
+                    "details": [violation.detail for violation in item.violations],
+                }
+                for item in payload.archTests
+                if not item.passed
+            ],
+            "commitMessage": payload.commitMessage,
             "runtimeIllustrative": payload.runtime.illustrative,
         }
         prompt = (

@@ -27,8 +27,12 @@ export function registerOrderRoutes(
     const log = logger.withCorrelation(order.id);
     log.info("order.received");
     await createOrder(order);
-    log.info("order.created", { status: order.status });
-    return reply.code(201).send({ id: order.id, status: order.status });
+    log.info("order.created", { status: order.status, shippingTier: order.shippingTier });
+    return reply.code(201).send({
+      id: order.id,
+      status: order.status,
+      shippingTier: order.shippingTier,
+    });
   });
 
   app.post("/orders/:id/pay", async (request, reply) => {

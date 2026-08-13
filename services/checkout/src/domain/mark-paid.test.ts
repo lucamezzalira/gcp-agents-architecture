@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryBodyStore } from "../infrastructure/in-memory-body-store.js";
+import { InMemoryEmailProvider } from "../infrastructure/email-provider.js";
 import { InMemoryInstructionPublisher } from "../infrastructure/in-memory-instruction-publisher.js";
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
 import { silentLogger } from "./logger.js";
@@ -13,18 +14,21 @@ const order: Order = {
   id: "ord-1",
   email: "buyer@example.com",
   status: "pending",
+  shippingTier: "standard",
 };
 
 function setup(): {
   orderStore: InMemoryOrderStore;
   bodyStore: InMemoryBodyStore;
   publisher: InMemoryInstructionPublisher;
+  mailer: InMemoryEmailProvider;
   logger: ReturnType<typeof silentLogger>;
 } {
   return {
     orderStore: new InMemoryOrderStore(),
     bodyStore: new InMemoryBodyStore(),
     publisher: new InMemoryInstructionPublisher(),
+    mailer: new InMemoryEmailProvider(),
     logger: silentLogger(),
   };
 }
@@ -37,14 +41,29 @@ describe("markPaid", () => {
     const result = await markPaid(order.id, deps);
 
     expect(result.status).toBe("paid");
-    expect(result.instruction.to).toBe(order.email);
-    expect(result.instruction.bodyRef).toBe(confirmationBodyRef(order.id));
+    expect(result.dispatch).toBe("queued");
+    expect(result.instruction?.to).toBe(order.email);
+    expect(result.instruction?.bodyRef).toBe(confirmationBodyRef(order.id));
     expect(deps.publisher.published).toEqual([result.instruction]);
+    expect(deps.mailer.calls).toHaveLength(0);
 
-    const stored = await deps.bodyStore.get(result.instruction.bodyRef);
+    const stored = await deps.bodyStore.get(result.instruction?.bodyRef ?? "");
     expect(stored).toBeDefined();
     expect(stored).toContain("48 hours");
     expect(stored).toContain(order.id);
+  });
+
+  it("sends an expedited confirmation directly and does not publish a send instruction", async () => {
+    const deps = setup();
+    await deps.orderStore.save({ ...order, shippingTier: "expedited" });
+
+    const result = await markPaid(order.id, deps);
+
+    expect(result).toEqual({ status: "paid", dispatch: "direct" });
+    expect(deps.publisher.published).toHaveLength(0);
+    expect(deps.mailer.calls).toHaveLength(1);
+    expect(deps.mailer.calls[0]?.html).toContain("24 hours");
+    expect(deps.mailer.calls[0]?.html).not.toContain("48 hours");
   });
 
   it("does not publish again when the order is already paid", async () => {
