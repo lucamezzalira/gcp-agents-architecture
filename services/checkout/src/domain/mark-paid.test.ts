@@ -4,6 +4,7 @@ import { InMemoryInstructionPublisher } from "../infrastructure/in-memory-instru
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
 import { silentLogger } from "./logger.js";
 import { markPaid } from "./mark-paid.js";
+import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
 import { confirmationBodyRef } from "./render-confirmation.js";
@@ -36,9 +37,6 @@ describe("markPaid", () => {
     const result = await markPaid(order.id, deps);
 
     expect(result.status).toBe("paid");
-    if (result.status !== "paid") {
-      return;
-    }
     expect(result.instruction.to).toBe(order.email);
     expect(result.instruction.bodyRef).toBe(confirmationBodyRef(order.id));
     expect(deps.publisher.published).toEqual([result.instruction]);
@@ -54,10 +52,22 @@ describe("markPaid", () => {
     await deps.orderStore.save(order);
     await markPaid(order.id, deps);
 
-    const second = await markPaid(order.id, deps);
-
-    expect(second).toEqual({ status: "already-paid" });
+    await expect(markPaid(order.id, deps)).rejects.toBeInstanceOf(
+      InvalidTransitionError,
+    );
     expect(deps.publisher.published).toHaveLength(1);
+    expect((await deps.orderStore.get(order.id))?.status).toBe("paid");
+  });
+
+  it("does not mark a cancelled order paid or publish a send instruction", async () => {
+    const deps = setup();
+    await deps.orderStore.save({ ...order, status: "cancelled" });
+
+    await expect(markPaid(order.id, deps)).rejects.toBeInstanceOf(
+      InvalidTransitionError,
+    );
+    expect(deps.publisher.published).toHaveLength(0);
+    expect((await deps.orderStore.get(order.id))?.status).toBe("cancelled");
   });
 
   it("fails when the order does not exist", async () => {

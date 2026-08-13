@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { InvalidTransitionError } from "../domain/invalid-transition.js";
 import type { Logger } from "../domain/logger.js";
 import type { MarkPaidResult } from "../domain/mark-paid.js";
 import { OrderNotFoundError } from "../domain/order-not-found.js";
@@ -48,6 +49,17 @@ export function registerOrderRoutes(
         return reply
           .code(404)
           .send({ error: "order not found", orderId: error.orderId });
+      }
+      if (error instanceof InvalidTransitionError) {
+        log.warn("order.invalid-transition", {
+          from: error.from,
+          to: error.to,
+        });
+        return reply.code(409).send({
+          error: "invalid transition",
+          from: error.from,
+          to: error.to,
+        });
       }
       log.error("order.pay-failed");
       throw error;

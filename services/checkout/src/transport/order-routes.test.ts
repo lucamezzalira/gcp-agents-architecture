@@ -52,6 +52,25 @@ describe("checkout HTTP", () => {
     expect(await app.bodyStore.get(bodyRef)).toContain("48 hours");
   });
 
+  it("returns 409 when paying an already-paid order", async () => {
+    await app.server.inject({
+      method: "POST",
+      url: "/orders",
+      payload: { id: "ord-1", email: "buyer@example.com" },
+    });
+    await app.server.inject({
+      method: "POST",
+      url: "/orders/ord-1/pay",
+    });
+
+    const second = await app.server.inject({
+      method: "POST",
+      url: "/orders/ord-1/pay",
+    });
+    expect(second.statusCode).toBe(409);
+    expect(app.publisher.published).toHaveLength(1);
+  });
+
   it("returns 404 when paying a missing order", async () => {
     const response = await app.server.inject({
       method: "POST",

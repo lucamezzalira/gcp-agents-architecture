@@ -1,17 +1,18 @@
 import type { BodyStore } from "./body-store.js";
 import type { InstructionPublisher } from "./instruction-publisher.js";
 import type { Logger } from "./logger.js";
+import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
+import type { Order } from "./order.js";
 import type { OrderStore } from "./order-store.js";
+import { applyTransition } from "./order-transition.js";
 import {
   confirmationBodyRef,
   renderConfirmation,
 } from "./render-confirmation.js";
 import type { SendInstruction } from "./send-instruction.js";
 
-export type MarkPaidResult =
-  | { status: "paid"; instruction: SendInstruction }
-  | { status: "already-paid" };
+export type MarkPaidResult = { status: "paid"; instruction: SendInstruction };
 
 export type MarkPaidDeps = {
   orderStore: OrderStore;
@@ -33,12 +34,18 @@ export async function markPaid(
     throw new OrderNotFoundError(orderId);
   }
 
-  if (order.status === "paid") {
-    log.info("mark-paid.already-paid");
-    return { status: "already-paid" };
+  let paid: Order;
+  try {
+    paid = applyTransition(order, "paid");
+  } catch (error: unknown) {
+    if (error instanceof InvalidTransitionError) {
+      log.warn("mark-paid.invalid-transition", {
+        from: error.from,
+        to: error.to,
+      });
+    }
+    throw error;
   }
-
-  const paid = { ...order, status: "paid" as const };
   await deps.orderStore.save(paid);
   log.info("mark-paid.paid");
 
