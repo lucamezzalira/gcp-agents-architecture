@@ -81,6 +81,44 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
   const sql = sqlClient(url);
 
   return {
+    async loadRuns(): Promise<LatestHealth[]> {
+      const runRows = await sql`
+        select run_id, commit_sha, commit_message, created_at, overall_score
+        from health_run
+        order by created_at asc
+      `;
+      const runs = z.array(runRowSchema).parse(runRows);
+      if (runs.length === 0) {
+        return [];
+      }
+      const charRows = await sql`
+        select run_id, characteristic, score, reasoning, recommendations, signals_used
+        from health_characteristic
+      `;
+      const grouped = new Map<string, LatestHealth["characteristics"]>();
+      for (const row of z
+        .array(characteristicRowSchema.extend({ run_id: z.string() }))
+        .parse(charRows)) {
+        const list = grouped.get(row.run_id) ?? [];
+        list.push({
+          id: row.characteristic,
+          score: row.score,
+          reasoning: row.reasoning ?? "",
+          recommendations: asStringArray(row.recommendations),
+          signalsUsed: asStringArray(row.signals_used),
+        });
+        grouped.set(row.run_id, list);
+      }
+      return runs.map((run) => ({
+        runId: run.run_id,
+        commitSha: run.commit_sha,
+        commitMessage: run.commit_message ?? "",
+        createdAt: asIso(run.created_at),
+        overall: run.overall_score,
+        characteristics: grouped.get(run.run_id) ?? [],
+      }));
+    },
+
     async loadLatest(): Promise<LatestHealth | undefined> {
       const runs = await sql`
         select run_id, commit_sha, commit_message, created_at, overall_score

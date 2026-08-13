@@ -14,7 +14,6 @@
     "collect": "pnpm --filter analysis collect",
     "score": "pnpm --filter @health/scoring score",
     "dashboard": "pnpm --filter @health/dashboard dev",
-    "mcp": "pnpm --filter @health/mcp-server start",
     "notification": "pnpm --filter @services/notification start",
     "checkout": "pnpm --filter @services/checkout start"
   },

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "architecture-health": {
+      "url": "https://health-mcp-k3ljxa4a4q-ew.a.run.app/mcp"
+    }
+  }
+}

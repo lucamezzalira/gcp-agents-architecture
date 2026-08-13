@@ -4,6 +4,7 @@ import {
   getHealth,
   getPriorDecisions,
   listCharacteristics,
+  listHealthRuns,
 } from "./tools.js";
 import type { LatestHealth } from "./types.js";
 
@@ -65,6 +66,48 @@ describe("get_health", () => {
     expect(result.scope).toBe("path");
     expect(result.characteristics.map((item) => item.id)).toEqual([
       "boundary-integrity",
+    ]);
+  });
+
+  it("loads a historical commit when commitSha is set", async () => {
+    const store = new InMemoryHealthStore();
+    const restored: LatestHealth = {
+      ...latest,
+      runId: "restored",
+      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      commitMessage: "Restore the notification boundary",
+      createdAt: "2026-08-13T13:00:00.000Z",
+      overall: 100,
+    };
+    store.runs = [latest, restored];
+    const result = await getHealth(store, { commitSha: "edfd7d79" });
+    expect(result).toMatchObject({ overall: 74, commitSha: latest.commitSha });
+  });
+});
+
+describe("list_health_runs", () => {
+  it("returns overall and characteristic scores oldest first", async () => {
+    const store = new InMemoryHealthStore();
+    store.runs = [
+      latest,
+      {
+        ...latest,
+        runId: "restored",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        commitMessage: "Restore the notification boundary",
+        createdAt: "2026-08-13T13:00:00.000Z",
+        overall: 100,
+        characteristics: latest.characteristics.map((item) => ({
+          ...item,
+          score: 100,
+        })),
+      },
+    ];
+    const result = await listHealthRuns(store);
+    expect(result.map((item) => item.overall)).toEqual([74, 100]);
+    expect(result[0]?.characteristics).toEqual([
+      { id: "boundary-integrity", score: 35 },
+      { id: "layering", score: 100 },
     ]);
   });
 });

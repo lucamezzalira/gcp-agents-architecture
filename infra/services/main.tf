@@ -13,6 +13,10 @@ provider "google" {
   region  = var.region
 }
 
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 variable "project_id" {
   type        = string
   description = "GCP project B: checkout and notification"

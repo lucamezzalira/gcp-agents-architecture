@@ -18,6 +18,12 @@ Read `docs/PRD.md` for what this is, `docs/BUILD-SPEC.md` for the tree, contract
 
 pnpm workspaces, Turborepo. TypeScript on Node 24 with Fastify for services. Zod at the HTTP and payload boundary. Python 3.12 with ADK for the agent. Astro for the dashboard. Vitest and pytest. One Firestore database per service. Postgres for health history only.
 
+## MCP (Cursor)
+
+Project config is `.cursor/mcp.json`. It points at the Cloud Run MCP (`https://health-mcp-k3ljxa4a4q-ew.a.run.app/mcp`), which reads Cloud SQL.
+
+Tools: `list_health_runs` (trend across commits), `get_health` (latest or a SHA, optional path), `get_prior_decisions`, `list_characteristics`. Scores come from Postgres. Do not invent them.
+
 ## Commands
 
 ```

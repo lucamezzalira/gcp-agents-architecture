@@ -206,7 +206,8 @@ The agent receives the computed scores and writes reasoning and recommendations 
 - Replay across N commits produces N rows in `health_run`.
 
 **MCP server**
-- `get_health` for a path returns the latest score, reasoning and recommendations.
+- `get_health` for a path returns the latest score, reasoning and recommendations. An optional `commitSha` loads that run instead.
+- `list_health_runs` returns overall and characteristic scores for every persisted run, oldest first.
 - `get_prior_decisions` returns only active decisions matching the path.
 
 **Dashboard**

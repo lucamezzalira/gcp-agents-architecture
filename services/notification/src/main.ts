@@ -7,7 +7,11 @@ await runtime.server.listen({ port, host: "0.0.0.0" });
 runtime.server.log.info(`notification listening on ${port}`);
 
 const subscription = process.env.SEND_INSTRUCTIONS_SUBSCRIPTION;
-if (subscription !== undefined && subscription.length > 0) {
+if (
+  process.env.SEND_INSTRUCTIONS_PULL === "1" &&
+  subscription !== undefined &&
+  subscription.length > 0
+) {
   listenForInstructions(subscription, runtime.handleInstruction);
   runtime.server.log.info(`subscribed to ${subscription}`);
 }

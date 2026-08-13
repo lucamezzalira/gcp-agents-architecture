@@ -9,6 +9,7 @@ How the AI context in this repository is organised, and why it is shaped this wa
 | `AGENTS.md` (root) | Layout, stack, commands, architecture rules, hard prohibitions. Read by Cursor and by any other agent that honours the open standard. |
 | `services/*/AGENTS.md`, `health/*/AGENTS.md` | Scoped context, loaded when working in that subtree. Nearest file wins. |
 | `.cursor/rules/*.mdc` | Cursor-specific rules with frontmatter-driven activation. |
+| `.cursor/mcp.json` | Project MCP: `architecture-health` over Streamable HTTP to Cloud Run. |
 | `docs/PRD.md` | What is being built. |
 | `docs/BUILD-SPEC.md` | Where things live, the contracts, the schema, the acceptance criteria, the build order. |
 | `docs/SCORING.md` | The published weights. |

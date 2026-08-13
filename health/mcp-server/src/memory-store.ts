@@ -6,10 +6,19 @@ import type {
 
 export class InMemoryHealthStore implements HealthStore {
   latest: LatestHealth | undefined;
+  runs: LatestHealth[] = [];
   decisions: AcceptedDecision[] = [];
 
   async loadLatest(): Promise<LatestHealth | undefined> {
-    return this.latest;
+    const runs = await this.loadRuns();
+    return runs.at(-1);
+  }
+
+  async loadRuns(): Promise<LatestHealth[]> {
+    if (this.runs.length > 0) {
+      return this.runs;
+    }
+    return this.latest === undefined ? [] : [this.latest];
   }
 
   async loadActiveDecisions(): Promise<AcceptedDecision[]> {

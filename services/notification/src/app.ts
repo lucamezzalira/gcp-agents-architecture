@@ -15,6 +15,7 @@ import {
   registerInstructionRoute,
   type InstructionHandler,
 } from "./transport/instruction-route.js";
+import { registerPubSubPushRoute } from "./transport/pubsub-push-route.js";
 import { registerSentRoute } from "./transport/sent-route.js";
 
 export type RecordedEmailProvider = EmailProvider & {
@@ -43,6 +44,7 @@ function buildApp(
   const server = Fastify();
   registerHealthRoute(server);
   registerInstructionRoute(server, handleInstruction);
+  registerPubSubPushRoute(server, handleInstruction);
   registerSentRoute(server, () => emailProvider.calls);
   return { server, handleInstruction };
 }

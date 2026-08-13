@@ -4,6 +4,7 @@ import {
   getHealth,
   getPriorDecisions,
   listCharacteristics,
+  listHealthRuns,
 } from "./tools.js";
 import type { HealthStore } from "./types.js";
 
@@ -21,16 +22,26 @@ export function createMcpServer(store: HealthStore): McpServer {
 
   server.tool(
     "get_health",
-    "Latest architecture health for a path or service: overall score, reasoning, recommendations.",
+    "Architecture health for a path or service: overall score, reasoning, recommendations. Defaults to the latest run.",
     {
       path: z
         .string()
         .optional()
         .describe(
-          "File or service path, e.g. services/checkout. Omit for the full latest run.",
+          "File or service path, e.g. services/checkout. Omit for the full run.",
         ),
+      commitSha: z
+        .string()
+        .optional()
+        .describe("Commit SHA to inspect. Omit for the latest run."),
     },
-    async ({ path }) => asText(await getHealth(store, path)),
+    async ({ path, commitSha }) => asText(await getHealth(store, { path, commitSha })),
+  );
+
+  server.tool(
+    "list_health_runs",
+    "Chronological health runs with overall and per-characteristic scores. Use this to see the architecture trend across commits.",
+    async () => asText(await listHealthRuns(store)),
   );
 
   server.tool(

@@ -2,6 +2,7 @@ import { pathMatchesGlob, signalTouchesPath } from "./path-match.js";
 import {
   CHARACTERISTICS,
   type CharacteristicRead,
+  type HealthRunSummary,
   type HealthStore,
   type LatestHealth,
 } from "./types.js";
@@ -16,24 +17,54 @@ export type HealthToolResult = {
   characteristics: CharacteristicRead[];
 };
 
+export type GetHealthOptions = {
+  path?: string;
+  commitSha?: string;
+};
+
 export async function getHealth(
   store: HealthStore,
-  path?: string,
+  pathOrOptions?: string | GetHealthOptions,
 ): Promise<HealthToolResult | { error: string }> {
-  const latest = await store.loadLatest();
-  if (latest === undefined) {
+  const options =
+    typeof pathOrOptions === "string" || pathOrOptions === undefined
+      ? { path: pathOrOptions }
+      : pathOrOptions;
+  const run = await loadRun(store, options.commitSha);
+  if (run === undefined) {
+    if (options.commitSha !== undefined && options.commitSha.length > 0) {
+      return { error: `no health run for commit ${options.commitSha}` };
+    }
     return { error: "no health runs in postgres" };
   }
+  const path = options.path;
   if (path === undefined || path.length === 0) {
-    return toResult(latest, undefined, "system", latest.characteristics);
+    return toResult(run, undefined, "system", run.characteristics);
   }
-  const matched = latest.characteristics.filter((item) =>
+  const matched = run.characteristics.filter((item) =>
     item.signalsUsed.some((signal) => signalTouchesPath(signal, path)),
   );
   if (matched.length === 0) {
-    return toResult(latest, path, "system", latest.characteristics);
+    return toResult(run, path, "system", run.characteristics);
   }
-  return toResult(latest, path, "path", matched);
+  return toResult(run, path, "path", matched);
+}
+
+export async function listHealthRuns(
+  store: HealthStore,
+): Promise<HealthRunSummary[]> {
+  const runs = await store.loadRuns();
+  return runs.map((run) => ({
+    runId: run.runId,
+    commitSha: run.commitSha,
+    commitMessage: run.commitMessage,
+    createdAt: run.createdAt,
+    overall: run.overall,
+    characteristics: run.characteristics.map((item) => ({
+      id: item.id,
+      score: item.score,
+    })),
+  }));
 }
 
 export async function getPriorDecisions(store: HealthStore, path: string) {
@@ -45,6 +76,19 @@ export async function getPriorDecisions(store: HealthStore, path: string) {
 
 export function listCharacteristics() {
   return CHARACTERISTICS.map((item) => ({ ...item }));
+}
+
+async function loadRun(
+  store: HealthStore,
+  commitSha?: string,
+): Promise<LatestHealth | undefined> {
+  if (commitSha === undefined || commitSha.length === 0) {
+    return store.loadLatest();
+  }
+  const runs = await store.loadRuns();
+  return runs.find(
+    (run) => run.commitSha.startsWith(commitSha) || run.runId.startsWith(commitSha),
+  );
 }
 
 function toResult(

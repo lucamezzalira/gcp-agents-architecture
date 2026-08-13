@@ -117,6 +117,26 @@ resource "google_pubsub_topic_iam_member" "checkout_publish" {
 resource "google_pubsub_subscription" "notification" {
   name  = "send-instructions-notification"
   topic = google_pubsub_topic.send_instructions.id
+  dynamic "push_config" {
+    for_each = var.notification_image == "" ? [] : [1]
+    content {
+      push_endpoint = "${google_cloud_run_v2_service.notification[0].uri}/pubsub"
+      oidc_token {
+        service_account_email = google_service_account.notification.email
+        audience              = google_cloud_run_v2_service.notification[0].uri
+      }
+    }
+  }
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+}
+
+resource "google_service_account_iam_member" "notification_pubsub_token" {
+  service_account_id = google_service_account.notification.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_pubsub_subscription_iam_member" "notification_subscribe" {

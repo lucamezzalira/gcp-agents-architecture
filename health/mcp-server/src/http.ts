@@ -8,10 +8,27 @@ export type HttpListenOptions = {
   createServer: () => McpServer;
 };
 
+function pathOf(req: IncomingMessage): string {
+  return (req.url ?? "/").split("?")[0] ?? "/";
+}
+
 function isHealth(req: IncomingMessage): boolean {
-  const url = req.url ?? "/";
-  const path = url.split("?")[0];
+  const path = pathOf(req);
   return req.method === "GET" && (path === "/" || path === "/health");
+}
+
+function isMcp(req: IncomingMessage): boolean {
+  return pathOf(req) === "/mcp";
+}
+
+function setCors(res: ServerResponse): void {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Accept, Mcp-Session-Id, Last-Event-ID, mcp-protocol-version",
+  );
+  res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id, mcp-protocol-version");
 }
 
 export function listenHttp(options: HttpListenOptions): Promise<Server> {
@@ -31,8 +48,17 @@ async function handle(
   res: ServerResponse,
   createServer: () => McpServer,
 ): Promise<void> {
+  setCors(res);
+  if (req.method === "OPTIONS" && isMcp(req)) {
+    res.writeHead(204).end();
+    return;
+  }
   if (isHealth(req)) {
     res.writeHead(200, { "content-type": "text/plain" }).end("ok");
+    return;
+  }
+  if (!isMcp(req)) {
+    res.writeHead(404, { "content-type": "text/plain" }).end("not found");
     return;
   }
   const mcp = createServer();

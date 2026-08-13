@@ -43,7 +43,7 @@ resource "google_cloud_run_v2_service" "notification" {
   name                = "notification"
   location            = var.region
   deletion_protection = false
-  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.notification.email
@@ -65,10 +65,6 @@ resource "google_cloud_run_v2_service" "notification" {
         value = google_storage_bucket.bodies.name
       }
       env {
-        name  = "SEND_INSTRUCTIONS_SUBSCRIPTION"
-        value = google_pubsub_subscription.notification.id
-      }
-      env {
         name  = "FIRESTORE_DATABASE"
         value = google_firestore_database.notification.name
       }
@@ -84,4 +80,12 @@ resource "google_cloud_run_v2_service_iam_member" "checkout_public" {
   location = var.region
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "notification_pubsub" {
+  count    = var.notification_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.notification[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.notification.email}"
 }

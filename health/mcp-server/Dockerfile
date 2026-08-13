@@ -11,7 +11,6 @@ COPY analysis/package.json analysis/package.json
 RUN pnpm install --frozen-lockfile
 COPY health/mcp-server ./health/mcp-server
 ENV PORT=8080
-ENV MCP_HTTP=1
 EXPOSE 8080
 WORKDIR /repo/health/mcp-server
 CMD ["pnpm", "exec", "tsx", "src/main.ts"]

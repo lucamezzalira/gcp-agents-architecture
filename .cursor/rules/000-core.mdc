@@ -14,3 +14,4 @@ Monorepo: two services under migration plus a health system measuring them. See 
 - No `any`. Use `unknown` and narrow. Parse unknown input with Zod.
 - Domain defines interfaces; infrastructure implements them.
 - Follow the build order in the spec. Cloud deployment is last.
+- Architecture health lives in Postgres. Call MCP `list_health_runs`, `get_health`, and `get_prior_decisions` instead of guessing scores.

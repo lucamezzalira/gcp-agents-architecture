@@ -26,8 +26,18 @@ export type AcceptedDecision = {
   active: boolean;
 };
 
+export type HealthRunSummary = {
+  runId: string;
+  commitSha: string;
+  commitMessage: string;
+  createdAt: string;
+  overall: number;
+  characteristics: Array<{ id: string; score: number }>;
+};
+
 export type HealthStore = {
   loadLatest(): Promise<LatestHealth | undefined>;
+  loadRuns(): Promise<LatestHealth[]>;
   loadActiveDecisions(): Promise<AcceptedDecision[]>;
 };
 
