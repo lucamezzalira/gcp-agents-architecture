@@ -10,6 +10,8 @@ import { FileBodyStore } from "./infrastructure/file-body-store.js";
 import { FirestoreDeliveryStore } from "./infrastructure/firestore-delivery-store.js";
 import { GcsBodyStore } from "./infrastructure/gcs-body-store.js";
 import { LoggingEmailProvider } from "./infrastructure/logging-email-provider.js";
+import { retryPolicyFromEnv } from "./infrastructure/retry-policy.js";
+import { RetryingEmailProvider } from "./infrastructure/retrying-email-provider.js";
 import { registerHealthRoute } from "./transport/health-route.js";
 import {
   registerInstructionRoute,
@@ -37,7 +39,8 @@ export type NotificationRuntime = {
 function buildApp(
   bodyStore: BodyStore,
   deliveryStore: DeliveryStore,
-  emailProvider: RecordedEmailProvider,
+  emailProvider: EmailProvider,
+  recorded: RecordedEmailProvider,
 ): { server: FastifyInstance; handleInstruction: InstructionHandler } {
   const handleInstruction: InstructionHandler = (instruction) =>
     deliver(instruction, { bodyStore, deliveryStore, emailProvider });
@@ -45,7 +48,7 @@ function buildApp(
   registerHealthRoute(server);
   registerInstructionRoute(server, handleInstruction);
   registerPubSubPushRoute(server, handleInstruction);
-  registerSentRoute(server, () => emailProvider.calls);
+  registerSentRoute(server, () => recorded.calls);
   return { server, handleInstruction };
 }
 
@@ -54,7 +57,8 @@ export function createApp(): NotificationApp {
   const deliveryStore = new InMemoryDeliveryStore();
   const emailProvider = new InMemoryEmailProvider();
   return {
-    server: buildApp(bodyStore, deliveryStore, emailProvider).server,
+    server: buildApp(bodyStore, deliveryStore, emailProvider, emailProvider)
+      .server,
     bodyStore,
     deliveryStore,
     emailProvider,
@@ -66,8 +70,11 @@ export function createLocalApp(): NotificationRuntime {
     process.env.BODY_STORE_DIR ?? ".local/bodies",
   );
   const deliveryStore = new InMemoryDeliveryStore();
-  const emailProvider = new InMemoryEmailProvider();
-  return buildApp(bodyStore, deliveryStore, emailProvider);
+  const recorded = new InMemoryEmailProvider();
+  const emailProvider = new RetryingEmailProvider(recorded, {
+    policy: retryPolicyFromEnv(),
+  });
+  return buildApp(bodyStore, deliveryStore, emailProvider, recorded);
 }
 
 export function createCloudApp(): NotificationRuntime {
@@ -75,8 +82,11 @@ export function createCloudApp(): NotificationRuntime {
   const deliveryStore = FirestoreDeliveryStore.connect(
     requireEnv("FIRESTORE_DATABASE"),
   );
-  const emailProvider = new LoggingEmailProvider();
-  return buildApp(bodyStore, deliveryStore, emailProvider);
+  const recorded = new LoggingEmailProvider();
+  const emailProvider = new RetryingEmailProvider(recorded, {
+    policy: retryPolicyFromEnv(),
+  });
+  return buildApp(bodyStore, deliveryStore, emailProvider, recorded);
 }
 
 export function createRuntimeApp(): NotificationRuntime {
