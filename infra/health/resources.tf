@@ -184,6 +184,12 @@ resource "google_project_iam_member" "agent_trace" {
   member  = "serviceAccount:${google_service_account.agent.email}"
 }
 
+resource "google_project_iam_member" "agent_vertex" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.agent.email}"
+}
+
 resource "google_pubsub_topic_iam_member" "ci_publish" {
   count  = var.services_ci_sa_email == "" ? 0 : 1
   topic  = google_pubsub_topic.analysis.name

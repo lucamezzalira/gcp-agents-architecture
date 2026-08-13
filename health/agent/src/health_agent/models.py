@@ -85,6 +85,8 @@ class HealthRead(BaseModel):
     commitSha: str
     overall: int
     characteristics: list[CharacteristicRead]
+    reasoner: str
+    traceId: str | None = None
 
 
 class Narrative(BaseModel):

@@ -13,6 +13,8 @@ const runRowSchema = z.object({
   commit_message: z.string().nullable(),
   created_at: z.union([z.string(), z.date()]),
   overall_score: z.coerce.number(),
+  reasoner: z.string().nullable().optional(),
+  trace_id: z.string().nullable().optional(),
 });
 
 const characteristicRowSchema = z.object({
@@ -98,7 +100,8 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
   return {
     async loadRuns(): Promise<HealthRun[]> {
       const runRows = await sql`
-        select run_id, commit_sha, commit_message, created_at, overall_score
+        select run_id, commit_sha, commit_message, created_at, overall_score,
+               reasoner, trace_id
         from health_run
         order by created_at asc
       `;
@@ -128,6 +131,8 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
         commitMessage: run.commit_message ?? "",
         createdAt: asIso(run.created_at),
         overall: run.overall_score,
+        reasoner: run.reasoner ?? undefined,
+        traceId: run.trace_id ?? undefined,
         characteristics: sortCharacteristics(grouped.get(run.run_id) ?? []),
       }));
     },

@@ -4,19 +4,47 @@ import argparse
 import json
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from health_agent.assemble import assemble, assert_scores_unchanged
+from health_agent.memory import MemoryBank, observation_from_read
 from health_agent.models import AnalysisPayload, HealthRead
 from health_agent.reasoner import Reasoner, StubReasoner
 from health_agent.score_bridge import repo_root, score_payload
+from health_agent.tracing import current_trace_id, tracer
+from health_agent.vertex_memory import choose_memory_bank
+
+if TYPE_CHECKING:
+    pass
+
+
+def _import_adk_reasoner() -> type[Reasoner]:
+    from health_agent.adk_reasoner import AdkReasoner
+
+    return AdkReasoner
+
+
+def reasoner_name(reasoner: Reasoner) -> str:
+    return type(reasoner).__name__.removesuffix("Reasoner").lower()
 
 
 def choose_reasoner() -> Reasoner:
-    if os.environ.get("HEALTH_REASONER", "stub") == "adk":
-        from health_agent.adk_reasoner import AdkReasoner
-
-        return AdkReasoner()
-    return StubReasoner()
+    name = os.environ.get("HEALTH_REASONER", "").strip()
+    if name == "stub":
+        if os.environ.get("K_SERVICE"):
+            raise RuntimeError("HEALTH_REASONER=stub is not allowed on Cloud Run")
+        return StubReasoner()
+    if name == "adk":
+        try:
+            cls = _import_adk_reasoner()
+        except ImportError as exc:
+            raise RuntimeError(
+                "HEALTH_REASONER=adk but google-adk is not importable"
+            ) from exc
+        return cls()
+    raise RuntimeError(
+        f"HEALTH_REASONER must be 'adk' or 'stub', got {name!r}"
+    )
 
 
 def load_file_priors() -> list[HealthRead]:
@@ -27,7 +55,10 @@ def load_file_priors() -> list[HealthRead]:
         if not directory.is_dir():
             continue
         for path in sorted(directory.glob("*.json")):
-            read = HealthRead.model_validate_json(path.read_text())
+            raw = json.loads(path.read_text())
+            if "reasoner" not in raw:
+                raw["reasoner"] = "stub"
+            read = HealthRead.model_validate(raw)
             if read.commitSha in seen:
                 continue
             seen.add(read.commitSha)
@@ -40,14 +71,54 @@ def produce_health_read(
     decisions_path: Path | None = None,
     reasoner: Reasoner | None = None,
     prior_reads: list[HealthRead] | None = None,
+    memory: MemoryBank | None = None,
 ) -> HealthRead:
     payload = AnalysisPayload.model_validate_json(payload_path.read_text())
-    scores = score_payload(payload_path, decisions_path)
+    selected = reasoner or choose_reasoner()
+    name = reasoner_name(selected)
+    bank = memory if memory is not None else choose_memory_bank()
     priors = prior_reads if prior_reads is not None else load_file_priors()
-    narratives = (reasoner or choose_reasoner()).reason(payload, scores, priors)
-    read = assemble(payload.runId, payload.commitSha, scores, narratives)
-    assert_scores_unchanged(scores, read)
-    return read
+    query = (
+        f"{payload.commitMessage}. "
+        f"paths: services/checkout services/notification"
+    )
+    with tracer().start_as_current_span("health_run") as root:
+        root.set_attribute("run.id", payload.runId)
+        root.set_attribute("commit.sha", payload.commitSha)
+        root.set_attribute("reasoner", name)
+        with tracer().start_as_current_span("scoring"):
+            scores = score_payload(payload_path, decisions_path)
+        with tracer().start_as_current_span("memory_retrieve"):
+            snippets = bank.retrieve(query)
+        print(
+            f"reasoner={name} memory_snippets={len(snippets)} run={payload.runId}",
+            flush=True,
+        )
+        with tracer().start_as_current_span("reasoning"):
+            narratives = selected.reason(
+                payload,
+                scores,
+                priors,
+                memory_snippets=snippets,
+            )
+        read = assemble(
+            payload.runId,
+            payload.commitSha,
+            scores,
+            narratives,
+            reasoner=name,
+            trace_id=current_trace_id(),
+        )
+        assert_scores_unchanged(scores, read)
+        layering = next(
+            item.reasoning for item in read.characteristics if item.id == "layering"
+        )
+        with tracer().start_as_current_span("memory_write"):
+            bank.write(
+                observation_from_read(read.commitSha, read.overall, layering),
+                {"runId": read.runId, "commitSha": read.commitSha},
+            )
+        return read
 
 
 def main() -> None:

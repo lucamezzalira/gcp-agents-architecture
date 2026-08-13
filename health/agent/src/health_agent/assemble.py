@@ -11,6 +11,8 @@ def assemble(
     commit_sha: str,
     scores: ScoreResult,
     narratives: list[Narrative],
+    reasoner: str,
+    trace_id: str | None = None,
 ) -> HealthRead:
     by_id = {item.id: item for item in narratives}
     characteristics: list[CharacteristicRead] = []
@@ -37,6 +39,8 @@ def assemble(
         commitSha=commit_sha,
         overall=scores.overall,
         characteristics=characteristics,
+        reasoner=reasoner,
+        traceId=trace_id,
     )
 
 

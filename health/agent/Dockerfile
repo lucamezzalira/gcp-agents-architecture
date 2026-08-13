@@ -11,10 +11,10 @@ COPY health/scoring ./health/scoring
 COPY health/agent ./health/agent
 RUN pnpm install --frozen-lockfile --filter @health/scoring...
 WORKDIR /repo/health/agent
-# Stub reasoner only. Skip google-adk so the demo does not pull Gemini.
-RUN python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e .
+RUN python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e ".[adk]"
 ENV PORT=8080
-ENV HEALTH_REASONER=stub
+ENV HEALTH_REASONER=adk
+ENV GOOGLE_GENAI_USE_VERTEXAI=true
 EXPOSE 8080
 WORKDIR /repo
 CMD ["health/agent/.venv/bin/python", "-m", "health_agent.push_server"]

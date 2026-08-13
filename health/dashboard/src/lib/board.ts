@@ -80,6 +80,10 @@ export function paintCopy(run: HealthRun): void {
   if (message) message.textContent = run.commitMessage;
   const runId = document.querySelector("[data-run-id]");
   if (runId) runId.textContent = run.runId;
+  const reasoner = document.querySelector("[data-reasoner]");
+  if (reasoner) reasoner.textContent = run.reasoner ?? "unknown";
+  const traceId = document.querySelector("[data-trace-id]");
+  if (traceId) traceId.textContent = run.traceId ?? "none";
 
   const cards = document.querySelector("[data-cards]");
   if (cards instanceof HTMLElement) {

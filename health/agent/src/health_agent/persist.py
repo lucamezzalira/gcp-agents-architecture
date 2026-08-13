@@ -7,6 +7,7 @@ import psycopg
 
 from health_agent.models import CharacteristicRead, HealthRead
 from health_agent.score_bridge import repo_root
+from health_agent.tracing import tracer
 
 
 def database_url() -> str:
@@ -21,8 +22,12 @@ def connect() -> psycopg.Connection:
 
 
 def migrate(conn: psycopg.Connection) -> None:
-    sql = (repo_root() / "health" / "agent" / "migrations" / "001_init.sql").read_text()
-    conn.execute(sql)
+    folder = repo_root() / "health" / "agent" / "migrations"
+    for path in sorted(folder.glob("*.sql")):
+        for statement in path.read_text().split(";"):
+            sql = statement.strip()
+            if sql:
+                conn.execute(sql)
     conn.commit()
 
 
@@ -31,38 +36,50 @@ def insert_health_read(
     read: HealthRead,
     commit_message: str,
 ) -> None:
-    conn.execute(
-        """
-        insert into health_run (run_id, commit_sha, commit_message, overall_score)
-        values (%s, %s, %s, %s)
-        on conflict (run_id) do update set
-          commit_sha = excluded.commit_sha,
-          commit_message = excluded.commit_message,
-          overall_score = excluded.overall_score
-        """,
-        (read.runId, read.commitSha, commit_message, read.overall),
-    )
-    conn.execute(
-        "delete from health_characteristic where run_id = %s",
-        (read.runId,),
-    )
-    for item in read.characteristics:
+    with tracer().start_as_current_span("persistence"):
         conn.execute(
             """
-            insert into health_characteristic (
-              run_id, characteristic, score, reasoning, recommendations, signals_used
-            ) values (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
+            insert into health_run (
+              run_id, commit_sha, commit_message, overall_score, reasoner, trace_id
+            )
+            values (%s, %s, %s, %s, %s, %s)
+            on conflict (run_id) do update set
+              commit_sha = excluded.commit_sha,
+              commit_message = excluded.commit_message,
+              overall_score = excluded.overall_score,
+              reasoner = excluded.reasoner,
+              trace_id = excluded.trace_id
             """,
             (
                 read.runId,
-                item.id,
-                item.score,
-                item.reasoning,
-                json.dumps(item.recommendations),
-                json.dumps(item.signalsUsed),
+                read.commitSha,
+                commit_message,
+                read.overall,
+                read.reasoner,
+                read.traceId,
             ),
         )
-    conn.commit()
+        conn.execute(
+            "delete from health_characteristic where run_id = %s",
+            (read.runId,),
+        )
+        for item in read.characteristics:
+            conn.execute(
+                """
+                insert into health_characteristic (
+                  run_id, characteristic, score, reasoning, recommendations, signals_used
+                ) values (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
+                """,
+                (
+                    read.runId,
+                    item.id,
+                    item.score,
+                    item.reasoning,
+                    json.dumps(item.recommendations),
+                    json.dumps(item.signalsUsed),
+                ),
+            )
+        conn.commit()
 
 
 def record_decision(
@@ -125,7 +142,7 @@ def count_runs(conn: psycopg.Connection) -> int:
 def load_recent_reads(conn: psycopg.Connection, limit: int = 8) -> list[HealthRead]:
     runs = conn.execute(
         """
-        select run_id, commit_sha, overall_score
+        select run_id, commit_sha, overall_score, reasoner, trace_id
         from health_run
         order by created_at asc
         limit %s
@@ -133,7 +150,7 @@ def load_recent_reads(conn: psycopg.Connection, limit: int = 8) -> list[HealthRe
         (limit,),
     ).fetchall()
     reads: list[HealthRead] = []
-    for run_id, commit_sha, overall in runs:
+    for run_id, commit_sha, overall, reasoner, trace_id in runs:
         rows = conn.execute(
             """
             select characteristic, score, reasoning, recommendations, signals_used
@@ -163,6 +180,8 @@ def load_recent_reads(conn: psycopg.Connection, limit: int = 8) -> list[HealthRe
                     commitSha=str(commit_sha),
                     overall=int(overall),
                     characteristics=characteristics,
+                    reasoner=str(reasoner or "stub"),
+                    traceId=str(trace_id) if trace_id else None,
                 )
             )
     return reads

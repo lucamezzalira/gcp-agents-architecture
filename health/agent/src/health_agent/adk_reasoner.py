@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 
@@ -20,6 +21,7 @@ class AdkReasoner(Reasoner):
         payload: AnalysisPayload,
         scores: ScoreResult,
         prior_reads: list | None = None,
+        memory_snippets: list[str] | None = None,
     ) -> list[Narrative]:
         facts = {
             "overall": scores.overall,
@@ -52,6 +54,7 @@ class AdkReasoner(Reasoner):
                 "dependencies": payload.dependencyCruiser.metrics.dependencies,
             },
             "priorOverall": [item.overall for item in (prior_reads or [])][-6:],
+            "memoryBank": memory_snippets or [],
             "runtimeIllustrative": payload.runtime.illustrative,
         }
         prompt = (
@@ -59,7 +62,8 @@ class AdkReasoner(Reasoner):
             "These scores are facts. Copy each id. Do not change a score.\n"
             "Return JSON: {\"narratives\": [{\"id\": \"\", \"reasoning\": \"\", \"recommendations\": []}]}\n"
             "Empty recommendations when score is 100. Reasoning may still "
-            "describe drift when rules pass.\n\n"
+            "describe drift when rules pass. If memoryBank is non-empty, "
+            "acknowledge those prior observations in the prose.\n\n"
             f"{json.dumps(facts)}"
         )
         session_service = InMemorySessionService()
@@ -68,9 +72,11 @@ class AdkReasoner(Reasoner):
             app_name="architecture_health",
             session_service=session_service,
         )
-        session = session_service.create_session(
-            app_name="architecture_health",
-            user_id="local",
+        session = asyncio.run(
+            session_service.create_session(
+                app_name="architecture_health",
+                user_id="local",
+            )
         )
         text = ""
         for event in runner.run(

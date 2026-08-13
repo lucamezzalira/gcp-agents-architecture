@@ -23,7 +23,7 @@ export function selectRun(
     return undefined;
   }
   if (sha !== undefined && sha.length > 0) {
-    const match = runs.find(
+    const match = [...runs].reverse().find(
       (run) => run.commitSha === sha || run.commitSha.startsWith(sha) || run.runId === sha,
     );
     if (match !== undefined) {

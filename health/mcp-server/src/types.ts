@@ -12,6 +12,8 @@ export type LatestHealth = {
   commitMessage: string;
   createdAt: string;
   overall: number;
+  reasoner?: string;
+  traceId?: string;
   characteristics: CharacteristicRead[];
 };
 
@@ -32,6 +34,8 @@ export type HealthRunSummary = {
   commitMessage: string;
   createdAt: string;
   overall: number;
+  reasoner?: string;
+  traceId?: string;
   characteristics: Array<{ id: string; score: number }>;
 };
 

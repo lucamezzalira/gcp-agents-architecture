@@ -100,6 +100,14 @@ const payload = JSON.stringify(model.runs);
                 <span>Run</span>
                 <p class="sha" data-run-id>{selected.runId}</p>
               </div>
+              <div>
+                <span>Reasoner</span>
+                <p data-reasoner>{selected.reasoner ?? "unknown"}</p>
+              </div>
+              <div>
+                <span>Trace</span>
+                <p class="sha" data-trace-id>{selected.traceId ?? "none"}</p>
+              </div>
             </div>
           </div>
         </section>
@@ -113,6 +121,9 @@ const payload = JSON.stringify(model.runs);
           <p>No history yet.</p>
         ) : (
           <>
+            <p class="signals">
+              Each run names its reasoner. Memory Bank holds prior observations, not accepted decisions. After platform wiring, re-reasoned history is a replay, not the original stub record.
+            </p>
             <svg class="chart" viewBox={`0 0 ${chartW} ${chartH}`} role="img">
               <title>Overall score across replayed commits. Click a point to inspect that run.</title>
               <defs>

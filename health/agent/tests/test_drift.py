@@ -60,6 +60,7 @@ def _prior() -> HealthRead:
             "runId": "p",
             "commitSha": "d" * 40,
             "overall": 100,
+            "reasoner": "stub",
             "characteristics": [
                 {
                     "id": "layering",

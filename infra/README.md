@@ -7,7 +7,7 @@ Two roots:
 
 Cloud Run services are skipped while `*_image` variables are empty. Apply the data plane first, build images, then set the image variables and apply again.
 
-Budget for this demo: stay inside the free-trial credits (about £226). The meter is Cloud SQL `db-f1-micro` plus its public IPv4, roughly £12–18 per month if left running. Firestore, GCS, Pub/Sub, and scale-to-zero Cloud Run are small next to that. Leave `HEALTH_REASONER=stub` so Gemini does not start a token bill. Destroy the stacks when the demo is done.
+Budget for this demo: stay inside the free-trial credits (about £226). The meter is Cloud SQL `db-f1-micro` plus its public IPv4, roughly £12–18 per month if left running. Firestore, GCS, Pub/Sub, and scale-to-zero Cloud Run are small next to that. The agent runs `HEALTH_REASONER=adk` against Vertex. That costs tokens. Destroy the stacks when the demo is done.
 
 Set a budget alert in the billing console at £40 and £80 before apply.
 

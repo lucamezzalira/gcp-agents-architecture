@@ -54,6 +54,17 @@ variable "agent_image" {
   default = ""
 }
 
+variable "agent_engine_id" {
+  type        = string
+  default     = ""
+  description = "Vertex AI Agent Engine id used as Memory Bank. Required for the agent."
+}
+
+variable "memory_bank_location" {
+  type    = string
+  default = "us-central1"
+}
+
 variable "services_ci_sa_email" {
   type        = string
   default     = ""

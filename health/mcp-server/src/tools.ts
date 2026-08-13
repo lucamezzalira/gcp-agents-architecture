@@ -14,6 +14,8 @@ export type HealthToolResult = {
   commitSha: string;
   commitMessage: string;
   overall: number;
+  reasoner?: string;
+  traceId?: string;
   characteristics: CharacteristicRead[];
 };
 
@@ -60,6 +62,8 @@ export async function listHealthRuns(
     commitMessage: run.commitMessage,
     createdAt: run.createdAt,
     overall: run.overall,
+    reasoner: run.reasoner,
+    traceId: run.traceId,
     characteristics: run.characteristics.map((item) => ({
       id: item.id,
       score: item.score,
@@ -86,9 +90,10 @@ async function loadRun(
     return store.loadLatest();
   }
   const runs = await store.loadRuns();
-  return runs.find(
+  const matches = runs.filter(
     (run) => run.commitSha.startsWith(commitSha) || run.runId.startsWith(commitSha),
   );
+  return matches.at(-1);
 }
 
 function toResult(
@@ -104,6 +109,8 @@ function toResult(
     commitSha: latest.commitSha,
     commitMessage: latest.commitMessage,
     overall: latest.overall,
+    reasoner: latest.reasoner,
+    traceId: latest.traceId,
     characteristics,
   };
 }

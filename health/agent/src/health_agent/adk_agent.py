@@ -19,6 +19,8 @@ holding and the contract is under pressure.
 
 Duplication between checkout and notification email rendering is deliberate.
 Runtime signals are illustrative.
+If the facts include memoryBank entries, those are prior observations
+from Memory Bank, not accepted decisions. Use them. Do not ignore them.
 
 Recommendations must be something a developer would do next, not a
 restatement of a rule. Empty recommendations when a characteristic

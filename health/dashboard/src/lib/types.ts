@@ -12,6 +12,8 @@ export type HealthRun = {
   commitMessage: string;
   createdAt: string;
   overall: number;
+  reasoner?: string;
+  traceId?: string;
   characteristics: CharacteristicRead[];
 };
 

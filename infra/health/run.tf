@@ -142,13 +142,33 @@ resource "google_cloud_run_v2_service" "agent" {
       resources {
         limits = {
           cpu    = "1"
-          memory = "512Mi"
+          memory = "1Gi"
         }
         cpu_idle = true
       }
       env {
         name  = "HEALTH_REASONER"
-        value = "stub"
+        value = "adk"
+      }
+      env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
+      }
+      env {
+        name  = "GOOGLE_CLOUD_LOCATION"
+        value = var.memory_bank_location
+      }
+      env {
+        name  = "GOOGLE_GENAI_USE_VERTEXAI"
+        value = "true"
+      }
+      env {
+        name  = "MEMORY_BANK_LOCATION"
+        value = var.memory_bank_location
+      }
+      env {
+        name  = "AGENT_ENGINE_ID"
+        value = var.agent_engine_id
       }
       env {
         name = "DATABASE_URL"
@@ -194,6 +214,7 @@ resource "google_pubsub_subscription" "analysis_push" {
       audience              = google_cloud_run_v2_service.agent[0].uri
     }
   }
+  ack_deadline_seconds = 120
   retry_policy {
     minimum_backoff = "10s"
     maximum_backoff = "600s"

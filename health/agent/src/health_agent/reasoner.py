@@ -14,6 +14,7 @@ class Reasoner:
         payload: AnalysisPayload,
         scores: ScoreResult,
         prior_reads: list[HealthRead] | None = None,
+        memory_snippets: list[str] | None = None,
     ) -> list[Narrative]:
         raise NotImplementedError
 
@@ -107,6 +108,7 @@ class StubReasoner(Reasoner):
         payload: AnalysisPayload,
         scores: ScoreResult,
         prior_reads: list[HealthRead] | None = None,
+        memory_snippets: list[str] | None = None,
     ) -> list[Narrative]:
         priors = prior_reads or []
         narratives: list[Narrative] = []
@@ -146,4 +148,12 @@ class StubReasoner(Reasoner):
                     ],
                 )
             )
+        if memory_snippets:
+            note = " Prior memory: " + " | ".join(memory_snippets)
+            narratives = [
+                item.model_copy(update={"reasoning": item.reasoning + note})
+                if item.id == "layering"
+                else item
+                for item in narratives
+            ]
         return narratives
