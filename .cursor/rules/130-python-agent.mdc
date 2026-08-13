@@ -1,0 +1,16 @@
+---
+description: Health agent conventions
+globs: ["health/agent/**/*.py"]
+alwaysApply: false
+---
+
+# Health agent
+
+Python 3.12, Google ADK. Consumes an `AnalysisPayload`, produces a `HealthRead`.
+
+- The agent NEVER computes or modifies scores. Numbers come from `health/scoring`. The agent writes reasoning and recommendations around them.
+- The agent NEVER runs analysis tools. It consumes CI output.
+- Deterministic findings are authoritative. A failed architecture test is a fact.
+- Runtime signals arrive with `illustrative: true`. Say so in the reasoning.
+- Distinguish a genuine violation from an accepted trade-off. Duplication between services is deliberate.
+- Type hints everywhere. pytest. Do not swallow errors; every run must be traceable.

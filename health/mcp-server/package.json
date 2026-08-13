@@ -1,0 +1,5 @@
+{
+  "name": "@health/mcp-server",
+  "private": true,
+  "type": "module"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "@health/dashboard",
+  "private": true,
+  "type": "module"
+}

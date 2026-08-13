@@ -1,0 +1,10 @@
+{
+  "id": "decision-rule-3-checkout-provider",
+  "ruleId": "rule-3",
+  "pathGlob": "services/checkout/**",
+  "decision": "accept",
+  "rationale": "temporary bypass while notification is unavailable",
+  "decidedBy": "test",
+  "decidedAt": "2026-01-02T00:00:00.000Z",
+  "active": true
+}

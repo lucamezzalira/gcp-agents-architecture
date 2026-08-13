@@ -1,0 +1,17 @@
+---
+description: Layering rules inside services
+globs: ["services/**/*.ts"]
+alwaysApply: false
+---
+
+# Service layering
+
+Three layers, dependencies pointing inward.
+
+- `transport/` — Pub/Sub subscribers and HTTP. Validates input shape, hands off. Makes NO decisions. Must not import provider or storage clients directly.
+- `domain/` — every decision lives here, plus the ports infrastructure implements. No cloud SDK imports.
+- `infrastructure/` — Firestore, Cloud Storage, provider and publisher adapters. Performs actions, decides nothing.
+
+Enforced by ts-arch. If a change requires crossing these lines, the change is wrong, not the rule.
+
+Cross-service: no service reads another's data store, and no service imports another's internal modules. Services communicate by publishing messages.

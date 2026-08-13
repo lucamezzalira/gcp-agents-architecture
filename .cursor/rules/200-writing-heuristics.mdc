@@ -1,0 +1,28 @@
+---
+description: Heuristics for making architectural judgments in this codebase, when deciding where code belongs or whether a finding is a real problem
+alwaysApply: false
+---
+
+# Architectural heuristics
+
+Applied when a decision is not settled by a rule.
+
+## Where does this code belong
+
+Ask what it decides. If it decides nothing and only moves data, it is infrastructure. If it decides whether or what, it is domain. If it only validates shape and hands off, it is transport.
+
+"It is more convenient here" is not an argument. Convenience is how drift starts.
+
+## Is this finding a problem
+
+Not every finding is a defect. Duplication between services is the accepted price of autonomy here. A finding is a problem when it moves the system away from its intended architecture, not merely when a tool reports it.
+
+If a deviation is genuinely acceptable, record it as an accepted decision with a rationale rather than silencing the check.
+
+## Adding a signal
+
+A new signal earns its place if it can be computed deterministically and it says something the existing signals cannot. Otherwise it is noise with a weight attached.
+
+## When speed pressures the design
+
+The provider-bypass shortcut exists precisely because it is fast, works, and passes review. Speed is not design. If a change would be faster by crossing a boundary, that is the moment the boundary matters most.

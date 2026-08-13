@@ -1,0 +1,15 @@
+node_modules
+dist
+.turbo
+coverage
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.venv
+venv
+__pycache__
+.pytest_cache
+.DS_Store
+analysis/.tmp-jscpd
+analysis/payload.json

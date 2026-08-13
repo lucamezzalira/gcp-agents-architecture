@@ -1,0 +1,15 @@
+---
+description: Determinism rules for the scoring model
+globs: ["health/scoring/**/*.ts"]
+alwaysApply: false
+---
+
+# Scoring determinism
+
+Pure functions only. No I/O, no network, no clock, no randomness, no model calls.
+
+- The same input MUST produce byte-identical output.
+- Each characteristic starts at 100; findings apply penalties stated in `docs/SCORING.md`.
+- Implementation and `docs/SCORING.md` must agree. Change both in the same commit.
+- An active accepted decision suppresses its penalty and is recorded in `suppressedBy`. Suppression is always visible, never silent.
+- Every scoring change needs a fixture in `fixtures/` demonstrating it.

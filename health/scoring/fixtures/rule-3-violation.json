@@ -1,0 +1,35 @@
+{
+  "runId": "run-rule-3",
+  "commitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "commitMessage": "checkout calls the provider directly",
+  "timestamp": "2026-01-02T00:00:00.000Z",
+  "archTests": [
+    {
+      "ruleId": "rule-3",
+      "passed": false,
+      "violations": [
+        {
+          "file": "services/checkout/src/infrastructure/email-provider.ts",
+          "detail": "email provider imported outside services/notification"
+        }
+      ]
+    }
+  ],
+  "dependencyCruiser": {
+    "cycles": [],
+    "orphans": [],
+    "violations": [],
+    "metrics": {
+      "modules": 12,
+      "dependencies": 18
+    }
+  },
+  "duplication": {
+    "clones": [],
+    "percentage": 0
+  },
+  "runtime": {
+    "illustrative": true,
+    "signals": []
+  }
+}

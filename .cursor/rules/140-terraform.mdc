@@ -1,0 +1,14 @@
+---
+description: Infrastructure conventions
+globs: ["infra/**/*.tf"]
+alwaysApply: false
+---
+
+# Terraform
+
+Two GCP projects: `infra/health` and `infra/services`. One region, used consistently.
+
+- Everything deployed is defined here. No console clicks, no gcloud scripts that mutate state.
+- Cross-project IAM is limited to CI publishing to the health project's signal topic. Nothing broader.
+- Name resources by purpose, not by product.
+- Deployment is the LAST step of the build. Do not start here.

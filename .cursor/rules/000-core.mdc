@@ -1,0 +1,16 @@
+---
+description: Core project constraints
+alwaysApply: true
+---
+
+# Core constraints
+
+Monorepo: two services under migration plus a health system measuring them. See `docs/BUILD-SPEC.md` for the tree, contracts and acceptance criteria.
+
+- Layer directories `transport/`, `domain/`, `infrastructure/` are load-bearing. Architecture tests are written against them. NEVER rename or restructure.
+- NEVER import the email provider outside `services/notification`.
+- NEVER create a shared rendering package. Duplication between services is deliberate.
+- NEVER let the health agent compute or modify a score. Scores are deterministic.
+- No `any`. Use `unknown` and narrow. Parse unknown input with Zod.
+- Domain defines interfaces; infrastructure implements them.
+- Follow the build order in the spec. Cloud deployment is last.

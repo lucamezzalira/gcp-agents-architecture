@@ -1,0 +1,6 @@
+packages:
+  - "services/*"
+  - "health/scoring"
+  - "health/mcp-server"
+  - "health/dashboard"
+  - "analysis"

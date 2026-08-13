@@ -1,0 +1,22 @@
+{
+  "name": "analysis",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "arch": "vitest run arch-tests/rules.test.ts",
+    "collect": "tsx collect-payload.ts"
+  },
+  "dependencies": {
+    "@health/scoring": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "dependency-cruiser": "^18.2.0",
+    "jscpd": "^5.0.15",
+    "tsarch": "^5.4.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

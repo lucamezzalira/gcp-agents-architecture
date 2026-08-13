@@ -1,0 +1,7 @@
+{
+  "path": ["services"],
+  "ignore": ["**/*.test.ts", "**/node_modules/**", "**/dist/**"],
+  "minLines": 5,
+  "minTokens": 50,
+  "reporters": ["console"]
+}

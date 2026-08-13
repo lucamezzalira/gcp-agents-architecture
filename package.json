@@ -1,0 +1,21 @@
+{
+  "name": "google-agents",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.25.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "turbo test",
+    "arch": "pnpm --filter analysis arch",
+    "depcruise": "pnpm --filter analysis exec depcruise --config .dependency-cruiser.js --output-type err ../services",
+    "jscpd": "pnpm --filter analysis exec jscpd --config .jscpd.json ../services",
+    "collect": "pnpm --filter analysis collect",
+    "score": "pnpm --filter @health/scoring score"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  }
+}

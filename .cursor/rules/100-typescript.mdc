@@ -1,0 +1,16 @@
+---
+description: TypeScript conventions for services and packages
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: false
+---
+
+# TypeScript conventions
+
+- Node 24, ESM, strict mode. No `any`; prefer `unknown` plus a narrow.
+- Parse unknown input with Zod at the boundary. Infer types from the schema. Do not hand-roll `typeof` object checks.
+- Explicit return types on exported functions.
+- No default exports except Next.js pages.
+- Tests colocate as `*.test.ts` beside the unit under test. Vitest.
+- NEVER add a barrel file that re-exports across a layer boundary; it defeats the architecture tests.
+- Do not add a dependency without checking the workspace for it first.
+- Errors: fail loudly with typed errors. Do not swallow.

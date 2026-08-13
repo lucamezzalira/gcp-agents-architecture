@@ -1,0 +1,30 @@
+{
+  "runId": "run-zero",
+  "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "commitMessage": "empty baseline",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "archTests": [],
+  "dependencyCruiser": {
+    "cycles": [],
+    "orphans": [],
+    "violations": [],
+    "metrics": {
+      "modules": 0,
+      "dependencies": 0
+    }
+  },
+  "duplication": {
+    "clones": [],
+    "percentage": 0
+  },
+  "runtime": {
+    "illustrative": true,
+    "signals": [
+      {
+        "name": "p95-latency",
+        "value": 120,
+        "unit": "ms"
+      }
+    ]
+  }
+}
