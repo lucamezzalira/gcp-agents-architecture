@@ -1,0 +1,24 @@
+[project]
+name = "health-agent"
+version = "0.1.0"
+description = "Local health agent: reasons about scores, never changes them"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.11",
+  "psycopg[binary]>=3.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3"]
+adk = ["google-adk"]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

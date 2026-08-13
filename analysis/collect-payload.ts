@@ -6,7 +6,10 @@ import { analysisPayloadSchema } from "@health/scoring/schemas";
 import { checkArchitecture } from "./arch-tests/check.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(here, "..");
+const defaultRoot = join(here, "..");
+const args = process.argv.slice(2).filter((item) => item !== "--");
+const outPath = args[0] ?? join(defaultRoot, "analysis", "payload.json");
+const repoRoot = args[1] ?? defaultRoot;
 
 function git(command: string[]): string {
   try {
@@ -81,7 +84,7 @@ function runJscpd(): JscpdJson {
       outDir,
       join(repoRoot, "services"),
     ],
-    { cwd: repoRoot, encoding: "utf8" },
+    { cwd: here, encoding: "utf8" },
   );
   try {
     return JSON.parse(
@@ -168,7 +171,6 @@ async function main(): Promise<void> {
     },
   });
 
-  const outPath = process.argv[2] ?? join(repoRoot, "analysis", "payload.json");
   writeFileSync(outPath, JSON.stringify(payload, null, 2) + "\n");
   process.stdout.write(outPath + "\n");
 }
