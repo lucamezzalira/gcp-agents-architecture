@@ -53,10 +53,8 @@ type JscpdJson = {
 
 function runDepcruise(): DepcruiseJson {
   const raw = execFileSync(
-    "pnpm",
+    join(here, "node_modules", ".bin", "depcruise"),
     [
-      "exec",
-      "depcruise",
       "--config",
       join(here, ".dependency-cruiser.js"),
       "--output-type",
