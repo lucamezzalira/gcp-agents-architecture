@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { BodyStore } from "./body-store.js";
 import type { InstructionPublisher } from "./instruction-publisher.js";
 import type { CorrelatedLogger, Logger } from "./logger.js";
-import type { Mailer, MailerMessage } from "./mailer.js";
 import { markPaid } from "./mark-paid.js";
 import type { Order } from "./order.js";
 import { OrderNotFoundError } from "./order-not-found.js";
@@ -48,14 +47,6 @@ class MemoryPublisher implements InstructionPublisher {
   }
 }
 
-class MemoryMailer implements Mailer {
-  readonly calls: MailerMessage[] = [];
-
-  async send(message: MailerMessage): Promise<void> {
-    this.calls.push(message);
-  }
-}
-
 describe("markPaid with a stub logger", () => {
   it("runs without an infrastructure logger", async () => {
     const publisher = new MemoryPublisher();
@@ -63,7 +54,6 @@ describe("markPaid with a stub logger", () => {
       orderStore: new MemoryOrderStore(order),
       bodyStore: new MemoryBodyStore(),
       publisher,
-      mailer: new MemoryMailer(),
       logger: new StubLogger(),
     });
 
@@ -77,7 +67,6 @@ describe("markPaid with a stub logger", () => {
         orderStore: new MemoryOrderStore(undefined),
         bodyStore: new MemoryBodyStore(),
         publisher: new MemoryPublisher(),
-        mailer: new MemoryMailer(),
         logger: new StubLogger(),
       }),
     ).rejects.toBeInstanceOf(OrderNotFoundError);

@@ -2,7 +2,6 @@ import type { BodyStore } from "./body-store.js";
 import { confirmationMessageId } from "./get-order-view.js";
 import type { InstructionPublisher } from "./instruction-publisher.js";
 import type { Logger } from "./logger.js";
-import type { Mailer } from "./mailer.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
@@ -17,15 +16,13 @@ import type { SendInstruction } from "./send-instruction.js";
 
 export type MarkPaidResult = {
   status: "paid";
-  dispatch: "queued" | "direct";
-  instruction?: SendInstruction;
+  instruction: SendInstruction;
 };
 
 export type MarkPaidDeps = {
   orderStore: OrderStore;
   bodyStore: BodyStore;
   publisher: InstructionPublisher;
-  mailer: Mailer;
   logger: Logger;
 };
 
@@ -68,17 +65,6 @@ export async function markPaid(
   const bodyRef = confirmationBodyRef(paid.id);
   await deps.bodyStore.put(bodyRef, html);
 
-  if (paid.shippingTier === "expedited") {
-    // Expedited customers should not wait behind the notification queue.
-    await deps.mailer.send({
-      to: paid.email,
-      subject: `Order ${paid.id} confirmed`,
-      html,
-    });
-    log.info("confirmation.sent-direct");
-    return { status: "paid", dispatch: "direct" };
-  }
-
   const instruction: SendInstruction = {
     messageId: confirmationMessageId(paid.id),
     to: paid.email,
@@ -87,5 +73,5 @@ export async function markPaid(
   };
   await deps.publisher.publish(instruction);
   log.info("instruction.published");
-  return { status: "paid", dispatch: "queued", instruction };
+  return { status: "paid", instruction };
 }
