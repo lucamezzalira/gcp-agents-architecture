@@ -1,17 +1,18 @@
-FROM node:24-bookworm
+FROM node:24-bookworm AS node
+FROM python:3.12-bookworm
 WORKDIR /repo
-RUN corepack enable \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends python3 python3-venv python3-pip \
-  && rm -rf /var/lib/apt/lists/*
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack \
+  && ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+  && corepack enable
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY health/scoring ./health/scoring
 COPY health/agent ./health/agent
-COPY pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --filter @health/scoring...
 WORKDIR /repo/health/agent
-# Stub reasoner only. Skip google-adk so pip does not backtrack on Python 3.11 (node:24-bookworm).
-RUN rm -rf .venv && python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e .
+# Stub reasoner only. Skip google-adk so the demo does not pull Gemini.
+RUN python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e .
 ENV PORT=8080
 ENV HEALTH_REASONER=stub
 EXPOSE 8080
