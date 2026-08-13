@@ -95,11 +95,12 @@ export async function checkArchitecture(
     .dependOnFiles()
     .matchingPattern(".*notification/src/.*/.*(store|Store).*");
 
+  // Store reads are scored as rule 4. Rule 5 covers other cross-service internals.
   const rule5 = files
     .matchingPattern(".*services/checkout/.*")
     .shouldNot()
     .dependOnFiles()
-    .inFolder("notification");
+    .matchingPattern(".*notification/src/(?!.*[Ss]tore).*");
 
   const notificationToCheckout = files
     .matchingPattern(".*services/notification/.*")

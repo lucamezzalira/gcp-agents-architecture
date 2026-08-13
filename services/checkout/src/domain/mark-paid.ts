@@ -1,4 +1,5 @@
 import type { BodyStore } from "./body-store.js";
+import { confirmationMessageId } from "./get-order-view.js";
 import type { InstructionPublisher } from "./instruction-publisher.js";
 import type { Logger } from "./logger.js";
 import type { Mailer } from "./mailer.js";
@@ -79,7 +80,7 @@ export async function markPaid(
   }
 
   const instruction: SendInstruction = {
-    messageId: `checkout:${paid.id}:paid`,
+    messageId: confirmationMessageId(paid.id),
     to: paid.email,
     subject: `Order ${paid.id} confirmed`,
     bodyRef,

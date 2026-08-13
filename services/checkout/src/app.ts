@@ -1,6 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { getOrderView } from "./domain/get-order-view.js";
 import { markPaid } from "./domain/mark-paid.js";
 import type { BodyStore } from "./domain/body-store.js";
+import type { DeliveryStatusLookup } from "./domain/delivery-status-lookup.js";
 import type { InstructionPublisher } from "./domain/instruction-publisher.js";
 import { silentLogger, type Logger } from "./domain/logger.js";
 import type { Mailer } from "./domain/mailer.js";
@@ -14,9 +16,11 @@ import { FirestoreOrderStore } from "./infrastructure/firestore-order-store.js";
 import { GcsBodyStore } from "./infrastructure/gcs-body-store.js";
 import { HttpInstructionPublisher } from "./infrastructure/http-instruction-publisher.js";
 import { InMemoryBodyStore } from "./infrastructure/in-memory-body-store.js";
+import { InMemoryDeliveryStatusLookup } from "./infrastructure/in-memory-delivery-status-lookup.js";
 import { InMemoryInstructionPublisher } from "./infrastructure/in-memory-instruction-publisher.js";
 import { InMemoryOrderStore } from "./infrastructure/in-memory-order-store.js";
 import { JsonLogger } from "./infrastructure/json-logger.js";
+import { NotificationDeliveryLookup } from "./infrastructure/notification-delivery-store.js";
 import { PubSubInstructionPublisher } from "./infrastructure/pubsub-instruction-publisher.js";
 import { registerHealthRoute } from "./transport/health-route.js";
 import { registerOrderRoutes } from "./transport/order-routes.js";
@@ -27,6 +31,7 @@ export type CheckoutApp = {
   bodyStore: InMemoryBodyStore;
   publisher: InMemoryInstructionPublisher;
   emailProvider: InMemoryEmailProvider;
+  deliveryStatus: InMemoryDeliveryStatusLookup;
 };
 
 function buildServer(
@@ -34,6 +39,7 @@ function buildServer(
   bodyStore: BodyStore,
   publisher: InstructionPublisher,
   mailer: Mailer,
+  deliveryStatus: DeliveryStatusLookup,
   logger: Logger,
 ): FastifyInstance {
   const server = Fastify();
@@ -51,6 +57,7 @@ function buildServer(
         mailer,
         logger,
       }),
+    (orderId) => getOrderView(orderId, { orderStore, deliveryStatus }),
     logger,
   );
   return server;
@@ -61,18 +68,21 @@ export function createApp(logger: Logger = silentLogger()): CheckoutApp {
   const bodyStore = new InMemoryBodyStore();
   const publisher = new InMemoryInstructionPublisher();
   const emailProvider = new InMemoryEmailProvider();
+  const deliveryStatus = new InMemoryDeliveryStatusLookup();
   return {
     server: buildServer(
       orderStore,
       bodyStore,
       publisher,
       emailProvider,
+      deliveryStatus,
       logger,
     ),
     orderStore,
     bodyStore,
     publisher,
     emailProvider,
+    deliveryStatus,
   };
 }
 
@@ -89,6 +99,7 @@ export function createLocalApp(): FastifyInstance {
     bodyStore,
     publisher,
     new DirectEmailProvider(),
+    new InMemoryDeliveryStatusLookup(),
     new JsonLogger(),
   );
 }
@@ -104,6 +115,9 @@ export function createCloudApp(): FastifyInstance {
     bodyStore,
     publisher,
     new DirectEmailProvider(),
+    NotificationDeliveryLookup.connect(
+      process.env.NOTIFICATION_FIRESTORE_DATABASE ?? "notification",
+    ),
     new JsonLogger(),
   );
 }

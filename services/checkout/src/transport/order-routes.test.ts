@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp, type CheckoutApp } from "../app.js";
+import { confirmationMessageId } from "../domain/get-order-view.js";
 import { confirmationBodyRef } from "../domain/render-confirmation.js";
 
 describe("checkout HTTP", () => {
@@ -102,5 +103,43 @@ describe("checkout HTTP", () => {
     });
     expect(response.statusCode).toBe(404);
     expect(app.publisher.published).toHaveLength(0);
+  });
+
+  it("shows whether the confirmation email was delivered", async () => {
+    await app.server.inject({
+      method: "POST",
+      url: "/orders",
+      payload: { id: "ord-1", email: "buyer@example.com" },
+    });
+    await app.server.inject({
+      method: "POST",
+      url: "/orders/ord-1/pay",
+    });
+
+    const before = await app.server.inject({
+      method: "GET",
+      url: "/orders/ord-1",
+    });
+    expect(before.statusCode).toBe(200);
+    expect(before.json()).toMatchObject({
+      id: "ord-1",
+      status: "paid",
+      confirmationDelivered: false,
+    });
+
+    app.deliveryStatus.markDelivered(confirmationMessageId("ord-1"));
+    const after = await app.server.inject({
+      method: "GET",
+      url: "/orders/ord-1",
+    });
+    expect(after.json()).toMatchObject({ confirmationDelivered: true });
+  });
+
+  it("returns 404 when viewing a missing order", async () => {
+    const response = await app.server.inject({
+      method: "GET",
+      url: "/orders/missing",
+    });
+    expect(response.statusCode).toBe(404);
   });
 });

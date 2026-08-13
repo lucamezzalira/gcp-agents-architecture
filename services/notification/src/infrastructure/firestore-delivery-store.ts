@@ -19,4 +19,9 @@ export class FirestoreDeliveryStore implements DeliveryStore {
       return true;
     });
   }
+
+  async hasClaimed(messageId: string): Promise<boolean> {
+    const snap = await this.db.collection("deliveries").doc(messageId).get();
+    return snap.exists;
+  }
 }

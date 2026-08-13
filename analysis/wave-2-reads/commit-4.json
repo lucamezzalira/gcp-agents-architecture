@@ -1,0 +1,39 @@
+{
+  "runId": "124fa316ebf16726faa6743e724bd28ba4f99875",
+  "commitSha": "124fa316ebf16726faa6743e724bd28ba4f99875",
+  "overall": 84,
+  "characteristics": [
+    {
+      "id": "boundary-integrity",
+      "score": 60,
+      "reasoning": "Checkout imports the email provider client (services/checkout/src/app.ts). Confirmations on that path never become a send instruction, so notification does not see them. Idempotency, retry and delivery records then cover only the queued mail. boundary-integrity is 60. Runtime signals are illustrative and were not scored.",
+      "recommendations": [
+        "Publish a SendInstruction for those confirmations too, and add a priority field so urgent mail jumps the queue without leaving notification."
+      ],
+      "signalsUsed": [
+        "ts-arch:rule-3:services/checkout/src/app.ts"
+      ]
+    },
+    {
+      "id": "layering",
+      "score": 100,
+      "reasoning": "layering is 100. No deterministic findings applied. Runtime signals are illustrative and were not scored.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "coupling",
+      "score": 100,
+      "reasoning": "coupling is 100. No deterministic findings applied. Runtime signals are illustrative and were not scored.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "duplication",
+      "score": 100,
+      "reasoning": "duplication is 100. No deterministic findings applied. Runtime signals are illustrative and were not scored.",
+      "recommendations": [],
+      "signalsUsed": []
+    }
+  ]
+}
