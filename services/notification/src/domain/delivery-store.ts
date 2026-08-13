@@ -1,4 +1,3 @@
 export type DeliveryStore = {
-  hasBeenDelivered(messageId: string): Promise<boolean>;
-  record(messageId: string): Promise<void>;
+  claim(messageId: string): Promise<boolean>;
 };

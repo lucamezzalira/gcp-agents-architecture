@@ -123,7 +123,9 @@ Terraform, two GCP projects.
 
 **Project A — health system**: Pub/Sub topic and subscription for signals, health agent on Agent Runtime with Agent Identity, Memory Bank, Cloud SQL Postgres, MCP server on Cloud Run, dashboard on Cloud Run, Cloud Trace.
 
-**Project B — services**: Pub/Sub topic and subscription for send instructions, notification and checkout on Cloud Run, Firestore, Cloud Storage.
+**Project B — services**: Pub/Sub topic and subscription for send instructions, notification and checkout on Cloud Run, one Firestore database per service, Cloud Storage for claim-check bodies.
+
+Checkout's Firestore holds orders. Notification's Firestore holds delivery records (idempotency). They are separate databases so an outage of one does not take the other service's state down. Notification fetches HTML by `bodyRef` from Cloud Storage. It does not read checkout's database.
 
 Cross-project IAM allows CI to publish to the health project's signal topic. Region is not significant; pick one and stay consistent.
 

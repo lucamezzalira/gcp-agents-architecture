@@ -1,0 +1,93 @@
+resource "google_cloud_run_v2_service" "checkout" {
+  count    = var.checkout_image == "" ? 0 : 1
+  name     = "checkout"
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.checkout.email
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 1
+    }
+    containers {
+      image = var.checkout_image
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle = true
+      }
+      env {
+        name  = "PORT"
+        value = "8080"
+      }
+      env {
+        name  = "BODY_BUCKET"
+        value = google_storage_bucket.bodies.name
+      }
+      env {
+        name  = "SEND_INSTRUCTIONS_TOPIC"
+        value = google_pubsub_topic.send_instructions.id
+      }
+      env {
+        name  = "FIRESTORE_DATABASE"
+        value = google_firestore_database.checkout.name
+      }
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_cloud_run_v2_service" "notification" {
+  count    = var.notification_image == "" ? 0 : 1
+  name     = "notification"
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  template {
+    service_account = google_service_account.notification.email
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 1
+    }
+    containers {
+      image = var.notification_image
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle = true
+      }
+      env {
+        name  = "PORT"
+        value = "8080"
+      }
+      env {
+        name  = "BODY_BUCKET"
+        value = google_storage_bucket.bodies.name
+      }
+      env {
+        name  = "SEND_INSTRUCTIONS_SUBSCRIPTION"
+        value = google_pubsub_subscription.notification.id
+      }
+      env {
+        name  = "FIRESTORE_DATABASE"
+        value = google_firestore_database.notification.name
+      }
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "checkout_public" {
+  count    = var.checkout_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.checkout[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}

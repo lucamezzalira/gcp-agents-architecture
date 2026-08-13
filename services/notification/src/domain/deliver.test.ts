@@ -4,6 +4,7 @@ import { InMemoryDeliveryStore } from "../infrastructure/in-memory-delivery-stor
 import { InMemoryEmailProvider } from "../infrastructure/in-memory-email-provider.js";
 import { BodyNotFoundError } from "./body-not-found.js";
 import { deliver } from "./deliver.js";
+import type { EmailMessage, EmailProvider } from "./email-provider.js";
 import type { SendInstruction } from "./send-instruction.js";
 
 const instruction: SendInstruction = {
@@ -14,6 +15,20 @@ const instruction: SendInstruction = {
 };
 
 const storedBody = "<p>ships within 48 hours</p>";
+
+class SlowEmailProvider implements EmailProvider {
+  readonly calls: EmailMessage[] = [];
+  private readonly waitMs: number;
+
+  constructor(waitMs: number) {
+    this.waitMs = waitMs;
+  }
+
+  async send(message: EmailMessage): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, this.waitMs));
+    this.calls.push(message);
+  }
+}
 
 function setup(): {
   bodyStore: InMemoryBodyStore;
@@ -54,15 +69,29 @@ describe("deliver", () => {
     expect(deps.emailProvider.calls).toHaveLength(1);
   });
 
-  it("fails without calling the provider when the body is missing", async () => {
+  it("claims before send so overlapping deliveries only send once", async () => {
+    const bodyStore = new InMemoryBodyStore();
+    const deliveryStore = new InMemoryDeliveryStore();
+    const emailProvider = new SlowEmailProvider(30);
+    bodyStore.put(instruction.bodyRef, storedBody);
+
+    const [first, second] = await Promise.all([
+      deliver(instruction, { bodyStore, deliveryStore, emailProvider }),
+      deliver(instruction, { bodyStore, deliveryStore, emailProvider }),
+    ]);
+
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual(["duplicate", "sent"]);
+    expect(emailProvider.calls).toHaveLength(1);
+  });
+
+  it("fails without claiming when the body is missing", async () => {
     const deps = setup();
 
     await expect(deliver(instruction, deps)).rejects.toBeInstanceOf(
       BodyNotFoundError,
     );
     expect(deps.emailProvider.calls).toHaveLength(0);
-    expect(await deps.deliveryStore.hasBeenDelivered(instruction.messageId)).toBe(
-      false,
-    );
+    expect(deps.deliveryStore.hasClaimed(instruction.messageId)).toBe(false);
   });
 });

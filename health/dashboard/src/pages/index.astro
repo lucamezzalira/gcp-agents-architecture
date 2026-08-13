@@ -1,0 +1,227 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { createPostgresStore } from "../lib/postgres";
+import {
+  buildDashboardModel,
+  displayName,
+  improvementCopy,
+  polyline,
+  ringOffset,
+  scoreTone,
+  shortSha,
+  toneColor,
+  trendPoints,
+} from "../lib/view";
+
+const store = createPostgresStore();
+const runs = await store.loadRuns();
+const requested = Astro.url.searchParams.get("commit") ?? undefined;
+const model = buildDashboardModel(runs, requested);
+const selected = model.selected;
+const chartW = 640;
+const chartH = 180;
+const plotted = trendPoints(
+  model.runs.map((run) => run.overall),
+  chartW,
+  chartH,
+);
+const line = polyline(plotted);
+const area =
+  plotted.length === 0
+    ? ""
+    : `${plotted[0]?.x},168 ${line} ${plotted[plotted.length - 1]?.x},168`;
+const radius = 58;
+const circumference = 2 * Math.PI * radius;
+const payload = JSON.stringify(model.runs);
+---
+
+<Layout title="Architectural health">
+  <main class="shell">
+    <header class="top">
+      <div class="brand">
+        <span>Health system</span>
+        <h1>Architecture score</h1>
+      </div>
+    </header>
+
+    {
+      selected === undefined ? (
+        <p class="empty">
+          No runs in Postgres yet. Start Postgres and run
+          <code>./scripts/replay.sh</code>.
+        </p>
+      ) : (
+        <section class="hero">
+          <div class={`panel score-panel ${scoreTone(selected.overall)}`} data-score-panel>
+            <div class="ring-wrap">
+              <svg viewBox="0 0 140 140" width="168" height="168" aria-hidden="true">
+                <circle
+                  cx="70"
+                  cy="70"
+                  r={radius}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.08)"
+                  stroke-width="8"
+                />
+                <circle
+                  data-ring
+                  cx="70"
+                  cy="70"
+                  r={radius}
+                  fill="none"
+                  stroke={toneColor(selected.overall)}
+                  stroke-width="8"
+                  stroke-linecap="round"
+                  stroke-dasharray={circumference}
+                  stroke-dashoffset={ringOffset(selected.overall, radius)}
+                />
+              </svg>
+              <div data-overall class={`value ${scoreTone(selected.overall)}`}>
+                {selected.overall}
+              </div>
+            </div>
+            <p class="caption">Overall · click a commit on the trend to compare</p>
+          </div>
+          <div class="panel">
+            <div class="meta-grid">
+              <div>
+                <span>Commit</span>
+                <p class="sha" data-commit>{shortSha(selected.commitSha)}</p>
+              </div>
+              <div>
+                <span>Overall</span>
+                <p data-overall-meta>{selected.overall} / 100</p>
+              </div>
+              <div>
+                <span>Message</span>
+                <p data-message>{selected.commitMessage}</p>
+              </div>
+              <div>
+                <span>Run</span>
+                <p class="sha" data-run-id>{selected.runId}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )
+    }
+
+    <section class="panel trend">
+      <h2>Trend across commits</h2>
+      {
+        model.runs.length === 0 ? (
+          <p>No history yet.</p>
+        ) : (
+          <>
+            <svg class="chart" viewBox={`0 0 ${chartW} ${chartH}`} role="img">
+              <title>Overall score across replayed commits. Click a point to inspect that run.</title>
+              <defs>
+                <linearGradient id="trendFill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#4ade80" stop-opacity="0.28" />
+                  <stop offset="100%" stop-color="#4ade80" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <line class="grid" x1="12" y1="36" x2="628" y2="36" />
+              <line class="grid" x1="12" y1="90" x2="628" y2="90" />
+              <line class="grid" x1="12" y1="144" x2="628" y2="144" />
+              <polygon class="area" points={area} />
+              <polyline class="line" points={line} />
+              {plotted.map((point, index) => {
+                const run = model.runs[index];
+                if (run === undefined) {
+                  return null;
+                }
+                const selectedDot = run.commitSha === selected?.commitSha;
+                return (
+                  <g
+                    data-run={run.commitSha}
+                    class={selectedDot ? "is-selected" : ""}
+                    role="button"
+                    tabindex="0"
+                    aria-label={`Inspect ${shortSha(run.commitSha)}, overall ${run.overall}`}
+                    aria-pressed={selectedDot ? "true" : "false"}
+                  >
+                    <circle class="hit" cx={point.x} cy={point.y} r="18" />
+                    <circle
+                      class={`dot ${scoreTone(point.score)}`}
+                      cx={point.x}
+                      cy={point.y}
+                      r="5"
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+            <div class="legend">
+              {model.runs.map((run) => (
+                <button
+                  type="button"
+                  data-run={run.commitSha}
+                  class:list={[
+                    `${scoreTone(run.overall)}-label`,
+                    run.commitSha === selected?.commitSha ? "is-selected" : "",
+                  ]}
+                  aria-pressed={run.commitSha === selected?.commitSha}
+                >
+                  <div class="sha">
+                    {shortSha(run.commitSha)} · {run.overall}
+                  </div>
+                  <p>{run.commitMessage}</p>
+                </button>
+              ))}
+            </div>
+          </>
+        )
+      }
+    </section>
+
+    {
+      selected !== undefined && (
+        <section class="cards" data-cards aria-label="Characteristics">
+          {selected.characteristics.map((item) => {
+            const recs = improvementCopy(item.score, item.recommendations);
+            return (
+              <article class="panel card">
+                <header>
+                  <h2>{displayName(item.id)}</h2>
+                  <div class={`n ${scoreTone(item.score)}`}>{item.score}</div>
+                </header>
+                <div class={`meter ${scoreTone(item.score)}`}>
+                  <span style={`width: ${item.score}%`} />
+                </div>
+                <p>{item.reasoning}</p>
+                {recs.length === 0 ? (
+                  <p class="ok-note">At 100. No changes needed.</p>
+                ) : (
+                  <div class="improve">
+                    <h3>How to improve</h3>
+                    <ul>
+                      {recs.map((rec) => (
+                        <li>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {item.signalsUsed.length > 0 && (
+                  <p class="signals">{item.signalsUsed.join(" · ")}</p>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      )
+    }
+  </main>
+
+  <script id="runs-data" type="application/json" set:html={payload} />
+  <script>
+    import { mountBoard } from "../lib/board";
+    import type { HealthRun } from "../lib/types";
+
+    const node = document.getElementById("runs-data");
+    if (node?.textContent) {
+      const runs = JSON.parse(node.textContent) as HealthRun[];
+      mountBoard(runs);
+    }
+  </script>
+</Layout>

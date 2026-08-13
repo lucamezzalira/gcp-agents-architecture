@@ -14,3 +14,9 @@ __pycache__
 .DS_Store
 analysis/.tmp-jscpd
 analysis/payload.json
+.astro
+.local
+.terraform
+*.tfstate
+*.tfstate.*
+terraform.tfvars

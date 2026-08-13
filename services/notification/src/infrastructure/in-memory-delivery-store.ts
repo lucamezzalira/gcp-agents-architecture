@@ -1,13 +1,17 @@
 import type { DeliveryStore } from "../domain/delivery-store.js";
 
 export class InMemoryDeliveryStore implements DeliveryStore {
-  private readonly delivered = new Set<string>();
+  private readonly claimed = new Set<string>();
 
-  async hasBeenDelivered(messageId: string): Promise<boolean> {
-    return this.delivered.has(messageId);
+  async claim(messageId: string): Promise<boolean> {
+    if (this.claimed.has(messageId)) {
+      return false;
+    }
+    this.claimed.add(messageId);
+    return true;
   }
 
-  async record(messageId: string): Promise<void> {
-    this.delivered.add(messageId);
+  hasClaimed(messageId: string): boolean {
+    return this.claimed.has(messageId);
   }
 }

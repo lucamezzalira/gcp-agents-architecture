@@ -13,7 +13,7 @@ Owns orders through payment. When an order is paid, renders a confirmation email
 
 - `src/transport/` — Pub/Sub subscriber and HTTP surface. Validates shape, hands off.
 - `src/domain/` — order state, the decision to notify, and rendering. All decisions live here.
-- `src/infrastructure/` — Firestore, Cloud Storage, the Pub/Sub publisher.
+- `src/infrastructure/` — this service's Firestore database, Cloud Storage writes, the Pub/Sub publisher. Never the notification database.
 
 ## Flow on payment
 

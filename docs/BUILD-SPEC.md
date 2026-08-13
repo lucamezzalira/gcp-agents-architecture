@@ -11,15 +11,17 @@ Companion to `PRD.md`. That document says what and why. This one says where, in 
 | Request and payload schemas | Zod |
 | Health agent | Python 3.12, Google ADK |
 | MCP server | TypeScript, official MCP SDK |
-| Dashboard | Next.js, App Router |
-| Service state | Firestore |
-| Health history and decisions | Postgres (Cloud SQL) |
-| Object storage | Cloud Storage |
+| Dashboard | Astro |
+| Service state | Firestore, one named database per service |
+| Health history and decisions | Postgres (Cloud SQL), health project only |
+| Object storage | Cloud Storage. Checkout writes confirmation objects. Notification fetches by `bodyRef`. |
 | IaC | Terraform |
 | Tests | Vitest (TS), pytest (Python) |
 | Architecture tests | ts-arch |
 | Static analysis | dependency-cruiser |
 | Duplication | jscpd |
+
+Checkout and notification do not share a database. Project B has two Firestore databases (`checkout`, `notification`). If one is unavailable, the other service's state stays up. Notification may `GetObject` by `bodyRef`. It must never query checkout's Firestore. Health history stays in its own Postgres in project A.
 
 ## Directory tree
 
@@ -117,7 +119,7 @@ type AnalysisPayload = {
 };
 ```
 
-`runtime.illustrative` is always `true` in this build. The flag exists so the dashboard and the article can label it honestly.
+`runtime.illustrative` is always `true` in this build. Runtime signals do not move a score and are omitted from the dashboard.
 
 ### Health read (agent output)
 
@@ -210,7 +212,7 @@ The agent receives the computed scores and writes reasoning and recommendations 
 **Dashboard**
 - Shows overall and per-characteristic scores for the latest run.
 - Shows the trend across all runs.
-- Labels illustrative signals as illustrative.
+- Runtime signals stay in the payload with `illustrative: true`. They do not appear on the dashboard and they do not move a score.
 
 ## Build order
 

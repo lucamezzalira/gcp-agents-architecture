@@ -12,10 +12,17 @@
     "depcruise": "pnpm --filter analysis exec depcruise --config .dependency-cruiser.js --output-type err ../services",
     "jscpd": "pnpm --filter analysis exec jscpd --config .jscpd.json ../services",
     "collect": "pnpm --filter analysis collect",
-    "score": "pnpm --filter @health/scoring score"
+    "score": "pnpm --filter @health/scoring score",
+    "dashboard": "pnpm --filter @health/dashboard dev",
+    "mcp": "pnpm --filter @health/mcp-server start",
+    "notification": "pnpm --filter @services/notification start",
+    "checkout": "pnpm --filter @services/checkout start"
   },
   "devDependencies": {
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp"]
   }
 }

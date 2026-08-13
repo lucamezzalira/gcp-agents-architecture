@@ -23,7 +23,8 @@ export async function deliver(
     throw new BodyNotFoundError(instruction.bodyRef);
   }
 
-  if (await deps.deliveryStore.hasBeenDelivered(instruction.messageId)) {
+  const claimed = await deps.deliveryStore.claim(instruction.messageId);
+  if (!claimed) {
     return { status: "duplicate" };
   }
 
@@ -32,6 +33,5 @@ export async function deliver(
     subject: instruction.subject,
     html,
   });
-  await deps.deliveryStore.record(instruction.messageId);
   return { status: "sent" };
 }

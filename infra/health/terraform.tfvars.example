@@ -1,0 +1,5 @@
+project_id = "REPLACE_HEALTH_PROJECT"
+region     = "europe-west1"
+# github_owner = "lucamezzalira"
+# github_repo  = "google-agents"
+# services_ci_sa_email = "services-ci@REPLACE_SERVICES_PROJECT.iam.gserviceaccount.com"

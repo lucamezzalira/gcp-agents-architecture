@@ -14,4 +14,4 @@ Three layers, dependencies pointing inward.
 
 Enforced by ts-arch. If a change requires crossing these lines, the change is wrong, not the rule.
 
-Cross-service: no service reads another's data store, and no service imports another's internal modules. Services communicate by publishing messages.
+Cross-service: each service has its own Firestore database. No service reads another's data store. No service imports another's internal modules. Services communicate by publishing messages. Notification may fetch a Cloud Storage object by `bodyRef`. It must not query checkout's Firestore.

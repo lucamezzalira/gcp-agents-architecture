@@ -1,5 +1,22 @@
 {
   "name": "@health/dashboard",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4321 --host",
+    "build": "astro build",
+    "preview": "astro preview --port 4321 --host",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.4.4",
+    "astro": "^5.14.0",
+    "postgres": "^3.4.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
 }

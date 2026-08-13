@@ -25,7 +25,7 @@ type SendInstruction = {
 
 - `src/transport/` — Pub/Sub subscriber, HTTP health endpoint. Validates shape, hands off. NEVER imports from `infrastructure/`.
 - `src/domain/` — the idempotency decision, and the ports that infrastructure implements. This is where the only real decision lives: has this `messageId` already been delivered.
-- `src/infrastructure/` — Firestore, Cloud Storage, the provider adapter. Performs actions, decides nothing.
+- `src/infrastructure/` — this service's Firestore database, Cloud Storage reads by `bodyRef`, the provider adapter. Performs actions, decides nothing. Never the checkout database.
 
 Pub/Sub delivers at-least-once. This service is responsible for making the effect exactly-once.
 
