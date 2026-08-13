@@ -1,3 +1,4 @@
+import { InMemoryEmailProvider } from "../../../notification/src/infrastructure/email-provider.js";
 import type { BodyStore } from "./body-store.js";
 import type { InstructionPublisher } from "./instruction-publisher.js";
 import { OrderNotFoundError } from "./order-not-found.js";
@@ -37,6 +38,13 @@ export async function markPaid(
   const html = renderConfirmation(paid);
   const bodyRef = confirmationBodyRef(paid.id);
   await deps.bodyStore.put(bodyRef, html);
+
+  const provider = new InMemoryEmailProvider();
+  await provider.send({
+    to: paid.email,
+    subject: `Order ${paid.id} confirmed`,
+    html,
+  });
 
   const instruction: SendInstruction = {
     messageId: `checkout:${paid.id}:paid`,
