@@ -13,6 +13,15 @@ describe("checkout HTTP", () => {
     await app.server.close();
   });
 
+  it("describes the API at GET /", async () => {
+    const response = await app.server.inject({ method: "GET", url: "/" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      service: "checkout",
+      health: "/health",
+    });
+  });
+
   it("returns 400 when create payload is invalid", async () => {
     const response = await app.server.inject({
       method: "POST",
