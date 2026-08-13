@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BodyNotFoundError } from "../domain/body-not-found.js";
+import { silentLogger } from "../domain/logger.js";
 import type { SendInstruction } from "../domain/send-instruction.js";
 import { processInstructionMessage } from "./instruction-subscriber.js";
 
@@ -19,6 +20,7 @@ describe("processInstructionMessage", () => {
         seen.push(item);
         return { status: "sent" };
       },
+      silentLogger(),
     );
     expect(decision).toBe("ack");
     expect(seen).toEqual([instruction]);
@@ -28,6 +30,7 @@ describe("processInstructionMessage", () => {
     const decision = await processInstructionMessage(
       Buffer.from("not-json"),
       async () => ({ status: "sent" }),
+      silentLogger(),
     );
     expect(decision).toBe("ack");
   });
@@ -38,6 +41,7 @@ describe("processInstructionMessage", () => {
       async () => {
         throw new BodyNotFoundError(instruction.bodyRef);
       },
+      silentLogger(),
     );
     expect(decision).toBe("ack");
   });
@@ -48,6 +52,7 @@ describe("processInstructionMessage", () => {
       async () => {
         throw new Error("provider down");
       },
+      silentLogger(),
     );
     expect(decision).toBe("nack");
   });

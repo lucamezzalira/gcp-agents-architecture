@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { markPaid } from "./domain/mark-paid.js";
 import type { BodyStore } from "./domain/body-store.js";
 import type { InstructionPublisher } from "./domain/instruction-publisher.js";
+import { silentLogger, type Logger } from "./domain/logger.js";
 import type { OrderStore } from "./domain/order-store.js";
 import { FileBodyStore } from "./infrastructure/file-body-store.js";
 import { FirestoreOrderStore } from "./infrastructure/firestore-order-store.js";
@@ -10,6 +11,7 @@ import { HttpInstructionPublisher } from "./infrastructure/http-instruction-publ
 import { InMemoryBodyStore } from "./infrastructure/in-memory-body-store.js";
 import { InMemoryInstructionPublisher } from "./infrastructure/in-memory-instruction-publisher.js";
 import { InMemoryOrderStore } from "./infrastructure/in-memory-order-store.js";
+import { JsonLogger } from "./infrastructure/json-logger.js";
 import { PubSubInstructionPublisher } from "./infrastructure/pubsub-instruction-publisher.js";
 import { registerHealthRoute } from "./transport/health-route.js";
 import { registerOrderRoutes } from "./transport/order-routes.js";
@@ -25,6 +27,7 @@ function buildServer(
   orderStore: OrderStore,
   bodyStore: BodyStore,
   publisher: InstructionPublisher,
+  logger: Logger,
 ): FastifyInstance {
   const server = Fastify();
   registerHealthRoute(server);
@@ -33,17 +36,18 @@ function buildServer(
     async (order) => {
       await orderStore.save(order);
     },
-    (orderId) => markPaid(orderId, { orderStore, bodyStore, publisher }),
+    (orderId) => markPaid(orderId, { orderStore, bodyStore, publisher, logger }),
+    logger,
   );
   return server;
 }
 
-export function createApp(): CheckoutApp {
+export function createApp(logger: Logger = silentLogger()): CheckoutApp {
   const orderStore = new InMemoryOrderStore();
   const bodyStore = new InMemoryBodyStore();
   const publisher = new InMemoryInstructionPublisher();
   return {
-    server: buildServer(orderStore, bodyStore, publisher),
+    server: buildServer(orderStore, bodyStore, publisher, logger),
     orderStore,
     bodyStore,
     publisher,
@@ -58,7 +62,7 @@ export function createLocalApp(): FastifyInstance {
   const publisher = new HttpInstructionPublisher(
     process.env.NOTIFICATION_URL ?? "http://127.0.0.1:3001/instructions",
   );
-  return buildServer(orderStore, bodyStore, publisher);
+  return buildServer(orderStore, bodyStore, publisher, new JsonLogger());
 }
 
 export function createCloudApp(): FastifyInstance {
@@ -67,7 +71,7 @@ export function createCloudApp(): FastifyInstance {
   const publisher = PubSubInstructionPublisher.fromTopicName(
     requireEnv("SEND_INSTRUCTIONS_TOPIC"),
   );
-  return buildServer(orderStore, bodyStore, publisher);
+  return buildServer(orderStore, bodyStore, publisher, new JsonLogger());
 }
 
 export function createRuntimeApp(): FastifyInstance {

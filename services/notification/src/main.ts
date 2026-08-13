@@ -12,6 +12,6 @@ if (
   subscription !== undefined &&
   subscription.length > 0
 ) {
-  listenForInstructions(subscription, runtime.handleInstruction);
+  listenForInstructions(subscription, runtime.handleInstruction, runtime.logger);
   runtime.server.log.info(`subscribed to ${subscription}`);
 }

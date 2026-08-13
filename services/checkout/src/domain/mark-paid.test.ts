@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { InMemoryBodyStore } from "../infrastructure/in-memory-body-store.js";
 import { InMemoryInstructionPublisher } from "../infrastructure/in-memory-instruction-publisher.js";
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
+import { silentLogger } from "./logger.js";
 import { markPaid } from "./mark-paid.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
@@ -17,11 +18,13 @@ function setup(): {
   orderStore: InMemoryOrderStore;
   bodyStore: InMemoryBodyStore;
   publisher: InMemoryInstructionPublisher;
+  logger: ReturnType<typeof silentLogger>;
 } {
   return {
     orderStore: new InMemoryOrderStore(),
     bodyStore: new InMemoryBodyStore(),
     publisher: new InMemoryInstructionPublisher(),
+    logger: silentLogger(),
   };
 }
 

@@ -5,6 +5,7 @@ import { InMemoryEmailProvider } from "../infrastructure/in-memory-email-provide
 import { BodyNotFoundError } from "./body-not-found.js";
 import { deliver } from "./deliver.js";
 import type { EmailMessage, EmailProvider } from "./email-provider.js";
+import { silentLogger } from "./logger.js";
 import type { SendInstruction } from "./send-instruction.js";
 
 const instruction: SendInstruction = {
@@ -34,11 +35,13 @@ function setup(): {
   bodyStore: InMemoryBodyStore;
   deliveryStore: InMemoryDeliveryStore;
   emailProvider: InMemoryEmailProvider;
+  logger: ReturnType<typeof silentLogger>;
 } {
   return {
     bodyStore: new InMemoryBodyStore(),
     deliveryStore: new InMemoryDeliveryStore(),
     emailProvider: new InMemoryEmailProvider(),
+    logger: silentLogger(),
   };
 }
 
@@ -75,9 +78,10 @@ describe("deliver", () => {
     const emailProvider = new SlowEmailProvider(30);
     bodyStore.put(instruction.bodyRef, storedBody);
 
+    const logger = silentLogger();
     const [first, second] = await Promise.all([
-      deliver(instruction, { bodyStore, deliveryStore, emailProvider }),
-      deliver(instruction, { bodyStore, deliveryStore, emailProvider }),
+      deliver(instruction, { bodyStore, deliveryStore, emailProvider, logger }),
+      deliver(instruction, { bodyStore, deliveryStore, emailProvider, logger }),
     ]);
 
     const statuses = [first.status, second.status].sort();

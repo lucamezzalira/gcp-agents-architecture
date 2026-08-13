@@ -3,6 +3,7 @@ import { InMemoryBodyStore } from "./in-memory-body-store.js";
 import { InMemoryDeliveryStore } from "./in-memory-delivery-store.js";
 import type { EmailMessage, EmailProvider } from "../domain/email-provider.js";
 import { deliver } from "../domain/deliver.js";
+import { silentLogger } from "../domain/logger.js";
 import type { SendInstruction } from "../domain/send-instruction.js";
 import { ProviderSendError } from "./provider-send-error.js";
 import { RetryingEmailProvider } from "./retrying-email-provider.js";
@@ -57,6 +58,7 @@ describe("RetryingEmailProvider", () => {
       bodyStore,
       deliveryStore,
       emailProvider: provider,
+      logger: silentLogger(),
     });
 
     expect(result).toEqual({ status: "sent" });
@@ -76,7 +78,12 @@ describe("RetryingEmailProvider", () => {
     bodyStore.put(instruction.bodyRef, storedBody);
 
     await expect(
-      deliver(instruction, { bodyStore, deliveryStore, emailProvider: provider }),
+      deliver(instruction, {
+        bodyStore,
+        deliveryStore,
+        emailProvider: provider,
+        logger: silentLogger(),
+      }),
     ).rejects.toBeInstanceOf(ProviderSendError);
     expect(inner.sent).toHaveLength(0);
     expect(inner.attempts).toBe(3);
@@ -92,11 +99,17 @@ describe("RetryingEmailProvider", () => {
     const deliveryStore = new InMemoryDeliveryStore();
     bodyStore.put(instruction.bodyRef, storedBody);
 
-    await deliver(instruction, { bodyStore, deliveryStore, emailProvider: provider });
+    await deliver(instruction, {
+      bodyStore,
+      deliveryStore,
+      emailProvider: provider,
+      logger: silentLogger(),
+    });
     const second = await deliver(instruction, {
       bodyStore,
       deliveryStore,
       emailProvider: provider,
+      logger: silentLogger(),
     });
 
     expect(second).toEqual({ status: "duplicate" });
