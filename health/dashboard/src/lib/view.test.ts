@@ -19,6 +19,8 @@ import {
   trendScores,
   worstService,
   servicesBelowThreshold,
+  displayedCharacteristics,
+  platformGapLine,
   platformSpreadLine,
   SERVICE_SPREAD_THRESHOLD,
 } from "./view.js";
@@ -193,5 +195,61 @@ describe("buildDashboardModel", () => {
     expect(servicesBelowThreshold(run)).toBe(1);
     expect(SERVICE_SPREAD_THRESHOLD).toBe(80);
     expect(platformSpreadLine(run)).toBe("Worst checkout 70 · 1 of 2 below 80");
+  });
+
+  it("names platform characteristics below 100 next to the ring", () => {
+    const characteristic = (
+      id: string,
+      score: number,
+    ): HealthRun["characteristics"][number] => ({
+      id,
+      score,
+      reasoning: "",
+      recommendations: [],
+      signalsUsed: [],
+    });
+    const run: HealthRun = {
+      ...restore,
+      overall: 98,
+      characteristics: [
+        characteristic("boundary-integrity", 100),
+        characteristic("layering", 100),
+        characteristic("coupling", 100),
+        characteristic("duplication", 100),
+        characteristic("cross-service-integrity", 90),
+      ],
+      services: [
+        { service: "checkout", overall: 100, characteristics: [] },
+        { service: "notification", overall: 100, characteristics: [] },
+      ],
+    };
+    expect(displayedCharacteristics(run).map((item) => item.id)).toContain(
+      "cross-service-integrity",
+    );
+    expect(platformGapLine(run)).toBe("cross service integrity 90");
+    expect(platformSpreadLine(run)).toBe("Worst checkout 100 · 0 of 2 below 80");
+    expect(platformGapLine(run, "checkout")).toBe("");
+    expect(
+      platformGapLine({
+        ...run,
+        overall: 100,
+        characteristics: run.characteristics.map((item) => ({
+          ...item,
+          score: 100,
+        })),
+      }),
+    ).toBe("");
+    expect(
+      platformGapLine({
+        ...run,
+        characteristics: [
+          characteristic("boundary-integrity", 80),
+          characteristic("layering", 100),
+          characteristic("coupling", 100),
+          characteristic("duplication", 100),
+          characteristic("cross-service-integrity", 90),
+        ],
+      }),
+    ).toBe("boundary integrity 80 · cross service integrity 90");
   });
 });

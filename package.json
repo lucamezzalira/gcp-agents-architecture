@@ -15,7 +15,8 @@
     "score": "pnpm --filter @health/scoring score",
     "dashboard": "pnpm --filter @health/dashboard dev",
     "notification": "pnpm --filter @services/notification start",
-    "checkout": "pnpm --filter @services/checkout start"
+    "checkout": "pnpm --filter @services/checkout start",
+    "inventory": "pnpm --filter @services/inventory start"
   },
   "devDependencies": {
     "turbo": "^2.5.4",

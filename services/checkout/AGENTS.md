@@ -1,6 +1,6 @@
 # Checkout service
 
-Owns orders through payment. When an order is paid, renders a confirmation email stating the order ships within 48 hours, stores the HTML, and publishes a send instruction.
+Owns orders through payment. When an order is paid, renders a confirmation email stating the order ships within 48 hours, stores the HTML, and publishes a send instruction. Stock is reserved by publishing a command to inventory, not by calling it. Checkout consumes reservation outcomes on a second topic, so it is both a publisher and a subscriber.
 
 ## What it must never do
 
@@ -11,9 +11,9 @@ Owns orders through payment. When an order is paid, renders a confirmation email
 
 ## Layers
 
-- `src/transport/` — Pub/Sub subscriber and HTTP surface. Validates shape, hands off.
+- `src/transport/` — Pub/Sub subscriber (reservation outcomes) and HTTP surface. Validates shape, hands off.
 - `src/domain/` — order state, the decision to notify, and rendering. All decisions live here. Ports that infrastructure implements live in `domain/ports/`.
-- `src/infrastructure/` — this service's Firestore database, Cloud Storage writes, the Pub/Sub publisher. Never the notification database.
+- `src/infrastructure/` — this service's Firestore database, Cloud Storage writes, the Pub/Sub publishers. Never the notification or inventory database.
 
 ## Flow on payment
 

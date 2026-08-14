@@ -19,7 +19,7 @@ data "google_project" "this" {
 
 variable "project_id" {
   type        = string
-  description = "GCP project B: checkout and notification"
+  description = "GCP project B: checkout, notification, inventory"
 }
 
 variable "region" {
@@ -33,6 +33,11 @@ variable "checkout_image" {
 }
 
 variable "notification_image" {
+  type    = string
+  default = ""
+}
+
+variable "inventory_image" {
   type    = string
   default = ""
 }

@@ -30,7 +30,7 @@ The same boundary breach also penalises platform `cross-service-integrity`, beca
 
 ## Services
 
-Known services in this build: `checkout` and `notification`. A service listed in the payload is scored even when it has no findings (every characteristic 100). New services are included from their first commit.
+Known services in this build: `checkout`, `notification`, and `inventory`. A service listed in the payload is scored even when it has no findings (every characteristic 100). New services are included from their first commit.
 
 ## Penalties
 

@@ -39,6 +39,9 @@ describe("checkout HTTP", () => {
       payload: { id: "ord-1", email: "buyer@example.com" },
     });
     expect(created.statusCode).toBe(201);
+    expect(app.stockReservations.published).toEqual([
+      { action: "reserve", orderId: "ord-1", sku: "standard-item", units: 1 },
+    ]);
 
     const paid = await app.server.inject({
       method: "POST",
@@ -46,6 +49,7 @@ describe("checkout HTTP", () => {
     });
     expect(paid.statusCode).toBe(200);
     expect(paid.json()).toMatchObject({ status: "paid" });
+    expect(app.stockReservations.published.at(-1)?.action).toBe("confirm");
 
     const bodyRef = confirmationBodyRef("ord-1");
     expect(app.publisher.published).toHaveLength(1);
@@ -142,5 +146,40 @@ describe("checkout HTTP", () => {
       url: "/orders/missing",
     });
     expect(response.statusCode).toBe(404);
+  });
+
+  it("cancels a pending order and publishes release", async () => {
+    await app.server.inject({
+      method: "POST",
+      url: "/orders",
+      payload: { id: "ord-c", email: "buyer@example.com" },
+    });
+    const cancelled = await app.server.inject({
+      method: "POST",
+      url: "/orders/ord-c/cancel",
+    });
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.json()).toEqual({ status: "cancelled" });
+    expect(app.stockReservations.published.at(-1)?.action).toBe("release");
+  });
+
+  it("records a reservation outcome from the push envelope", async () => {
+    const outcome = {
+      orderId: "ord-1",
+      result: "reserved",
+      sku: "standard-item",
+      units: 1,
+    };
+    const response = await app.server.inject({
+      method: "POST",
+      url: "/reservation-outcomes",
+      payload: {
+        message: {
+          data: Buffer.from(JSON.stringify(outcome)).toString("base64"),
+        },
+      },
+    });
+    expect(response.statusCode).toBe(204);
+    expect(app.stockOutcomes.recorded).toEqual([outcome]);
   });
 });

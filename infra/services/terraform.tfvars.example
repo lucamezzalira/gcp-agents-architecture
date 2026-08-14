@@ -1,3 +1,3 @@
 project_id = "REPLACE_SERVICES_PROJECT"
 region     = "europe-west1"
-# health_analysis_topic = "projects/REPLACE_HEALTH_PROJECT/topics/analysis-payloads"
+# checkout_image / notification_image / inventory_image leave empty until the first build

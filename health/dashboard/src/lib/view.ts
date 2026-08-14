@@ -164,6 +164,16 @@ export function displayedCharacteristics(
   );
 }
 
+export function platformGapLine(run: HealthRun, service?: string): string {
+  if (service !== undefined) {
+    return "";
+  }
+  return displayedCharacteristics(run)
+    .filter((item) => item.score < 100)
+    .map((item) => `${displayName(item.id)} ${item.score}`)
+    .join(" · ");
+}
+
 export function hundredNote(item: {
   score: number;
   suppressedBy?: string[];

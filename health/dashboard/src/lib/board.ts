@@ -9,6 +9,7 @@ import {
   improvementCopy,
   legendScoreLine,
   lerp,
+  platformGapLine,
   platformRollupLine,
   platformSpreadLine,
   polyline,
@@ -210,6 +211,12 @@ export function paintCopy(
     spread.textContent = platformSpreadLine(run);
     spread.classList.toggle("is-hidden", service !== undefined);
   }
+  const gap = document.querySelector("[data-platform-gap]");
+  if (gap instanceof HTMLElement) {
+    const line = platformGapLine(run, service);
+    gap.textContent = line;
+    gap.classList.toggle("is-hidden", line.length === 0);
+  }
   const rollup = document.querySelector("[data-platform-rollup]");
   if (rollup instanceof HTMLElement) {
     rollup.textContent = platformRollupLine();
@@ -232,6 +239,10 @@ export function paintCopy(
   );
   if (notificationOverall) {
     notificationOverall.textContent = serviceOverall(run, "notification");
+  }
+  const inventoryOverall = document.querySelector("[data-inventory-overall]");
+  if (inventoryOverall) {
+    inventoryOverall.textContent = serviceOverall(run, "inventory");
   }
 
   document.querySelectorAll("[data-service]").forEach((node) => {

@@ -21,7 +21,7 @@ Companion to `PRD.md`. That document says what and why. This one says where, in 
 | Static analysis | dependency-cruiser |
 | Duplication | jscpd |
 
-Checkout and notification do not share a database. Project B has two Firestore databases (`checkout`, `notification`). If one is unavailable, the other service's state stays up. Notification may `GetObject` by `bodyRef`. It must never query checkout's Firestore. Health history stays in its own Postgres in project A.
+Checkout, notification and inventory do not share a database. Project B has one Firestore database per service (`checkout`, `notification`, `inventory`). If one is unavailable, the other services' state stays up. Notification may `GetObject` by `bodyRef`. It must never query checkout's Firestore. Inventory never queries checkout's Firestore either. Health history stays in its own Postgres in project A.
 
 ## Directory tree
 
@@ -44,11 +44,18 @@ Checkout and notification do not share a database. Project B has two Firestore d
 │   │   │   ├── domain/           # idempotency decision, ports
 │   │   │   └── infrastructure/   # firestore, storage, provider
 │   │   └── test/
-│   └── checkout/
+│   ├── checkout/
+│   │   ├── AGENTS.md
+│   │   ├── src/
+│   │   │   ├── transport/
+│   │   │   ├── domain/           # order state, notify decision, rendering
+│   │   │   └── infrastructure/
+│   │   └── test/
+│   └── inventory/
 │       ├── AGENTS.md
 │       ├── src/
 │       │   ├── transport/
-│       │   ├── domain/           # order state, notify decision, rendering
+│       │   ├── domain/           # stock, reservations, expiry
 │       │   └── infrastructure/
 │       └── test/
 ├── health/

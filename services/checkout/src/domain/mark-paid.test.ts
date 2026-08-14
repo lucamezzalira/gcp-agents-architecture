@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryBodyStore } from "../infrastructure/in-memory-body-store.js";
 import { InMemoryInstructionPublisher } from "../infrastructure/in-memory-instruction-publisher.js";
+import { MemoryStockReservations } from "../infrastructure/memory-stock-reservations.js";
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
 import { silentLogger } from "./ports/logger.js";
 import { markPaid } from "./mark-paid.js";
@@ -20,12 +21,14 @@ function setup(): {
   orderStore: InMemoryOrderStore;
   bodyStore: InMemoryBodyStore;
   publisher: InMemoryInstructionPublisher;
+  stockReservations: MemoryStockReservations;
   logger: ReturnType<typeof silentLogger>;
 } {
   return {
     orderStore: new InMemoryOrderStore(),
     bodyStore: new InMemoryBodyStore(),
     publisher: new InMemoryInstructionPublisher(),
+    stockReservations: new MemoryStockReservations(),
     logger: silentLogger(),
   };
 }
@@ -41,6 +44,9 @@ describe("markPaid", () => {
     expect(result.instruction.to).toBe(order.email);
     expect(result.instruction.bodyRef).toBe(confirmationBodyRef(order.id));
     expect(deps.publisher.published).toEqual([result.instruction]);
+    expect(deps.stockReservations.published).toEqual([
+      { action: "confirm", orderId: order.id, sku: "standard-item", units: 1 },
+    ]);
 
     const stored = await deps.bodyStore.get(result.instruction.bodyRef);
     expect(stored).toBeDefined();

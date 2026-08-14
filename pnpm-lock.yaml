@@ -146,6 +146,34 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(tsx@4.23.12)
 
+  services/inventory:
+    dependencies:
+      '@google-cloud/firestore':
+        specifier: ^9.0.0
+        version: 9.0.0
+      '@google-cloud/pubsub':
+        specifier: ^6.0.1
+        version: 6.0.1
+      fastify:
+        specifier: ^5.4.0
+        version: 5.11.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      tsx:
+        specifier: ^4.23.12
+        version: 4.23.12
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(tsx@4.23.12)
+
   services/notification:
     dependencies:
       '@google-cloud/firestore':

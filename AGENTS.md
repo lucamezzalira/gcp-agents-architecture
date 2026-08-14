@@ -1,13 +1,14 @@
 # AGENTS.md
 
-Monorepo containing two services under migration and a health system that measures them.
+Monorepo containing services under migration and a health system that measures them.
 
 Read `docs/PRD.md` for what this is, `docs/BUILD-SPEC.md` for the tree, contracts, schema and acceptance criteria. Follow the build order in the spec; do not jump ahead to cloud deployment.
 
 ## Layout
 
 - `services/notification` — the only service allowed to talk to the email provider
-- `services/checkout` — owns orders, renders its own emails, publishes send instructions
+- `services/checkout` — owns orders, renders its own emails, publishes send instructions, reserves stock through inventory
+- `services/inventory` — owns stock levels and reservations, publishes reservation outcomes
 - `health/scoring` — deterministic scoring, pure TypeScript, no I/O
 - `health/agent` — Python ADK agent, writes reasoning around the computed scores
 - `health/mcp-server`, `health/dashboard`

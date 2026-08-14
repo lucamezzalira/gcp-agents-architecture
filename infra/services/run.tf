@@ -32,6 +32,10 @@ resource "google_cloud_run_v2_service" "checkout" {
         name  = "FIRESTORE_DATABASE"
         value = google_firestore_database.checkout.name
       }
+      env {
+        name  = "STOCK_RESERVATIONS_TOPIC"
+        value = google_pubsub_topic.stock_reservations.id
+      }
     }
   }
 
@@ -88,4 +92,56 @@ resource "google_cloud_run_v2_service_iam_member" "notification_pubsub" {
   location = var.region
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.notification.email}"
+}
+
+resource "google_cloud_run_v2_service" "inventory" {
+  count               = var.inventory_image == "" ? 0 : 1
+  name                = "inventory"
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.inventory.email
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 1
+    }
+    containers {
+      image = var.inventory_image
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle = true
+      }
+      env {
+        name  = "FIRESTORE_DATABASE"
+        value = google_firestore_database.inventory.name
+      }
+      env {
+        name  = "RESERVATION_OUTCOMES_TOPIC"
+        value = google_pubsub_topic.reservation_outcomes.id
+      }
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "inventory_public" {
+  count    = var.inventory_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.inventory[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "inventory_pubsub" {
+  count    = var.inventory_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.inventory[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.inventory.email}"
 }

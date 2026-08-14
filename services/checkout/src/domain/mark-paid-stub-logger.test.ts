@@ -7,6 +7,8 @@ import type { Order } from "./order.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { OrderStore } from "./ports/order-store.js";
 import type { SendInstruction } from "./send-instruction.js";
+import type { StockReservationPublisher } from "./ports/stock-reservation-publisher.js";
+import type { StockCommand } from "./stock-command.js";
 
 const order: Order = {
   id: "ord-1",
@@ -51,6 +53,10 @@ class MemoryPublisher implements InstructionPublisher {
   }
 }
 
+class MemoryStockPublisher implements StockReservationPublisher {
+  async publish(_command: StockCommand): Promise<void> {}
+}
+
 describe("markPaid with a stub logger", () => {
   it("runs without an infrastructure logger", async () => {
     const publisher = new MemoryPublisher();
@@ -58,6 +64,7 @@ describe("markPaid with a stub logger", () => {
       orderStore: new MemoryOrderStore(order),
       bodyStore: new MemoryBodyStore(),
       publisher,
+      stockReservations: new MemoryStockPublisher(),
       logger: new StubLogger(),
     });
 
@@ -71,6 +78,7 @@ describe("markPaid with a stub logger", () => {
         orderStore: new MemoryOrderStore(undefined),
         bodyStore: new MemoryBodyStore(),
         publisher: new MemoryPublisher(),
+        stockReservations: new MemoryStockPublisher(),
         logger: new StubLogger(),
       }),
     ).rejects.toBeInstanceOf(OrderNotFoundError);

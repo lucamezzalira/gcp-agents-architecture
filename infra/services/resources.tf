@@ -27,6 +27,13 @@ resource "google_firestore_database" "notification" {
   depends_on  = [google_project_service.apis]
 }
 
+resource "google_firestore_database" "inventory" {
+  name        = "inventory"
+  location_id = var.region
+  type        = "FIRESTORE_NATIVE"
+  depends_on  = [google_project_service.apis]
+}
+
 resource "google_storage_bucket" "bodies_logs" { #tfsec:ignore:google-storage-bucket-encryption-customer-key
   #checkov:skip=CKV_GCP_62:This bucket is the access log destination
   name                        = "${var.project_id}-email-bodies-logs"
@@ -59,6 +66,18 @@ resource "google_pubsub_topic" "send_instructions" {
   depends_on = [google_project_service.apis]
 }
 
+resource "google_pubsub_topic" "stock_reservations" {
+  #checkov:skip=CKV_GCP_83:Google-managed encryption is enough for this demo
+  name       = "stock-reservations"
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_pubsub_topic" "reservation_outcomes" {
+  #checkov:skip=CKV_GCP_83:Google-managed encryption is enough for this demo
+  name       = "reservation-outcomes"
+  depends_on = [google_project_service.apis]
+}
+
 resource "google_service_account" "checkout" {
   account_id   = "checkout"
   display_name = "Checkout service"
@@ -67,6 +86,11 @@ resource "google_service_account" "checkout" {
 resource "google_service_account" "notification" {
   account_id   = "notification"
   display_name = "Notification service"
+}
+
+resource "google_service_account" "inventory" {
+  account_id   = "inventory"
+  display_name = "Inventory service"
 }
 
 resource "google_service_account" "ci" {
@@ -96,6 +120,17 @@ resource "google_project_iam_member" "notification_firestore" {
   }
 }
 
+resource "google_project_iam_member" "inventory_firestore" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.inventory.email}"
+  condition {
+    title       = "inventory-database-only"
+    description = "Inventory may only use the inventory Firestore database"
+    expression  = "resource.name.startsWith(\"projects/${var.project_id}/databases/${google_firestore_database.inventory.name}\")"
+  }
+}
+
 resource "google_storage_bucket_iam_member" "checkout_write" {
   bucket = google_storage_bucket.bodies.name
   role   = "roles/storage.objectUser"
@@ -112,6 +147,18 @@ resource "google_pubsub_topic_iam_member" "checkout_publish" {
   topic  = google_pubsub_topic.send_instructions.name
   role   = "roles/pubsub.publisher"
   member = "serviceAccount:${google_service_account.checkout.email}"
+}
+
+resource "google_pubsub_topic_iam_member" "checkout_reservations_publish" {
+  topic  = google_pubsub_topic.stock_reservations.name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:${google_service_account.checkout.email}"
+}
+
+resource "google_pubsub_topic_iam_member" "inventory_outcomes_publish" {
+  topic  = google_pubsub_topic.reservation_outcomes.name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:${google_service_account.inventory.email}"
 }
 
 resource "google_pubsub_subscription" "notification" {
@@ -145,6 +192,68 @@ resource "google_pubsub_subscription_iam_member" "notification_subscribe" {
   member       = "serviceAccount:${google_service_account.notification.email}"
 }
 
+resource "google_pubsub_subscription" "inventory_reservations" {
+  name  = "stock-reservations-inventory"
+  topic = google_pubsub_topic.stock_reservations.id
+  dynamic "push_config" {
+    for_each = var.inventory_image == "" ? [] : [1]
+    content {
+      push_endpoint = "${google_cloud_run_v2_service.inventory[0].uri}/pubsub"
+      oidc_token {
+        service_account_email = google_service_account.inventory.email
+        audience              = google_cloud_run_v2_service.inventory[0].uri
+      }
+    }
+  }
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+}
+
+resource "google_service_account_iam_member" "inventory_pubsub_token" {
+  service_account_id = google_service_account.inventory.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "inventory_subscribe" {
+  subscription = google_pubsub_subscription.inventory_reservations.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:${google_service_account.inventory.email}"
+}
+
+resource "google_pubsub_subscription" "checkout_outcomes" {
+  name  = "reservation-outcomes-checkout"
+  topic = google_pubsub_topic.reservation_outcomes.id
+  dynamic "push_config" {
+    for_each = var.checkout_image == "" ? [] : [1]
+    content {
+      push_endpoint = "${google_cloud_run_v2_service.checkout[0].uri}/reservation-outcomes"
+      oidc_token {
+        service_account_email = google_service_account.checkout.email
+        audience              = google_cloud_run_v2_service.checkout[0].uri
+      }
+    }
+  }
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+}
+
+resource "google_service_account_iam_member" "checkout_pubsub_token" {
+  service_account_id = google_service_account.checkout.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "checkout_outcomes_subscribe" {
+  subscription = google_pubsub_subscription.checkout_outcomes.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:${google_service_account.checkout.email}"
+}
+
 output "ci_sa_email" {
   value = google_service_account.ci.email
 }
@@ -167,4 +276,8 @@ output "firestore_checkout" {
 
 output "firestore_notification" {
   value = google_firestore_database.notification.name
+}
+
+output "firestore_inventory" {
+  value = google_firestore_database.inventory.name
 }

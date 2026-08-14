@@ -10,3 +10,7 @@ output "checkout_uri" {
 output "notification_uri" {
   value = try(google_cloud_run_v2_service.notification[0].uri, "")
 }
+
+output "inventory_uri" {
+  value = try(google_cloud_run_v2_service.inventory[0].uri, "")
+}

@@ -2,6 +2,7 @@ import type { BodyStore } from "./ports/body-store.js";
 import { confirmationMessageId } from "./get-order-view.js";
 import type { InstructionPublisher } from "./ports/instruction-publisher.js";
 import type { Logger } from "./ports/logger.js";
+import type { StockReservationPublisher } from "./ports/stock-reservation-publisher.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
@@ -13,6 +14,7 @@ import {
 } from "./render-confirmation.js";
 import { renderExpeditedConfirmation } from "./render-expedited-confirmation.js";
 import type { SendInstruction } from "./send-instruction.js";
+import { confirmCommand } from "./stock-command.js";
 
 export type MarkPaidResult = {
   status: "paid";
@@ -23,6 +25,7 @@ export type MarkPaidDeps = {
   orderStore: OrderStore;
   bodyStore: BodyStore;
   publisher: InstructionPublisher;
+  stockReservations: StockReservationPublisher;
   logger: Logger;
 };
 
@@ -72,6 +75,7 @@ export async function markPaid(
     bodyRef,
   };
   await deps.publisher.publish(instruction);
+  await deps.stockReservations.publish(confirmCommand(paid.id));
   log.info("instruction.published");
   return { status: "paid", instruction };
 }

@@ -9,6 +9,7 @@ import {
   displayedOverall,
   hundredNote,
   improvementCopy,
+  platformGapLine,
   platformRollupLine,
   platformSpreadLine,
   polyline,
@@ -43,6 +44,8 @@ const selected = model.selected;
 const selectedService = model.service;
 const overall =
   selected === undefined ? 0 : displayedOverall(selected, selectedService);
+const gapLine =
+  selected === undefined ? "" : platformGapLine(selected, selectedService);
 const characteristics =
   selected === undefined
     ? []
@@ -152,6 +155,12 @@ const historyHref = includeSuperseded
               {platformSpreadLine(selected)}
             </p>
             <p
+              class:list={["gap", gapLine === "" ? "is-hidden" : ""]}
+              data-platform-gap
+            >
+              {gapLine}
+            </p>
+            <p
               class:list={["rollup", selectedService === undefined ? "" : "is-hidden"]}
               data-platform-rollup
             >
@@ -213,8 +222,10 @@ const historyHref = includeSuperseded
         <section class="panel map">
           <h2>Services</h2>
           <p class="signals">
-            Checkout publishes a send-instruction. Notification is the only
-            subscriber allowed to talk to the email provider.
+            Checkout publishes send-instructions to notification and stock
+            reservations to inventory. Inventory publishes reservation
+            outcomes back. Notification is the only subscriber allowed to
+            talk to the email provider.
           </p>
           <div class="service-map" data-service-map>
             <a
@@ -241,6 +252,20 @@ const historyHref = includeSuperseded
                 {selected.services.find((item) => item.service === "checkout")?.overall ?? "n/a"}
               </strong>
             </a>
+            <span class="edge">reservations</span>
+            <a
+              class:list={[
+                "svc",
+                selectedService === "inventory" ? "is-selected" : "",
+              ]}
+              href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}&service=inventory${includeSuperseded ? "&history=all" : ""}`}
+              data-service="inventory"
+            >
+              inventory
+              <strong data-inventory-overall>
+                {selected.services.find((item) => item.service === "inventory")?.overall ?? "n/a"}
+              </strong>
+            </a>
             <span class="edge">send-instruction topic</span>
             <a
               class:list={[
@@ -256,6 +281,54 @@ const historyHref = includeSuperseded
               </strong>
             </a>
           </div>
+        </section>
+      )
+    }
+
+    {
+      selected !== undefined && (
+        <section class="cards" data-cards aria-label="Characteristics">
+          {characteristics.map((item) => {
+            const recs = improvementCopy(item.score, item.recommendations);
+            const note = hundredNote(item);
+            return (
+              <article
+                class:list={[
+                  "panel",
+                  "card",
+                  note !== undefined && (item.suppressedBy ?? []).length > 0
+                    ? "card-suppressed"
+                    : "",
+                ]}
+              >
+                <header>
+                  <h2>{displayName(item.id)}</h2>
+                  <div class={`n ${scoreTone(item.score)}`}>{item.score}</div>
+                </header>
+                <div class={`meter ${scoreTone(item.score)}`}>
+                  <span style={`width: ${item.score}%`} />
+                </div>
+                <p>{item.reasoning}</p>
+                {note !== undefined ? (
+                  <p class={ (item.suppressedBy ?? []).length > 0 ? "suppressed-note" : "ok-note"}>
+                    {note}
+                  </p>
+                ) : (
+                  <div class="improve">
+                    <h3>How to improve</h3>
+                    <ul>
+                      {recs.map((rec) => (
+                        <li>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {item.signalsUsed.length > 0 && (
+                  <p class="signals">{item.signalsUsed.join(" · ")}</p>
+                )}
+              </article>
+            );
+          })}
         </section>
       )
     }
@@ -359,54 +432,6 @@ const historyHref = includeSuperseded
         )
       }
     </section>
-
-    {
-      selected !== undefined && (
-        <section class="cards" data-cards aria-label="Characteristics">
-          {characteristics.map((item) => {
-            const recs = improvementCopy(item.score, item.recommendations);
-            const note = hundredNote(item);
-            return (
-              <article
-                class:list={[
-                  "panel",
-                  "card",
-                  note !== undefined && (item.suppressedBy ?? []).length > 0
-                    ? "card-suppressed"
-                    : "",
-                ]}
-              >
-                <header>
-                  <h2>{displayName(item.id)}</h2>
-                  <div class={`n ${scoreTone(item.score)}`}>{item.score}</div>
-                </header>
-                <div class={`meter ${scoreTone(item.score)}`}>
-                  <span style={`width: ${item.score}%`} />
-                </div>
-                <p>{item.reasoning}</p>
-                {note !== undefined ? (
-                  <p class={ (item.suppressedBy ?? []).length > 0 ? "suppressed-note" : "ok-note"}>
-                    {note}
-                  </p>
-                ) : (
-                  <div class="improve">
-                    <h3>How to improve</h3>
-                    <ul>
-                      {recs.map((rec) => (
-                        <li>{rec}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {item.signalsUsed.length > 0 && (
-                  <p class="signals">{item.signalsUsed.join(" · ")}</p>
-                )}
-              </article>
-            );
-          })}
-        </section>
-      )
-    }
   </main>
 
   <dialog class="rules-modal" data-rules-modal aria-labelledby="rules-modal-title">

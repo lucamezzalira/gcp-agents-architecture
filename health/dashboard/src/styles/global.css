@@ -157,16 +157,22 @@ body {
 }
 
 .spread,
+.gap,
 .rollup {
   margin: 0.45rem 0 0;
   text-align: center;
   max-width: 16rem;
 }
 
-.spread {
+.spread,
+.gap {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 0.78rem;
   color: var(--text);
+}
+
+.gap {
+  font-weight: 500;
 }
 
 .rollup {
