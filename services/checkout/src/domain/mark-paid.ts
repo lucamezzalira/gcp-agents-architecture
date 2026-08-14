@@ -2,6 +2,7 @@ import type { BodyStore } from "./ports/body-store.js";
 import { confirmationMessageId } from "./get-order-view.js";
 import type { InstructionPublisher } from "./ports/instruction-publisher.js";
 import type { Logger } from "./ports/logger.js";
+import type { StockLookup } from "./ports/stock-lookup.js";
 import type { StockReservationPublisher } from "./ports/stock-reservation-publisher.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
@@ -14,7 +15,8 @@ import {
 } from "./render-confirmation.js";
 import { renderExpeditedConfirmation } from "./render-expedited-confirmation.js";
 import type { SendInstruction } from "./send-instruction.js";
-import { confirmCommand } from "./stock-command.js";
+import { CHECKOUT_SKU, CHECKOUT_UNITS, confirmCommand } from "./stock-command.js";
+import { StockUnavailableError } from "./stock-unavailable.js";
 
 export type MarkPaidResult = {
   status: "paid";
@@ -26,6 +28,7 @@ export type MarkPaidDeps = {
   bodyStore: BodyStore;
   publisher: InstructionPublisher;
   stockReservations: StockReservationPublisher;
+  stockLookup: StockLookup;
   logger: Logger;
 };
 
@@ -47,6 +50,12 @@ export async function markPaid(
   if (order === undefined) {
     log.warn("mark-paid.not-found");
     throw new OrderNotFoundError(orderId);
+  }
+
+  const available = await deps.stockLookup.available(CHECKOUT_SKU);
+  if (available < CHECKOUT_UNITS) {
+    log.warn("mark-paid.stock-unavailable", { available });
+    throw new StockUnavailableError(CHECKOUT_SKU, CHECKOUT_UNITS, available);
   }
 
   let paid: Order;

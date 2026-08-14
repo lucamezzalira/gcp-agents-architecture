@@ -8,17 +8,20 @@ import type { DeliveryStatusLookup } from "./domain/ports/delivery-status-lookup
 import type { InstructionPublisher } from "./domain/ports/instruction-publisher.js";
 import { silentLogger, type Logger } from "./domain/ports/logger.js";
 import type { OrderStore } from "./domain/ports/order-store.js";
+import type { StockLookup } from "./domain/ports/stock-lookup.js";
 import type { StockOutcomeSink } from "./domain/ports/stock-outcome-sink.js";
 import type { StockReservationPublisher } from "./domain/ports/stock-reservation-publisher.js";
 import { FileBodyStore } from "./infrastructure/file-body-store.js";
 import { FirestoreOrderStore } from "./infrastructure/firestore-order-store.js";
 import { GcsBodyStore } from "./infrastructure/gcs-body-store.js";
 import { HttpInstructionPublisher } from "./infrastructure/http-instruction-publisher.js";
+import { HttpStockLookup } from "./infrastructure/http-stock-lookup.js";
 import { InMemoryBodyStore } from "./infrastructure/in-memory-body-store.js";
 import { InMemoryDeliveryStatusLookup } from "./infrastructure/in-memory-delivery-status-lookup.js";
 import { InMemoryInstructionPublisher } from "./infrastructure/in-memory-instruction-publisher.js";
 import { InMemoryOrderStore } from "./infrastructure/in-memory-order-store.js";
 import { JsonLogger } from "./infrastructure/json-logger.js";
+import { MemoryStockLookup } from "./infrastructure/memory-stock-lookup.js";
 import { MemoryStockOutcomes } from "./infrastructure/memory-stock-outcomes.js";
 import { MemoryStockReservations } from "./infrastructure/memory-stock-reservations.js";
 import { PubSubInstructionPublisher } from "./infrastructure/pubsub-instruction-publisher.js";
@@ -34,6 +37,7 @@ export type CheckoutApp = {
   publisher: InMemoryInstructionPublisher;
   stockReservations: MemoryStockReservations;
   stockOutcomes: MemoryStockOutcomes;
+  stockLookup: MemoryStockLookup;
   deliveryStatus: InMemoryDeliveryStatusLookup;
 };
 
@@ -43,6 +47,7 @@ function buildServer(
   publisher: InstructionPublisher,
   stockReservations: StockReservationPublisher,
   stockOutcomes: StockOutcomeSink,
+  stockLookup: StockLookup,
   deliveryStatus: DeliveryStatusLookup,
   logger: Logger,
 ): FastifyInstance {
@@ -57,6 +62,7 @@ function buildServer(
         bodyStore,
         publisher,
         stockReservations,
+        stockLookup,
         logger,
       }),
     (orderId) => getOrderView(orderId, { orderStore, deliveryStatus }),
@@ -73,6 +79,8 @@ export function createApp(logger: Logger = silentLogger()): CheckoutApp {
   const publisher = new InMemoryInstructionPublisher();
   const stockReservations = new MemoryStockReservations();
   const stockOutcomes = new MemoryStockOutcomes();
+  const stockLookup = new MemoryStockLookup();
+  stockLookup.set("standard-item", 100);
   const deliveryStatus = new InMemoryDeliveryStatusLookup();
   return {
     server: buildServer(
@@ -81,6 +89,7 @@ export function createApp(logger: Logger = silentLogger()): CheckoutApp {
       publisher,
       stockReservations,
       stockOutcomes,
+      stockLookup,
       deliveryStatus,
       logger,
     ),
@@ -89,6 +98,7 @@ export function createApp(logger: Logger = silentLogger()): CheckoutApp {
     publisher,
     stockReservations,
     stockOutcomes,
+    stockLookup,
     deliveryStatus,
   };
 }
@@ -101,12 +111,16 @@ export function createLocalApp(): FastifyInstance {
   const publisher = new HttpInstructionPublisher(
     process.env.NOTIFICATION_URL ?? "http://127.0.0.1:3001/instructions",
   );
+  const stockLookup = new HttpStockLookup(
+    process.env.INVENTORY_URL ?? "http://127.0.0.1:3002",
+  );
   return buildServer(
     orderStore,
     bodyStore,
     publisher,
     new MemoryStockReservations(),
     new MemoryStockOutcomes(),
+    stockLookup,
     new InMemoryDeliveryStatusLookup(),
     new JsonLogger(),
   );
@@ -127,6 +141,11 @@ export function createCloudApp(): FastifyInstance {
     publisher,
     stockReservations,
     new MemoryStockOutcomes(),
+    new HttpStockLookup(
+      process.env.INVENTORY_URL && process.env.INVENTORY_URL.length > 0
+        ? process.env.INVENTORY_URL
+        : "http://127.0.0.1:3002",
+    ),
     new InMemoryDeliveryStatusLookup(),
     new JsonLogger(),
   );

@@ -3,6 +3,7 @@ import { InvalidTransitionError } from "../domain/invalid-transition.js";
 import type { Logger } from "../domain/ports/logger.js";
 import type { MarkPaidResult } from "../domain/mark-paid.js";
 import { OrderNotFoundError } from "../domain/order-not-found.js";
+import { StockUnavailableError } from "../domain/stock-unavailable.js";
 import type { OrderView } from "../domain/get-order-view.js";
 import {
   parseCreateOrder,
@@ -58,6 +59,17 @@ export function registerOrderRoutes(
         return reply
           .code(404)
           .send({ error: "order not found", orderId: error.orderId });
+      }
+      if (error instanceof StockUnavailableError) {
+        log.warn("order.stock-unavailable", {
+          sku: error.sku,
+          available: error.available,
+        });
+        return reply.code(409).send({
+          error: "stock unavailable",
+          sku: error.sku,
+          available: error.available,
+        });
       }
       if (error instanceof InvalidTransitionError) {
         log.warn("order.invalid-transition", {

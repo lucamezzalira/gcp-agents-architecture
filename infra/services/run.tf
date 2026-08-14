@@ -36,6 +36,10 @@ resource "google_cloud_run_v2_service" "checkout" {
         name  = "STOCK_RESERVATIONS_TOPIC"
         value = google_pubsub_topic.stock_reservations.id
       }
+      env {
+        name  = "INVENTORY_URL"
+        value = try(google_cloud_run_v2_service.inventory[0].uri, "")
+      }
     }
   }
 

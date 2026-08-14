@@ -1,0 +1,22 @@
+{
+  "commit": 2,
+  "commitSha": "453a163e71623a70310ca19b4cce85c547e467f3",
+  "commitMessage": "Put reservation expiry next to the store timestamps because that is where reservedAt already lives.",
+  "runId": "453a163e71623a70310ca19b4cce85c547e467f3:4482a478fe154c0898adbb3bc4ec3325",
+  "reasoner": "adk",
+  "overall": 100,
+  "services": { "checkout": 100, "inventory": 100, "notification": 100 },
+  "characteristics": {
+    "boundary-integrity": 100,
+    "layering": 100,
+    "coupling": 100,
+    "duplication": 100,
+    "cross-service-integrity": 100
+  },
+  "rule2": {
+    "passed": true,
+    "violations": []
+  },
+  "layeringSignals": [],
+  "findings": "Rule 2 did not fire. expireHeldInAdapter lives in infrastructure and compares reservedAt to TTL without importing a domain use case. It only imports domain/ports. Layering stayed 100 for inventory and the platform. The ports refactor made rule 2 'infrastructure must not import domain except ports', which solved the false-positive problem (adapters depending on ports) without catching a decision written inside the adapter. Agent (adk) described layering as holding and talked about folder instability; it did not name expiry as a misplaced decision."
+}

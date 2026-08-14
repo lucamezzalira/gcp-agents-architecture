@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryBodyStore } from "../infrastructure/in-memory-body-store.js";
 import { InMemoryInstructionPublisher } from "../infrastructure/in-memory-instruction-publisher.js";
+import { MemoryStockLookup } from "../infrastructure/memory-stock-lookup.js";
 import { MemoryStockReservations } from "../infrastructure/memory-stock-reservations.js";
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
 import { silentLogger } from "./ports/logger.js";
 import { markPaid } from "./mark-paid.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
+import { StockUnavailableError } from "./stock-unavailable.js";
 import type { Order } from "./order.js";
 import { confirmationBodyRef } from "./render-confirmation.js";
 
@@ -22,13 +24,17 @@ function setup(): {
   bodyStore: InMemoryBodyStore;
   publisher: InMemoryInstructionPublisher;
   stockReservations: MemoryStockReservations;
+  stockLookup: MemoryStockLookup;
   logger: ReturnType<typeof silentLogger>;
 } {
+  const stockLookup = new MemoryStockLookup();
+  stockLookup.set("standard-item", 10);
   return {
     orderStore: new InMemoryOrderStore(),
     bodyStore: new InMemoryBodyStore(),
     publisher: new InMemoryInstructionPublisher(),
     stockReservations: new MemoryStockReservations(),
+    stockLookup,
     logger: silentLogger(),
   };
 }
@@ -96,5 +102,17 @@ describe("markPaid", () => {
       OrderNotFoundError,
     );
     expect(deps.publisher.published).toHaveLength(0);
+  });
+
+  it("waits on stock lookup and refuses to pay when inventory has nothing", async () => {
+    const deps = setup();
+    deps.stockLookup.set("standard-item", 0);
+    await deps.orderStore.save(order);
+
+    await expect(markPaid(order.id, deps)).rejects.toBeInstanceOf(
+      StockUnavailableError,
+    );
+    expect(deps.publisher.published).toHaveLength(0);
+    expect((await deps.orderStore.get(order.id))?.status).toBe("pending");
   });
 });
