@@ -154,6 +154,9 @@ importers:
       '@google-cloud/pubsub':
         specifier: ^6.0.1
         version: 6.0.1
+      '@google-cloud/storage':
+        specifier: ^7.22.0
+        version: 7.22.0
       fastify:
         specifier: ^5.4.0
         version: 5.11.3

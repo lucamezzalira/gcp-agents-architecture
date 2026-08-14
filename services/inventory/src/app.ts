@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import type { LowStockMailer } from "./domain/alert-low-stock.js";
 import { handleReservation } from "./domain/handle-reservation.js";
 import { quietLog, type Log } from "./domain/ports/logger.js";
 import type { OutcomePublisher } from "./domain/ports/outcome-publisher.js";
@@ -13,11 +14,15 @@ import {
   asReservationStore,
   FirestoreInventory,
 } from "./infrastructure/firestore-inventory.js";
+import { GcsHtml } from "./infrastructure/gcs-html.js";
 import { LineLogger } from "./infrastructure/line-logger.js";
+import { MemoryHtml } from "./infrastructure/memory-html.js";
+import { MemoryMail } from "./infrastructure/memory-mail.js";
 import { MemoryOutcomes } from "./infrastructure/memory-outcomes.js";
 import { MemoryReservations } from "./infrastructure/memory-reservations.js";
 import { MemoryStock } from "./infrastructure/memory-stock.js";
 import { PubSubOutcomes } from "./infrastructure/pubsub-outcomes.js";
+import { TopicMail } from "./infrastructure/topic-mail.js";
 import { registerHealthRoute } from "./transport/health-route.js";
 import {
   registerReservationPushRoute,
@@ -30,6 +35,8 @@ export type InventoryApp = {
   stock: MemoryStock;
   reservations: MemoryReservations;
   outcomes: MemoryOutcomes;
+  mail: MemoryMail;
+  html: MemoryHtml;
 };
 
 function buildServer(
@@ -38,6 +45,7 @@ function buildServer(
   outcomes: OutcomePublisher,
   logger: Log,
   ttlMs: number,
+  lowStock?: LowStockMailer,
 ): FastifyInstance {
   const handle: ReservationHandler = async (command) => {
     await expireHeldInAdapter(
@@ -51,6 +59,7 @@ function buildServer(
       outcomes,
       logger,
       now: () => new Date(),
+      lowStock,
     });
   };
   const server = Fastify();
@@ -72,6 +81,8 @@ export function createApp(logger: Log = quietLog()): InventoryApp {
   const stock = new MemoryStock();
   const reservations = new MemoryReservations();
   const outcomes = new MemoryOutcomes();
+  const html = new MemoryHtml();
+  const mail = new MemoryMail();
   return {
     server: buildServer(
       stock,
@@ -79,33 +90,49 @@ export function createApp(logger: Log = quietLog()): InventoryApp {
       outcomes,
       logger,
       HELD_TTL_MS,
+      { html, mailer: mail },
     ),
     stock,
     reservations,
     outcomes,
+    mail,
+    html,
   };
 }
 
 export function createLocalApp(): FastifyInstance {
   const stock = new MemoryStock();
   void stock.save({ sku: DEFAULT_SKU, available: 100 });
+  const html = new MemoryHtml();
+  const mail = new MemoryMail();
   return buildServer(
     stock,
     new MemoryReservations(),
     new MemoryOutcomes(),
     new LineLogger("inventory"),
     HELD_TTL_MS,
+    { html, mailer: mail },
   );
 }
 
 export function createCloudApp(): FastifyInstance {
   const firestore = FirestoreInventory.connect(requireEnv("FIRESTORE_DATABASE"));
+  const bucket = process.env.BODY_BUCKET;
+  const topic = process.env.SEND_INSTRUCTIONS_TOPIC;
+  const lowStock =
+    bucket !== undefined &&
+    bucket.length > 0 &&
+    topic !== undefined &&
+    topic.length > 0
+      ? { html: new GcsHtml(bucket), mailer: new TopicMail(topic) }
+      : undefined;
   return buildServer(
     firestore,
     asReservationStore(firestore),
     PubSubOutcomes.forTopic(requireEnv("RESERVATION_OUTCOMES_TOPIC")),
     new LineLogger("inventory"),
     Number(process.env.RESERVATION_TTL_MS ?? HELD_TTL_MS),
+    lowStock,
   );
 }
 

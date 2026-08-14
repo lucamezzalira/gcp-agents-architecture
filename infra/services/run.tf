@@ -128,6 +128,14 @@ resource "google_cloud_run_v2_service" "inventory" {
         name  = "RESERVATION_OUTCOMES_TOPIC"
         value = google_pubsub_topic.reservation_outcomes.id
       }
+      env {
+        name  = "BODY_BUCKET"
+        value = google_storage_bucket.bodies.name
+      }
+      env {
+        name  = "SEND_INSTRUCTIONS_TOPIC"
+        value = google_pubsub_topic.send_instructions.id
+      }
     }
   }
 

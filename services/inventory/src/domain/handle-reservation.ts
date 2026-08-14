@@ -1,3 +1,4 @@
+import { alertLowStock, type LowStockMailer } from "./alert-low-stock.js";
 import type { Log } from "./ports/logger.js";
 import type { OutcomePublisher } from "./ports/outcome-publisher.js";
 import type { ReservationStore } from "./ports/reservation-store.js";
@@ -12,6 +13,7 @@ export type HandleReservationDeps = {
   outcomes: OutcomePublisher;
   logger: Log;
   now: () => Date;
+  lowStock?: LowStockMailer;
 };
 
 async function restoreUnits(
@@ -58,6 +60,18 @@ export async function handleReservation(
       units: command.units,
     });
     log.info("reserve.held", { sku: command.sku, units: command.units });
+    const remaining = available - command.units;
+    if (deps.lowStock !== undefined) {
+      const instruction = await alertLowStock(
+        command.sku,
+        remaining,
+        deps.lowStock,
+        deps.now(),
+      );
+      if (instruction !== undefined) {
+        log.info("low-stock.published", { remaining });
+      }
+    }
     return;
   }
 

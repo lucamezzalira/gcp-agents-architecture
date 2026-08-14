@@ -24,4 +24,4 @@ Checkout publishes a reservation command. Inventory adjusts stock, records the r
 - Reserve decrements available stock and publishes `reserved`.
 - Reserve against empty stock publishes `rejected` and does not create a reservation.
 - Release restores stock. Confirm leaves stock decremented.
-- Expiry of an unconfirmed reservation restores stock. The expiry decision currently lives next to the store timestamps in infrastructure.
+- If remaining stock after a reserve is below the ops threshold, inventory renders its own HTML, stores it, and publishes a `SendInstruction`. Same contract as checkout. No shared rendering package.

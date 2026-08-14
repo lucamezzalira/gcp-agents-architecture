@@ -1,0 +1,23 @@
+{
+  "commit": 3,
+  "commitSha": "72673d2be6683227da26d9cedbc8951289be954c",
+  "commitMessage": "Ask inventory for stock over HTTP before paying so checkout can refuse an empty shelf.",
+  "runId": "72673d2be6683227da26d9cedbc8951289be954c",
+  "reasoner": "adk",
+  "overall": 100,
+  "services": { "checkout": 100, "inventory": 100, "notification": 100 },
+  "coupling": {
+    "priorCe": { "checkout": 0, "inventory": 0, "notification": 0 },
+    "currentCe": { "checkout": 0, "inventory": 0, "notification": 0 },
+    "score": 100,
+    "signals": [],
+    "moved": false
+  },
+  "rulesCoveringCheckoutInventory": {
+    "rule-3": "general: any service except notification must not depend on email-provider. HTTP stock lookup does not import email-provider. No fire.",
+    "rule-4": "only services/checkout must not depend on notification stores. Does not mention inventory. HTTP without importing inventory source does not fire.",
+    "rule-5": "checkout internals vs notification only. inventory is invisible.",
+    "rule-7": "checkout transport vs notification transport only. HTTP client is infrastructure, not a transport-to-transport import."
+  },
+  "findings": "Checkout Ce stayed 0 (prior 0, current 0). Coupling stayed 100. No dependency-cruiser:efferent-growth signal. Ce only counts resolved modules whose path leaves services/checkout/. fetch() to inventory is a runtime call, not a source import, so the coupling fix does not see it. Rules 4, 5 and 7 still name checkout and notification. Rule 3 uses (?!notification) and would catch an email-provider import in inventory, but not this HTTP pair. Agent (adk) scored coupling 100 and talked about zero outgoing code dependencies; it did not name the HTTP wait as a relationship."
+}

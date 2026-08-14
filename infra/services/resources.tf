@@ -161,6 +161,18 @@ resource "google_pubsub_topic_iam_member" "inventory_outcomes_publish" {
   member = "serviceAccount:${google_service_account.inventory.email}"
 }
 
+resource "google_pubsub_topic_iam_member" "inventory_instructions_publish" {
+  topic  = google_pubsub_topic.send_instructions.name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:${google_service_account.inventory.email}"
+}
+
+resource "google_storage_bucket_iam_member" "inventory_write" {
+  bucket = google_storage_bucket.bodies.name
+  role   = "roles/storage.objectUser"
+  member = "serviceAccount:${google_service_account.inventory.email}"
+}
+
 resource "google_pubsub_subscription" "notification" {
   name  = "send-instructions-notification"
   topic = google_pubsub_topic.send_instructions.id
