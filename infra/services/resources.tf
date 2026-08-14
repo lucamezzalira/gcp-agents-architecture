@@ -203,6 +203,21 @@ resource "google_service_account_iam_member" "ci_wif" {
   member             = var.github_wif_principal
 }
 
+# WIF ADC is an external account. print-identity-token --impersonate-service-account
+# calls generateIdToken as services-ci, which needs tokenCreator on itself.
+resource "google_service_account_iam_member" "ci_self_token_creator" {
+  service_account_id = google_service_account.ci.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.ci.email}"
+}
+
+resource "google_service_account_iam_member" "ci_wif_token_creator" {
+  count              = var.github_wif_principal == "" ? 0 : 1
+  service_account_id = google_service_account.ci.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = var.github_wif_principal
+}
+
 resource "google_storage_bucket_iam_member" "checkout_write" {
   bucket = google_storage_bucket.bodies.name
   role   = "roles/storage.objectUser"

@@ -11,7 +11,7 @@ from health_agent.models import (
     ScoreResult,
 )
 
-KNOWN_RULE_IDS = [f"rule-{n}" for n in range(1, 10)]
+KNOWN_RULE_IDS = [f"rule-{n}" for n in range(1, 11)]
 
 
 def leftover_runtime_illustrative(payload: AnalysisPayload) -> bool:

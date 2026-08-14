@@ -91,6 +91,14 @@ export const ARCH_RULES: ArchRuleCard[] = [
     characteristic: "layering",
     penalty: 20,
   },
+  {
+    id: "rule-10",
+    title: "Services import observability as-is",
+    description:
+      "Every service imports @observability/runtime. None may boot a tracer, clone the logger, subclass it, or re-export the package.",
+    characteristic: "boundary-integrity",
+    penalty: 25,
+  },
 ];
 
 export const RULE_COUNT = ARCH_RULES.length;

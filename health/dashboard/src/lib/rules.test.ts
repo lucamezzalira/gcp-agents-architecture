@@ -7,8 +7,8 @@ import {
 } from "./rules.js";
 
 describe("architecture rule catalog", () => {
-  it("lists nine rules with a description and a penalty", () => {
-    expect(RULE_COUNT).toBe(9);
+  it("lists ten rules with a description and a penalty", () => {
+    expect(RULE_COUNT).toBe(10);
     expect(ARCH_RULES.map((rule) => rule.id)).toEqual([
       "rule-1",
       "rule-2",
@@ -19,6 +19,7 @@ describe("architecture rule catalog", () => {
       "rule-7",
       "rule-8",
       "rule-9",
+      "rule-10",
     ]);
     for (const rule of ARCH_RULES) {
       expect(rule.title.length).toBeGreaterThan(0);

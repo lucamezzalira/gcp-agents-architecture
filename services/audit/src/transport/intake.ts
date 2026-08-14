@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { withPubSubConsume } from "@observability/runtime";
 import { noteArrival } from "../domain/note-arrival.js";
 import type { Tape } from "../domain/ports/tape.js";
 
@@ -19,19 +20,15 @@ function decodeData(raw: string): unknown {
   }
 }
 
-export function mountIntake(
-  app: FastifyInstance,
-  tape: Tape,
-  stamp: (peer: string) => void,
-): void {
+export function mountIntake(app: FastifyInstance, tape: Tape): void {
   app.post("/intake", async (request, reply) => {
-    const peer = request.headers["x-ga-service"];
-    stamp(typeof peer === "string" ? peer : "unknown");
-    const parsed = pushBody.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "bad envelope" });
-    }
-    await noteArrival(decodeData(parsed.data.message.data), tape);
-    return reply.code(204).send();
+    return withPubSubConsume(request, "audit", async () => {
+      const parsed = pushBody.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "bad envelope" });
+      }
+      await noteArrival(decodeData(parsed.data.message.data), tape);
+      return reply.code(204).send();
+    });
   });
 }

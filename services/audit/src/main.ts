@@ -1,6 +1,6 @@
-import { bootAuditSpans } from "./infrastructure/telemetry.js";
+import { startTracing } from "@observability/runtime";
 
-await bootAuditSpans();
+await startTracing("audit");
 const { createRuntimeApp } = await import("./app.js");
 
 const port = Number(process.env.PORT ?? "3003");

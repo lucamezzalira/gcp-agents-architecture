@@ -2,14 +2,13 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { Tape } from "./domain/ports/tape.js";
 import { FirestoreTape } from "./infrastructure/firestore-tape.js";
 import { MemoryTape } from "./infrastructure/memory-tape.js";
-import { stampIntake } from "./infrastructure/telemetry.js";
 import { mountIntake } from "./transport/intake.js";
 import { mountStatus } from "./transport/status.js";
 
 export function buildAudit(tape: Tape): FastifyInstance {
   const server = Fastify();
   mountStatus(server);
-  mountIntake(server, tape, stampIntake);
+  mountIntake(server, tape);
   return server;
 }
 

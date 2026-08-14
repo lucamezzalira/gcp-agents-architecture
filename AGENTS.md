@@ -48,6 +48,7 @@ pnpm jscpd              # duplication
 7. Transport in one service must not depend on transport in another.
 8. Domain must not depend on infrastructure.
 9. Infrastructure must not depend on transport.
+10. Every service imports `@observability/runtime` as-is. Do not boot a tracer, clone the logger, or subclass it.
 
 Layer directory names (`transport/`, `domain/`, `infrastructure/`) are load-bearing. The architecture tests are written against them. NEVER rename or restructure them.
 

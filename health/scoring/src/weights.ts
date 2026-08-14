@@ -51,6 +51,7 @@ export const ARCH_PENALTIES: Record<string, ArchPenalty> = {
   "rule-7": { characteristic: "boundary-integrity", penalty: 25 },
   "rule-8": { characteristic: "layering", penalty: 20 },
   "rule-9": { characteristic: "layering", penalty: 20 },
+  "rule-10": { characteristic: "boundary-integrity", penalty: 25 },
 };
 
 export const CROSS_SERVICE_RULES = new Set([

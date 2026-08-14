@@ -23,7 +23,7 @@ def _payload(**overrides: object) -> AnalysisPayload:
         "timestamp": "2026-01-01T00:00:00.000Z",
         "archTests": [
             {"ruleId": f"rule-{n}", "passed": True, "violations": []}
-            for n in range(1, 10)
+            for n in range(1, 11)
         ],
         "dependencyCruiser": {
             "cycles": [],
@@ -174,6 +174,7 @@ def test_facts_include_layer_profiles_and_active_rules() -> None:
     assert isinstance(active, list)
     assert "rule-5" in active
     assert "rule-9" in active
+    assert "rule-10" in active
 
 
 def test_metrics_from_payload_stores_service_coupling() -> None:
@@ -249,6 +250,7 @@ def test_instruction_covers_efferent_level_and_existing_rules() -> None:
     assert "not a hidden" in text
     assert "packages/observability" in text
     assert "must not subclass" in text
+    assert "rule 10 fails" in collapsed
     assert "silence about memory is a correct outcome" in collapsed
     assert "must name the commit and come from a retrieved record" in collapsed
     assert "never state that a commit fixed, introduced or resolved" in collapsed

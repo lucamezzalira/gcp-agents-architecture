@@ -534,6 +534,32 @@ describe("score", () => {
     expect(serviceScore(result, "checkout").overall).toBe(84);
     expect(result.overall).toBe(89);
   });
+
+  it("drops checkout boundary when it wraps observability and does not touch CSI", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      archTests: [
+        {
+          ruleId: "rule-10",
+          passed: false,
+          violations: [
+            {
+              file: "services/checkout/src/logger.ts",
+              detail: "defines a local logger factory; import @observability/runtime as-is",
+              service: "checkout",
+            },
+          ],
+        },
+      ],
+    };
+    const result = score(payload, []);
+    expect(serviceChar(result, "checkout", "boundary-integrity").score).toBe(75);
+    expect(serviceChar(result, "notification", "boundary-integrity").score).toBe(
+      100,
+    );
+    expect(characteristic(result, "cross-service-integrity").score).toBe(100);
+  });
 });
 
 describe("classifyClone", () => {

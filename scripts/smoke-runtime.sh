@@ -13,7 +13,13 @@ echo "synthetic smoke: place an order, reserve stock, pay, send a confirmation, 
 
 identity_token() {
   local audience="$1"
-  gcloud auth print-identity-token --audiences="$audience"
+  # WIF and user ADC are not service accounts. --audiences only works when
+  # gcloud mints the token by impersonating one (services-ci in GitHub Actions).
+  local args=(--audiences="$audience" --quiet)
+  if [[ -n "${SERVICES_CI_SA:-}" ]]; then
+    args+=(--impersonate-service-account="$SERVICES_CI_SA" --include-email)
+  fi
+  gcloud auth print-identity-token "${args[@]}"
 }
 
 request() {

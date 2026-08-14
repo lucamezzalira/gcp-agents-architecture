@@ -304,6 +304,7 @@ The agent receives the computed scores and writes reasoning and recommendations 
 **Checkout service**
 - Marking an order paid renders HTML, stores it, and publishes a `SendInstruction` with a `bodyRef` pointing at it.
 - Checkout never imports the provider client. Enforced by ts-arch rule 3.
+- Every service imports `@observability/runtime` as-is. Enforced by rule 10.
 
 **Architecture tests**
 - Each rule has a fixture that passes and a fixture that fails. A rule whose pattern matches everything, or nothing, cannot pass the suite.

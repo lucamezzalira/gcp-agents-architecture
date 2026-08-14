@@ -30,7 +30,7 @@ The same boundary breach also penalises platform `cross-service-integrity`, beca
 
 ## Services
 
-Known services in this build: `checkout`, `notification`, and `inventory`. A service listed in the payload is scored even when it has no findings (every characteristic 100). New services are included from their first commit.
+Known services in this build: `checkout`, `notification`, `inventory`, and `audit`. A service listed in the payload is scored even when it has no findings (every characteristic 100). New services are included from their first commit.
 
 ## Penalties
 
@@ -49,6 +49,7 @@ Known services in this build: `checkout`, `notification`, and `inventory`. A ser
 | ts-arch | rule 7 | `cross-service-integrity` | platform | 25 |
 | ts-arch | rule 8 (domain imports infrastructure) | `layering` | offending service | 20 |
 | ts-arch | rule 9 (infrastructure imports transport) | `layering` | offending service | 20 |
+| ts-arch | rule 10 (service skips or wraps `@observability/runtime`) | `boundary-integrity` | offending service | 25 |
 | dependency-cruiser | each cycle | `coupling` | service owning the cycle path | 15 |
 | dependency-cruiser | each orphan | `coupling` | service owning the orphan | 5 |
 | dependency-cruiser | each `not-to-unresolvable` | `coupling` | service owning `from` | 10 |
@@ -185,3 +186,7 @@ The dashboard reports the worst service and the count of services below 80 on th
 ### Version 6
 
 Penalties apply to architectural state, not to recent change. Clone findings always use the current count. Efferent coupling is `currentCe * 10` every run, including the first observation. Prior counts stay on the payload for the reasoner and do not move a score.
+
+### Version 7
+
+Rule 10: every service under `services/` must import `@observability/runtime`. A service that boots its own tracer, clones `createJsonLogger` / `silentLogger`, subclasses the logger, or re-exports the package fails. Penalty 25 on that service's `boundary-integrity`. Not a cross-service-integrity rule. The package remains the only place that talks to the tracing SDK.

@@ -75,8 +75,9 @@ runtime edge is dead coupling. p95-latency and error-rate remain
 illustrative.
 Observability (logger and tracing) lives in packages/observability.
 Services import that package as-is. They must not subclass or wrap it.
-Email rendering and send-instruction publishers stay duplicated on
-purpose.
+Rule 10 fails when a service boots its own tracer, clones the logger,
+or never imports @observability/runtime. Email rendering and
+send-instruction publishers stay duplicated on purpose.
 Retrieved memoryBank entries are structured score records, not
 narrative. Use them where they are relevant to what this commit
 changed. Say nothing about memory when they are not. Silence about

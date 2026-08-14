@@ -30,6 +30,8 @@ jobs:
       - name: Generate synthetic traffic
         id: smoke
         if: steps.auth.outcome == 'success'
+        env:
+          SERVICES_CI_SA: ${{ vars.SERVICES_CI_SA }}
         run: |
           echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
           bash scripts/smoke-runtime.sh

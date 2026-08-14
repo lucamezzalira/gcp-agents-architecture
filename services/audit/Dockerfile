@@ -12,6 +12,7 @@ COPY health/mcp-server/package.json health/mcp-server/package.json
 COPY analysis/package.json analysis/package.json
 COPY packages/observability/package.json packages/observability/package.json
 RUN pnpm install --frozen-lockfile
+COPY packages/observability ./packages/observability
 COPY services/audit ./services/audit
 ENV PORT=8080
 EXPOSE 8080

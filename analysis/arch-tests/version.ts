@@ -1,4 +1,4 @@
-export const RULE_SET_VERSION = 5;
+export const RULE_SET_VERSION = 7;
 
 export const RULE_IDS = [
   "rule-1",
@@ -10,6 +10,7 @@ export const RULE_IDS = [
   "rule-7",
   "rule-8",
   "rule-9",
+  "rule-10",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];

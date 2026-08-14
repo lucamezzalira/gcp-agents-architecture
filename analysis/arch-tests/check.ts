@@ -1,4 +1,5 @@
 import { filesOfProject } from "tsarch";
+import { checkObservability } from "./observability.js";
 import { RULE_IDS, RULE_SET_VERSION, type RuleId } from "./version.js";
 
 export { RULE_IDS, RULE_SET_VERSION, type RuleId };
@@ -179,6 +180,7 @@ export async function checkArchitecture(
     r7,
     r8,
     r9,
+    r10,
   ] = await Promise.all([
     combined("rule-1", [rule1Folder, rule1Clients]),
     result("rule-2", rule2),
@@ -189,10 +191,11 @@ export async function checkArchitecture(
     combined("rule-7", [rule7Checkout, rule7Notification]),
     result("rule-8", rule8),
     result("rule-9", rule9),
+    checkObservability(tsConfigFilePath),
   ]);
 
   const byId = new Map(
-    [r1, r2, r3, r4, r5, r6, r7, r8, r9].map((item) => [item.ruleId, item]),
+    [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10].map((item) => [item.ruleId, item]),
   );
   return RULE_IDS.map((id) => {
     const found = byId.get(id);
