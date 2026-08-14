@@ -1,24 +1,24 @@
-export type LogFields = Record<string, string | number | boolean>;
+export type AttrMap = { [name: string]: string | number | boolean };
 
-export type CorrelatedLogger = {
-  info(event: string, fields?: LogFields): void;
-  warn(event: string, fields?: LogFields): void;
-  error(event: string, fields?: LogFields): void;
+export type BoundLog = {
+  info(name: string, attrs?: AttrMap): void;
+  warn(name: string, attrs?: AttrMap): void;
+  error(name: string, attrs?: AttrMap): void;
 };
 
-export type Logger = {
-  withCorrelation(correlationId: string): CorrelatedLogger;
+export type Log = {
+  bind(cid: string): BoundLog;
 };
 
-export function quietLogger(): Logger {
-  const noop = {
+export function quietLog(): Log {
+  const sink: BoundLog = {
     info() {},
     warn() {},
     error() {},
   };
   return {
-    withCorrelation() {
-      return noop;
+    bind() {
+      return sink;
     },
   };
 }

@@ -1,39 +1,49 @@
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
-import type { Logger } from "../domain/ports/logger.js";
-import { parseReservationCommand } from "../domain/reservation-command.js";
-import type { ReservationCommand } from "../domain/reservation-command.js";
-
-const envelopeSchema = z.object({
-  message: z.object({
-    data: z.string().min(1),
-  }),
-});
+import type { Log } from "../domain/ports/logger.js";
+import {
+  parseReservationCommand,
+  type ReservationCommand,
+} from "../domain/reservation-command.js";
 
 export type ReservationHandler = (command: ReservationCommand) => Promise<void>;
+
+function decodePushBody(body: unknown): Buffer | undefined {
+  if (typeof body !== "object" || body === null || !("message" in body)) {
+    return undefined;
+  }
+  const message = (body as { message: unknown }).message;
+  if (typeof message !== "object" || message === null || !("data" in message)) {
+    return undefined;
+  }
+  const data = (message as { data: unknown }).data;
+  if (typeof data !== "string" || data.length === 0) {
+    return undefined;
+  }
+  return Buffer.from(data, "base64");
+}
 
 export async function processReservationBytes(
   data: Buffer,
   handle: ReservationHandler,
-  logger: Logger,
+  log: Log,
 ): Promise<"ack" | "nack"> {
-  let payload: unknown;
+  let parsed: unknown;
   try {
-    payload = JSON.parse(data.toString("utf8")) as unknown;
+    parsed = JSON.parse(data.toString("utf8")) as unknown;
   } catch {
-    logger.withCorrelation("unparsed").warn("reservation.invalid");
+    log.bind("unparsed").warn("reservation.invalid");
     return "ack";
   }
-  const command = parseReservationCommand(payload);
+  const command = parseReservationCommand(parsed);
   if (command === undefined) {
-    logger.withCorrelation("unparsed").warn("reservation.invalid");
+    log.bind("unparsed").warn("reservation.invalid");
     return "ack";
   }
   try {
     await handle(command);
     return "ack";
   } catch {
-    logger.withCorrelation(command.orderId).error("reservation.nacked");
+    log.bind(command.orderId).error("reservation.nacked");
     return "nack";
   }
 }
@@ -41,16 +51,15 @@ export async function processReservationBytes(
 export function registerReservationPushRoute(
   app: FastifyInstance,
   handle: ReservationHandler,
-  logger: Logger,
+  log: Log,
 ): void {
   app.post("/pubsub", async (request, reply) => {
-    const parsed = envelopeSchema.safeParse(request.body);
-    if (!parsed.success) {
-      logger.withCorrelation("unparsed").warn("pubsub.invalid");
+    const bytes = decodePushBody(request.body);
+    if (bytes === undefined) {
+      log.bind("unparsed").warn("pubsub.invalid");
       return reply.code(400).send({ error: "invalid pubsub envelope" });
     }
-    const data = Buffer.from(parsed.data.message.data, "base64");
-    const decision = await processReservationBytes(data, handle, logger);
+    const decision = await processReservationBytes(bytes, handle, log);
     if (decision === "nack") {
       return reply.code(500).send({ error: "nack" });
     }

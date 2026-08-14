@@ -4,7 +4,7 @@ import {
   expireReservations,
 } from "./domain/expire-reservations.js";
 import { handleReservation } from "./domain/handle-reservation.js";
-import { quietLogger, type Logger } from "./domain/ports/logger.js";
+import { quietLog, type Log } from "./domain/ports/logger.js";
 import type { OutcomePublisher } from "./domain/ports/outcome-publisher.js";
 import type { ReservationStore } from "./domain/ports/reservation-store.js";
 import type { StockStore } from "./domain/ports/stock-store.js";
@@ -36,7 +36,7 @@ function buildServer(
   stock: StockStore,
   reservations: ReservationStore,
   outcomes: OutcomePublisher,
-  logger: Logger,
+  logger: Log,
   ttlMs: number,
 ): FastifyInstance {
   const handle: ReservationHandler = async (command) => {
@@ -68,7 +68,7 @@ function buildServer(
   return server;
 }
 
-export function createApp(logger: Logger = quietLogger()): InventoryApp {
+export function createApp(logger: Log = quietLog()): InventoryApp {
   const stock = new MemoryStock();
   const reservations = new MemoryReservations();
   const outcomes = new MemoryOutcomes();

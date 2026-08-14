@@ -1,33 +1,32 @@
-import type { Logger, LogFields } from "../domain/ports/logger.js";
+import type { AttrMap, Log } from "../domain/ports/logger.js";
 
-export class LineLogger implements Logger {
+export class LineLogger implements Log {
   constructor(private readonly serviceName: string) {}
 
-  withCorrelation(correlationId: string) {
+  bind(cid: string): {
+    info(name: string, attrs?: AttrMap): void;
+    warn(name: string, attrs?: AttrMap): void;
+    error(name: string, attrs?: AttrMap): void;
+  } {
     const serviceName = this.serviceName;
-    const emit = (level: string, event: string, fields?: LogFields): void => {
-      const line = [
-        `svc=${serviceName}`,
-        `lvl=${level}`,
-        `evt=${event}`,
-        `cid=${correlationId}`,
-      ];
-      if (fields !== undefined) {
-        for (const [key, value] of Object.entries(fields)) {
-          line.push(`${key}=${String(value)}`);
+    const emit = (level: string, name: string, attrs?: AttrMap): void => {
+      const parts = [`svc=${serviceName}`, `lvl=${level}`, `evt=${name}`, `cid=${cid}`];
+      if (attrs !== undefined) {
+        for (const key of Object.keys(attrs)) {
+          parts.push(`${key}=${String(attrs[key])}`);
         }
       }
-      process.stdout.write(`${line.join(" ")}\n`);
+      process.stdout.write(`${parts.join(" ")}\n`);
     };
     return {
-      info(event: string, fields?: LogFields) {
-        emit("info", event, fields);
+      info(name, attrs) {
+        emit("info", name, attrs);
       },
-      warn(event: string, fields?: LogFields) {
-        emit("warn", event, fields);
+      warn(name, attrs) {
+        emit("warn", name, attrs);
       },
-      error(event: string, fields?: LogFields) {
-        emit("error", event, fields);
+      error(name, attrs) {
+        emit("error", name, attrs);
       },
     };
   }

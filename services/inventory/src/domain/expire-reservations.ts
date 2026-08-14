@@ -1,4 +1,4 @@
-import type { Logger } from "./ports/logger.js";
+import type { Log } from "./ports/logger.js";
 import type { OutcomePublisher } from "./ports/outcome-publisher.js";
 import type { ReservationStore } from "./ports/reservation-store.js";
 import type { StockStore } from "./ports/stock-store.js";
@@ -10,7 +10,7 @@ export type ExpireDeps = {
   stock: StockStore;
   reservations: ReservationStore;
   outcomes: OutcomePublisher;
-  logger: Logger;
+  logger: Log;
 };
 
 export function isExpired(
@@ -51,7 +51,7 @@ export async function expireReservations(
       sku: reservation.sku,
       units: reservation.units,
     });
-    deps.logger.withCorrelation(reservation.orderId).info("reservation.expired");
+    deps.logger.bind(reservation.orderId).info("reservation.expired");
     expired += 1;
   }
   return expired;

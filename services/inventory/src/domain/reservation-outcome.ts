@@ -1,10 +1,20 @@
-import { z } from "zod";
+export const OUTCOME_RESULTS = [
+  "reserved",
+  "rejected",
+  "released",
+  "confirmed",
+  "expired",
+] as const;
 
-export const reservationOutcomeSchema = z.object({
-  orderId: z.string().min(1),
-  result: z.enum(["reserved", "rejected", "released", "confirmed", "expired"]),
-  sku: z.string().min(1),
-  units: z.number().int().nonnegative(),
-});
+export type OutcomeResult = (typeof OUTCOME_RESULTS)[number];
 
-export type ReservationOutcome = z.infer<typeof reservationOutcomeSchema>;
+export type ReservationOutcome = {
+  orderId: string;
+  result: OutcomeResult;
+  sku: string;
+  units: number;
+};
+
+export function isOutcomeResult(value: string): value is OutcomeResult {
+  return (OUTCOME_RESULTS as readonly string[]).includes(value);
+}

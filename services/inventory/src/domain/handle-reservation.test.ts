@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { handleReservation } from "./handle-reservation.js";
-import { quietLogger } from "./ports/logger.js";
+import { quietLog } from "./ports/logger.js";
 import { MemoryOutcomes } from "../infrastructure/memory-outcomes.js";
 import { MemoryReservations } from "../infrastructure/memory-reservations.js";
 import { MemoryStock } from "../infrastructure/memory-stock.js";
@@ -10,7 +10,7 @@ function setup() {
     stock: new MemoryStock(),
     reservations: new MemoryReservations(),
     outcomes: new MemoryOutcomes(),
-    logger: quietLogger(),
+    logger: quietLog(),
     now: () => new Date("2026-08-14T10:00:00.000Z"),
   };
 }

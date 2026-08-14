@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { expireReservations, isExpired } from "./expire-reservations.js";
-import { quietLogger } from "./ports/logger.js";
+import { quietLog } from "./ports/logger.js";
 import { MemoryOutcomes } from "../infrastructure/memory-outcomes.js";
 import { MemoryReservations } from "../infrastructure/memory-reservations.js";
 import { MemoryStock } from "../infrastructure/memory-stock.js";
@@ -32,7 +32,7 @@ describe("expireReservations", () => {
     await reservations.save(held);
 
     const count = await expireReservations(
-      { stock, reservations, outcomes, logger: quietLogger() },
+      { stock, reservations, outcomes, logger: quietLog() },
       new Date("2026-08-14T09:20:00.000Z"),
       15 * 60 * 1000,
     );

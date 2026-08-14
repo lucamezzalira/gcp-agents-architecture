@@ -1,4 +1,4 @@
-import type { Logger } from "./ports/logger.js";
+import type { Log } from "./ports/logger.js";
 import type { OutcomePublisher } from "./ports/outcome-publisher.js";
 import type { ReservationStore } from "./ports/reservation-store.js";
 import type { StockStore } from "./ports/stock-store.js";
@@ -10,7 +10,7 @@ export type HandleReservationDeps = {
   stock: StockStore;
   reservations: ReservationStore;
   outcomes: OutcomePublisher;
-  logger: Logger;
+  logger: Log;
   now: () => Date;
 };
 
@@ -28,7 +28,7 @@ export async function handleReservation(
   command: ReservationCommand,
   deps: HandleReservationDeps,
 ): Promise<void> {
-  const log = deps.logger.withCorrelation(command.orderId);
+  const log = deps.logger.bind(command.orderId);
   if (command.action === "reserve") {
     const level = await deps.stock.get(command.sku);
     const available = level?.available ?? 0;
