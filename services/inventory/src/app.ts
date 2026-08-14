@@ -15,6 +15,7 @@ import {
   FirestoreInventory,
 } from "./infrastructure/firestore-inventory.js";
 import { GcsHtml } from "./infrastructure/gcs-html.js";
+import { HttpInstructionPublisher } from "./infrastructure/http-instruction-publisher.js";
 import { LineLogger } from "./infrastructure/line-logger.js";
 import { MemoryHtml } from "./infrastructure/memory-html.js";
 import { MemoryMail } from "./infrastructure/memory-mail.js";
@@ -22,7 +23,7 @@ import { MemoryOutcomes } from "./infrastructure/memory-outcomes.js";
 import { MemoryReservations } from "./infrastructure/memory-reservations.js";
 import { MemoryStock } from "./infrastructure/memory-stock.js";
 import { PubSubOutcomes } from "./infrastructure/pubsub-outcomes.js";
-import { TopicMail } from "./infrastructure/topic-mail.js";
+import { PubSubInstructionPublisher } from "./infrastructure/pubsub-instruction-publisher.js";
 import { registerHealthRoute } from "./transport/health-route.js";
 import {
   registerReservationPushRoute,
@@ -104,14 +105,18 @@ export function createLocalApp(): FastifyInstance {
   const stock = new MemoryStock();
   void stock.save({ sku: DEFAULT_SKU, available: 100 });
   const html = new MemoryHtml();
-  const mail = new MemoryMail();
+  const mailer =
+    process.env.NOTIFICATION_URL !== undefined &&
+    process.env.NOTIFICATION_URL.length > 0
+      ? new HttpInstructionPublisher(process.env.NOTIFICATION_URL)
+      : new MemoryMail();
   return buildServer(
     stock,
     new MemoryReservations(),
     new MemoryOutcomes(),
     new LineLogger("inventory"),
     HELD_TTL_MS,
-    { html, mailer: mail },
+    { html, mailer },
   );
 }
 
@@ -124,7 +129,10 @@ export function createCloudApp(): FastifyInstance {
     bucket.length > 0 &&
     topic !== undefined &&
     topic.length > 0
-      ? { html: new GcsHtml(bucket), mailer: new TopicMail(topic) }
+      ? {
+          html: new GcsHtml(bucket),
+          mailer: PubSubInstructionPublisher.fromTopicName(topic),
+        }
       : undefined;
   return buildServer(
     firestore,

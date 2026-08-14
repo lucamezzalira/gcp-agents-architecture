@@ -1,0 +1,34 @@
+{
+  "commit": 4,
+  "commitSha": "86487ab973c643f5bd512a4c61c50f67945a19b6",
+  "commitMessage": "Let inventory warn ops about low stock through the same send-instruction contract checkout already uses.",
+  "runId": "86487ab973c643f5bd512a4c61c50f67945a19b6:c3fefe2833d7454281fa259a5f796110",
+  "reasoner": "adk",
+  "ruleSetVersion": 5,
+  "overall": 100,
+  "services": { "checkout": 100, "inventory": 100, "notification": 100 },
+  "characteristics": {
+    "boundary-integrity": 100,
+    "layering": 100,
+    "coupling": 100,
+    "duplication": 100,
+    "cross-service-integrity": 100
+  },
+  "csi": {
+    "score": 100,
+    "signalsUsed": [],
+    "clonePairs": [
+      ["services/checkout/src/domain/ports/logger.ts", "services/notification/src/domain/ports/logger.ts"],
+      ["services/checkout/src/infrastructure/file-body-store.ts", "services/notification/src/infrastructure/file-body-store.ts"]
+    ]
+  },
+  "archFailed": [],
+  "publisherDistinctFromCheckout": true,
+  "sendInstructionCloneDetected": false,
+  "agentQuotes": {
+    "boundary-integrity": "The score does not cover non-code boundaries or contracts between services.",
+    "cross-service-integrity": "No violations of cross-service integrity rules (3-5, 7) were found. While the analysis identified cross-service clones between `checkout` and `notification` (`logger.ts` and `file-body-store.ts`), their presence is currently within the allowed threshold.",
+    "inventory-boundary": "The inventory service has no boundary violations. Recent changes to add notification capabilities, as seen in the changed files, were implemented without violating the service's boundary rules."
+  },
+  "findings": "Inventory renders its own HTML and publishes SendInstruction. Arch still all pass. send-instruction.ts did not clone (checkout has a describe() on bodyRef). Rules 4/5/7 still name checkout and notification only, so a third caller of the mail contract is invisible to them. CSI stayed 100, one number, no per-relationship split. Agent (adk) said scores do not cover contracts between services, then treated the new path as a clean boundary. It did not name three callers, missing priority, or operational versus transactional intent living in the subject line."
+}
