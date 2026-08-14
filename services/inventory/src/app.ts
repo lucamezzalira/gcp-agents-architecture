@@ -1,14 +1,14 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import {
-  DEFAULT_RESERVATION_TTL_MS,
-  expireReservations,
-} from "./domain/expire-reservations.js";
 import { handleReservation } from "./domain/handle-reservation.js";
 import { quietLog, type Log } from "./domain/ports/logger.js";
 import type { OutcomePublisher } from "./domain/ports/outcome-publisher.js";
 import type { ReservationStore } from "./domain/ports/reservation-store.js";
 import type { StockStore } from "./domain/ports/stock-store.js";
 import { DEFAULT_SKU } from "./domain/stock.js";
+import {
+  expireHeldInAdapter,
+  HELD_TTL_MS,
+} from "./infrastructure/expire-held.js";
 import {
   asReservationStore,
   FirestoreInventory,
@@ -40,8 +40,8 @@ function buildServer(
   ttlMs: number,
 ): FastifyInstance {
   const handle: ReservationHandler = async (command) => {
-    await expireReservations(
-      { stock, reservations, outcomes, logger },
+    await expireHeldInAdapter(
+      { stock, reservations, outcomes, log: logger },
       new Date(),
       ttlMs,
     );
@@ -58,8 +58,8 @@ function buildServer(
   registerStockRoutes(server, stock, logger);
   registerReservationPushRoute(server, handle, logger);
   server.post("/expire", async (_request, reply) => {
-    const count = await expireReservations(
-      { stock, reservations, outcomes, logger },
+    const count = await expireHeldInAdapter(
+      { stock, reservations, outcomes, log: logger },
       new Date(),
       ttlMs,
     );
@@ -78,7 +78,7 @@ export function createApp(logger: Log = quietLog()): InventoryApp {
       reservations,
       outcomes,
       logger,
-      DEFAULT_RESERVATION_TTL_MS,
+      HELD_TTL_MS,
     ),
     stock,
     reservations,
@@ -94,7 +94,7 @@ export function createLocalApp(): FastifyInstance {
     new MemoryReservations(),
     new MemoryOutcomes(),
     new LineLogger("inventory"),
-    DEFAULT_RESERVATION_TTL_MS,
+    HELD_TTL_MS,
   );
 }
 
@@ -105,7 +105,7 @@ export function createCloudApp(): FastifyInstance {
     asReservationStore(firestore),
     PubSubOutcomes.forTopic(requireEnv("RESERVATION_OUTCOMES_TOPIC")),
     new LineLogger("inventory"),
-    Number(process.env.RESERVATION_TTL_MS ?? DEFAULT_RESERVATION_TTL_MS),
+    Number(process.env.RESERVATION_TTL_MS ?? HELD_TTL_MS),
   );
 }
 

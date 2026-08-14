@@ -1,0 +1,43 @@
+{
+  "commit": 1,
+  "commitSha": "bab83ea3a04bacff92616fd7ef543c1085e61760",
+  "landingSha": "60f180fcd5d27a0cd01564e430ce1b0830c4baf4",
+  "commitMessage": "Keep inventory's logger and push path from cloning checkout and notification.",
+  "runId": "bab83ea3a04bacff92616fd7ef543c1085e61760:0b47eb27050942e1aa0193b27ca7e93f",
+  "reasoner": "adk",
+  "ruleSetVersion": 5,
+  "prior": {
+    "commitSha": "3dee97dee63baeb40666acd82aad6cb8fb519d8a",
+    "overall": 100,
+    "services": { "checkout": 100, "notification": 100 }
+  },
+  "overall": 100,
+  "services": {
+    "checkout": 100,
+    "inventory": 100,
+    "notification": 100
+  },
+  "characteristics": {
+    "boundary-integrity": 100,
+    "layering": 100,
+    "coupling": 100,
+    "duplication": 100,
+    "cross-service-integrity": 100
+  },
+  "csi": {
+    "score": 100,
+    "crossServiceClones": 2,
+    "clonePairs": [
+      ["services/checkout/src/domain/ports/logger.ts", "services/notification/src/domain/ports/logger.ts"],
+      ["services/checkout/src/infrastructure/file-body-store.ts", "services/notification/src/infrastructure/file-body-store.ts"]
+    ],
+    "signalsUsed": []
+  },
+  "serviceMetrics": [
+    { "service": "checkout", "afferentCoupling": 0, "efferentCoupling": 0 },
+    { "service": "inventory", "afferentCoupling": 0, "efferentCoupling": 0 },
+    { "service": "notification", "afferentCoupling": 0, "efferentCoupling": 0 }
+  ],
+  "archTests": "all nine rules passed",
+  "findings": "Inventory scored 100 on all four characteristics. Checkout and notification stayed at 100. Platform overall stayed 100 (prior 3dee97d was already 100). A third service at 100 cannot lift a ceilinged mean: mean([100,100]) = 100 and mean([100,100,100]) = 100. The formula would lift a sub-100 estate; at 100 the third service is invisible on overall. The dashboard now shows an inventory chip, so a reader can see three service scores, but nothing on the platform ring distinguishes a new 100 from real improvement. CSI is still one number covering checkout-notification clones and the new checkout-inventory relationship. Reasoner: adk."
+}
