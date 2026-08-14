@@ -439,10 +439,7 @@ export function score(
       (item) => item.characteristics.find((char) => char.id === id)?.score ?? 100,
     );
 
-  const rolledBoundary =
-    serviceScores.length === 0
-      ? 100
-      : Math.min(...serviceChar("boundary-integrity"));
+  const rolledBoundary = meanScore(serviceChar("boundary-integrity"));
   const rolledLayering = meanScore(serviceChar("layering"));
   const rolledCoupling = meanScore(serviceChar("coupling"));
   const rolledDuplication = meanScore(serviceChar("duplication"));

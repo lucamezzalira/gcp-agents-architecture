@@ -9,6 +9,8 @@ import {
   displayedOverall,
   hundredNote,
   improvementCopy,
+  platformRollupLine,
+  platformSpreadLine,
   polyline,
   ringOffset,
   ruleSetMarkers,
@@ -142,6 +144,18 @@ const historyHref = includeSuperseded
                   ? "Platform overall · click a commit on the trend to compare"
                   : `${selectedService} overall · click Overall to return`
               }
+            </p>
+            <p
+              class:list={["spread", selectedService === undefined ? "" : "is-hidden"]}
+              data-platform-spread
+            >
+              {platformSpreadLine(selected)}
+            </p>
+            <p
+              class:list={["rollup", selectedService === undefined ? "" : "is-hidden"]}
+              data-platform-rollup
+            >
+              {platformRollupLine()}
             </p>
           </div>
           <div class="panel meta-panel">
@@ -406,7 +420,9 @@ const historyHref = includeSuperseded
       <p class="rules-lead">
         Each characteristic starts at 100. A finding subtracts its penalty,
         floored at 0. The service that committed the import takes the hit.
-        Rules 3, 4, 5 and 7 also move platform cross-service-integrity.
+        Rules 3, 4, 5 and 7 also move platform cross-service-integrity, which
+        is the platform's boundary channel. Platform boundary-integrity is a
+        mean across services.
       </p>
       <ol class="rule-list">
         {ARCH_RULES.map((rule) => (

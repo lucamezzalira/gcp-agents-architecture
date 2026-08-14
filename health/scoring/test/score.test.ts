@@ -110,14 +110,14 @@ describe("score", () => {
     expect(serviceChar(result, "notification", "boundary-integrity").score).toBe(
       100,
     );
-    expect(characteristic(result, "boundary-integrity").score).toBe(60);
+    expect(characteristic(result, "boundary-integrity").score).toBe(80);
     expect(characteristic(result, "cross-service-integrity").score).toBe(60);
     expect(
       serviceChar(result, "checkout", "boundary-integrity").signalsUsed,
     ).toContain(
       "ts-arch:rule-3:services/checkout/src/infrastructure/email-provider.ts",
     );
-    expect(result.overall).toBe(78);
+    expect(result.overall).toBe(84);
     expect(serviceScore(result, "checkout").overall).toBe(84);
     expect(serviceScore(result, "notification").overall).toBe(100);
   });
@@ -469,6 +469,64 @@ describe("score", () => {
       100,
     );
     expect(characteristic(result, "cross-service-integrity").score).toBe(75);
+  });
+
+  it("raises the platform score when the second-worst service improves", () => {
+    const twoBreaches: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      archTests: [
+        {
+          ruleId: "rule-3",
+          passed: false,
+          violations: [
+            {
+              file: "services/checkout/src/app.ts",
+              detail: "email provider imported outside services/notification",
+              service: "checkout",
+            },
+          ],
+        },
+        {
+          ruleId: "rule-5",
+          passed: false,
+          violations: [
+            {
+              file: "services/notification/src/app.ts",
+              detail: "imports checkout internals",
+              service: "notification",
+            },
+          ],
+        },
+      ],
+    };
+    const notificationClean: AnalysisPayload = {
+      ...twoBreaches,
+      archTests: twoBreaches.archTests.filter((item) => item.ruleId === "rule-3"),
+    };
+    const worse = score(twoBreaches, []);
+    const better = score(notificationClean, []);
+    expect(serviceScore(worse, "checkout").overall).toBeLessThan(
+      serviceScore(worse, "notification").overall,
+    );
+    expect(characteristic(worse, "boundary-integrity").score).toBe(68);
+    expect(characteristic(better, "boundary-integrity").score).toBe(80);
+    expect(better.overall).toBeGreaterThan(worse.overall);
+  });
+
+  it("moves platform score proportionally when one of many services breaches", () => {
+    const names = Array.from({ length: 23 }, (_, index) =>
+      index === 0 ? "checkout" : `svc-${String(index).padStart(2, "0")}`,
+    );
+    const payload: AnalysisPayload = {
+      ...rule3Violation,
+      services: names,
+    };
+    const result = score(payload, []);
+    expect(characteristic(result, "boundary-integrity").score).toBe(98);
+    expect(characteristic(result, "cross-service-integrity").score).toBe(60);
+    expect(serviceScore(result, "checkout").overall).toBe(84);
+    expect(result.overall).toBe(89);
   });
 });
 

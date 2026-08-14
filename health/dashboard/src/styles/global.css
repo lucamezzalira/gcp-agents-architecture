@@ -156,6 +156,29 @@ body {
   min-height: 260px;
 }
 
+.spread,
+.rollup {
+  margin: 0.45rem 0 0;
+  text-align: center;
+  max-width: 16rem;
+}
+
+.spread {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.rollup {
+  color: var(--mute);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.is-hidden {
+  display: none;
+}
+
 .ring-wrap {
   position: relative;
   width: 168px;

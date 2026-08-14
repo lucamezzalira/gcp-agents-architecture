@@ -96,15 +96,17 @@ The platform's four original characteristics are composed from the per-service s
 
 | Characteristic | Roll-up |
 | --- | --- |
-| `boundary-integrity` | worst-of (minimum) across services |
+| `boundary-integrity` | mean, rounded |
 | `layering` | mean, rounded |
 | `coupling` | mean, rounded |
 | `duplication` | mean, rounded |
 | `cross-service-integrity` | scored on the platform; not a roll-up |
 
-Worst-of for boundary integrity: one service in ruins and one perfect must not average to tolerable.
+`cross-service-integrity` is the sole platform-level boundary channel. A boundary breach still lands there at weight 0.25. Rolling `boundary-integrity` as a mean avoids counting the same event twice and keeps the platform number able to move when a second-worst service improves. Worst-of hid that: one breach in a corner of a large estate looked identical to fifteen.
 
 If the payload lists no services, rolled-up characteristics are 100.
+
+The dashboard platform view names the lowest-scoring service beside the platform figure, and counts how many services score below 80. That threshold is presentation, not a scoring input. Neither a mean nor a worst-of carries spread, so the count sits next to the number rather than inside it.
 
 ## Overall
 
@@ -131,7 +133,7 @@ Weighted mean of the five platform characteristics.
 | `duplication` | 0.10 |
 | `cross-service-integrity` | 0.25 |
 
-A rule-3 finding therefore appears twice in the platform overall: once through worst-of `boundary-integrity`, and once through `cross-service-integrity`. That is intentional. The breach is both a service failure and a relationship failure.
+A rule-3 finding therefore appears in the platform overall once, through `cross-service-integrity`. The offending service's own `boundary-integrity` still drops. The platform's rolled-up `boundary-integrity` is the mean of the services, so one bad service does not set the number for everyone.
 
 ## New services and the denominator
 
@@ -171,3 +173,9 @@ Coupling now penalises efferent coupling growth only: `max(0, currentCe - priorC
 Duplication penalties are increase-only once a prior clone count exists. The first observation still scores the current count as the baseline.
 
 The reasoner receives those layer profiles and the active rule ids. It must not recommend reducing transport instability, and must not recommend adding a rule that is already in force.
+
+### Version 5
+
+Platform `boundary-integrity` is a mean across services, matching layering, coupling and duplication. Worst-of is gone. `cross-service-integrity` remains the sole platform-level boundary channel. Per-service scoring and the weights are unchanged.
+
+The dashboard reports the worst service and the count of services below 80 on the platform view. Those figures are presentation. They do not enter the score.

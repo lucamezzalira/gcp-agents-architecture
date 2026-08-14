@@ -231,4 +231,7 @@ def test_instruction_covers_efferent_growth_and_existing_rules() -> None:
     assert "already present" in text
     assert "activeRules" in INSTRUCTION or "activerules" in text
     assert "never recommend reducing" in text
+    collapsed = " ".join(text.split())
+    assert "mean of the services" in collapsed
+    assert "sole platform-level" in text
 

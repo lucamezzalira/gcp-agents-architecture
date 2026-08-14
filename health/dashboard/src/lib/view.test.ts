@@ -17,6 +17,10 @@ import {
   trendHeading,
   trendPoints,
   trendScores,
+  worstService,
+  servicesBelowThreshold,
+  platformSpreadLine,
+  SERVICE_SPREAD_THRESHOLD,
 } from "./view.js";
 import type { HealthRun } from "./types.js";
 
@@ -174,5 +178,20 @@ describe("buildDashboardModel", () => {
     expect(trendHeading()).toBe("Trend across commits");
     expect(trendCaption("checkout")).toMatch(/^checkout overall/);
     expect(trendCaption()).toMatch(/^Platform overall/);
+  });
+
+  it("names the worst service and counts those below 80", () => {
+    const run: HealthRun = {
+      ...restore,
+      overall: 76,
+      services: [
+        { service: "checkout", overall: 70, characteristics: [] },
+        { service: "notification", overall: 100, characteristics: [] },
+      ],
+    };
+    expect(worstService(run)).toEqual({ service: "checkout", overall: 70 });
+    expect(servicesBelowThreshold(run)).toBe(1);
+    expect(SERVICE_SPREAD_THRESHOLD).toBe(80);
+    expect(platformSpreadLine(run)).toBe("Worst checkout 70 · 1 of 2 below 80");
   });
 });

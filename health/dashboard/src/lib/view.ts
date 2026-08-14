@@ -66,6 +66,51 @@ export function displayedOverall(
   );
 }
 
+export const SERVICE_SPREAD_THRESHOLD = 80;
+
+export type WorstService = {
+  service: string;
+  overall: number;
+};
+
+export function worstService(run: HealthRun): WorstService | undefined {
+  if (run.services.length === 0) {
+    return undefined;
+  }
+  const ranked = [...run.services].sort((left, right) => {
+    if (left.overall !== right.overall) {
+      return left.overall - right.overall;
+    }
+    return left.service.localeCompare(right.service);
+  });
+  const found = ranked[0];
+  if (found === undefined) {
+    return undefined;
+  }
+  return { service: found.service, overall: found.overall };
+}
+
+export function servicesBelowThreshold(
+  run: HealthRun,
+  threshold = SERVICE_SPREAD_THRESHOLD,
+): number {
+  return run.services.filter((item) => item.overall < threshold).length;
+}
+
+export function platformRollupLine(): string {
+  return "Weighted mean of five characteristics. Boundary, layering, coupling and duplication are means across services. Cross-service-integrity is the platform boundary channel.";
+}
+
+export function platformSpreadLine(run: HealthRun): string {
+  const worst = worstService(run);
+  const below = servicesBelowThreshold(run);
+  const total = run.services.length;
+  if (worst === undefined) {
+    return `${below} of ${total} below ${SERVICE_SPREAD_THRESHOLD}`;
+  }
+  return `Worst ${worst.service} ${worst.overall} · ${below} of ${total} below ${SERVICE_SPREAD_THRESHOLD}`;
+}
+
 export function trendScores(
   runs: HealthRun[],
   service?: string,

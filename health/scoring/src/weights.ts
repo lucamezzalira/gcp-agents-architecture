@@ -69,3 +69,6 @@ export const EFFERENT_GROWTH_PENALTY = 10;
 export const INTERNAL_CLONE_PENALTY = 8;
 export const CROSS_SERVICE_CLONE_PENALTY = 10;
 export const SHARED_CLONE_PENALTY = 8;
+
+/** Services below this overall are counted as in trouble on the platform view. */
+export const SERVICE_SPREAD_THRESHOLD = 80;

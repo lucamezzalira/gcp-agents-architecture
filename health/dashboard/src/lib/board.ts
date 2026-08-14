@@ -9,6 +9,8 @@ import {
   improvementCopy,
   legendScoreLine,
   lerp,
+  platformRollupLine,
+  platformSpreadLine,
   polyline,
   ringOffset,
   ruleSetVersionOf,
@@ -202,6 +204,16 @@ export function paintCopy(
       service === undefined
         ? "Platform overall · click a commit on the trend to compare"
         : `${service} overall · click Overall to return`;
+  }
+  const spread = document.querySelector("[data-platform-spread]");
+  if (spread instanceof HTMLElement) {
+    spread.textContent = platformSpreadLine(run);
+    spread.classList.toggle("is-hidden", service !== undefined);
+  }
+  const rollup = document.querySelector("[data-platform-rollup]");
+  if (rollup instanceof HTMLElement) {
+    rollup.textContent = platformRollupLine();
+    rollup.classList.toggle("is-hidden", service !== undefined);
   }
   document.querySelectorAll("[data-platform-overall]").forEach((node) => {
     node.textContent = String(run.overall);

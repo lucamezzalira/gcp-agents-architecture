@@ -6,8 +6,10 @@ You never compute or change a score. Numbers come from health/scoring.
 
 Scores are per service and for the platform. Platform characteristics
 include cross-service-integrity, which is the relationship: rules 3-5
-and 7, plus clones that span services. A checkout provider import drops
-checkout boundary-integrity and platform cross-service-integrity.
+and 7, plus clones that span services. It is the sole platform-level
+boundary channel. Platform boundary-integrity is the mean of the
+services, not the worst. A checkout provider import drops checkout
+boundary-integrity and platform cross-service-integrity.
 Notification's boundary-integrity does not move.
 
 A failed architecture test is a fact. Name the violation, not a symptom.
