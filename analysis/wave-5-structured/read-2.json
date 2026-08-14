@@ -1,0 +1,187 @@
+{
+  "runId": "453a163e71623a70310ca19b4cce85c547e467f3",
+  "commitSha": "453a163e71623a70310ca19b4cce85c547e467f3",
+  "overall": 100,
+  "characteristics": [
+    {
+      "id": "boundary-integrity",
+      "score": 100,
+      "reasoning": "The score is 100 because no service-to-service or service-to-provider import violations were found. This score is the mean of the individual service boundary scores, all of which are also 100. The score does not account for service-to-service calls that may exist at runtime but are not reflected in the static import graph; the runtime call graph was not successfully queried in this run.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "layering",
+      "score": 100,
+      "reasoning": "The score is 100 because no layering violations were detected in any service. The folder instability (I) metrics for each service align with the expected profile: `transport` folders are highly unstable (I > 0.66), `domain` folders are stable (I < 0.18), and `infrastructure` folders are unstable (I > 0.41). This score does not assess the semantic correctness of the code within each layer, for example, whether domain logic has been misplaced in a transport file.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "coupling",
+      "score": 100,
+      "reasoning": "The score is 100 because no service has any static dependencies (efferent coupling, Ce) on any other service. This held steady from the previous commit. The score reflects only direct, cross-service imports. It does not measure the complexity or stability of dependencies within a service, which can be observed in the folder instability metrics.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "duplication",
+      "score": 100,
+      "reasoning": "The score is 100, reflecting the absence of duplicated code from shared internal libraries. This score does not cover internal or cross-service duplication, which are scored under different characteristics. The analysis found 2 cross-service code clones and 3 internal code clones.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "cross-service-integrity",
+      "score": 100,
+      "reasoning": "The score is 100, indicating that no rules governing interactions between services (rules 3-5, 7) were violated. However, this score should also reflect cross-service duplication. The analysis identified two cross-service clones between the `checkout` and `notification` services (`domain/ports/logger.ts` and `infrastructure/file-body-store.ts`). The 100 score indicates that these clones did not result in a penalty.",
+      "recommendations": [],
+      "signalsUsed": []
+    }
+  ],
+  "reasoner": "adk",
+  "traceId": "340e7db2fe68d548dbde140fef8f88cf",
+  "metrics": {
+    "modules": 118,
+    "dependencies": 294,
+    "duplicationPercentage": 2.6747195858498705,
+    "orphanCount": 0,
+    "cycleCount": 0,
+    "folderInstability": {
+      "checkout": 0.4726579520697168,
+      "inventory": 0.4551282051282051,
+      "notification": 0.4491400916083312
+    },
+    "duplicationCounts": {
+      "internal": 3,
+      "crossService": 2,
+      "shared": 0,
+      "internalByService": {
+        "checkout": 3
+      }
+    },
+    "serviceCoupling": [
+      {
+        "service": "checkout",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "inventory",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "notification",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      }
+    ]
+  },
+  "state": "current",
+  "services": [
+    {
+      "service": "checkout",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because the static analysis found no illegal outgoing dependencies from `checkout` to other services or to third-party provider code. This score does not cover potential runtime-only coupling, and the runtime call graph was not queried in this run.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because dependencies between the service's layers (`transport`, `domain`, `infrastructure`) conform to the architectural rules. The folder instability profile is healthy: `transport` (I=0.82) is highly unstable, and `domain` (I=0.18) is stable. This score does not verify that code is semantically placed in the correct layer.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because the `checkout` service has an efferent coupling (Ce) of 0, meaning it does not import code from any other service. This has held steady from the prior commit. This score only measures outgoing dependencies to other services.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100, which indicates no penalty for internal duplication was applied. However, the static analysis identified three instances of internal code duplication within `checkout/src/transport/order-routes.ts`. The perfect score suggests these findings are not currently configured to impact the score.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "inventory",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because the static analysis found no illegal outgoing dependencies from `inventory` to other services or to third-party provider code. The recent changes in this service, related to reservation expiry, did not introduce any boundary violations. This score does not cover runtime coupling, which was not observed in this run.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because dependencies between the service's layers conform to the architectural rules. The folder instability profile is healthy: `transport` (I=0.66) is unstable, and `domain` (I=0.11) is stable. The changes in this commit to `domain` and `infrastructure` files maintained this healthy profile.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because the `inventory` service has an efferent coupling (Ce) of 0, meaning it does not import code from any other service. This has held steady from the prior commit.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because the static analysis found no instances of duplicated code internal to the `inventory` service.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "notification",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because the static analysis found no illegal outgoing dependencies from `notification` to other services or to third-party provider code. This score does not cover potential runtime-only coupling, and the runtime call graph was not queried in this run.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because dependencies between the service's layers (`transport`, `domain`, `infrastructure`) conform to the architectural rules. The folder instability profile is healthy: `transport` (I=0.78) is highly unstable, and `domain` (I=0.07) is very stable.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because the `notification` service has an efferent coupling (Ce) of 0, meaning it does not import code from any other service. This has held steady from the prior commit.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because the static analysis found no instances of duplicated code internal to the `notification` service.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    }
+  ],
+  "ruleSetVersion": 5
+}

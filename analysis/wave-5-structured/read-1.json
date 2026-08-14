@@ -1,0 +1,193 @@
+{
+  "runId": "bab83ea3a04bacff92616fd7ef543c1085e61760",
+  "commitSha": "bab83ea3a04bacff92616fd7ef543c1085e61760",
+  "overall": 95,
+  "characteristics": [
+    {
+      "id": "boundary-integrity",
+      "score": 100,
+      "reasoning": "The platform boundary integrity score is the mean of the individual service scores. All services currently score 100, as no static analysis rules for service boundaries were violated. This score does not cover runtime-only dependencies, as the runtime call graph could not be queried for this run (`queried: false`).",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "layering",
+      "score": 100,
+      "reasoning": "No layering violations were found in any service. Folder instability metrics show healthy profiles across all services: domain layers are stable (e.g., checkout I=0.17, inventory I=0.24, notification I=0.07) and transport layers are appropriately unstable (e.g., checkout I=0.82, inventory I=0.66, notification I=0.78). The score only validates dependencies between layers, not the correctness of logic within them.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "coupling",
+      "score": 100,
+      "reasoning": "The coupling score is based on efferent (outgoing) static dependencies from one service to another. No such dependencies were found for any service, so all services score 100. This score does not reflect runtime coupling, as Cloud Trace was not queried for this run. It also does not score afferent (incoming) dependencies.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "duplication",
+      "score": 100,
+      "reasoning": "The platform duplication score is the average of service-level duplication scores. All services currently score 100. This score reflects duplication *within* a service boundary. Duplication *between* services is measured as part of cross-service-integrity and does not affect this score.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "cross-service-integrity",
+      "score": 80,
+      "reasoning": "The score is reduced due to two instances of cross-service duplication between the `checkout` and `notification` services. The duplicated files are:\n- `services/checkout/src/domain/ports/logger.ts` and `services/notification/src/domain/ports/logger.ts`\n- `services/checkout/src/infrastructure/file-body-store.ts` and `services/notification/src/infrastructure/file-body-store.ts`\nThis represents a violation of cross-service boundaries.",
+      "recommendations": [
+        "Consolidate the `logger.ts` port definition into a shared library or decide which service should own the canonical definition.",
+        "Abstract the `file-body-store.ts` logic into a shared infrastructure library that both services can import, removing the direct code copy."
+      ],
+      "signalsUsed": [
+        "jscpd:cross-service:services/checkout/src/domain/ports/logger.ts|services/notification/src/domain/ports/logger.ts",
+        "jscpd:cross-service:services/checkout/src/infrastructure/file-body-store.ts|services/notification/src/infrastructure/file-body-store.ts"
+      ]
+    }
+  ],
+  "reasoner": "adk",
+  "traceId": "c7d88ada71bfb74626b5c26a00d9988b",
+  "metrics": {
+    "modules": 118,
+    "dependencies": 296,
+    "duplicationPercentage": 2.670111972437554,
+    "orphanCount": 0,
+    "cycleCount": 0,
+    "folderInstability": {
+      "checkout": 0.4726579520697168,
+      "inventory": 0.445079365079365,
+      "notification": 0.4491400916083312
+    },
+    "duplicationCounts": {
+      "internal": 3,
+      "crossService": 2,
+      "shared": 0,
+      "internalByService": {
+        "checkout": 3
+      }
+    },
+    "serviceCoupling": [
+      {
+        "service": "checkout",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "inventory",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "notification",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      }
+    ]
+  },
+  "state": "current",
+  "services": [
+    {
+      "service": "checkout",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The checkout service has no static analysis violations of its boundaries; it does not import code from other services or from prohibited external libraries. This score does not reflect runtime behavior, as the runtime call graph was not queried.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "No layering violations were detected. The folder instability profile is healthy, with the domain layer being stable (I=0.17) and the transport layer being appropriately unstable (I=0.82). The score validates dependency directions but does not inspect the logic within each layer.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The service has an efferent coupling (Ce) count of 0, meaning it has no static dependencies on other services. This score does not reflect runtime coupling, which was not observed in this run, nor does it penalize for incoming (afferent) dependencies.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "While three instances of internal duplication were found in `services/checkout/src/transport/order-routes.ts`, they are below the token count that would trigger a score penalty. This score does not guarantee zero internal duplication.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "inventory",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The inventory service has no static analysis violations of its boundaries. This score does not reflect runtime behavior, as the runtime call graph was not queried. Changes in this commit were confined to this service and did not introduce boundary violations.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "No layering violations were detected. The folder instability profile is healthy, with the domain layer being stable (I=0.24) and the transport layer being appropriately unstable (I=0.66). The score validates dependency directions but does not inspect the logic within each layer.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The service has an efferent coupling (Ce) count of 0, meaning it has no static dependencies on other services. This score does not reflect runtime coupling, which was not observed in this run, nor does it penalize for incoming (afferent) dependencies.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "No internal duplication above the penalty threshold was detected. This score does not guarantee zero internal duplication.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "notification",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The notification service has no static analysis violations of its boundaries; it does not import code from other services or from prohibited external libraries. This score does not reflect runtime behavior, as the runtime call graph was not queried.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "No layering violations were detected. The folder instability profile is healthy, with the domain layer being highly stable (I=0.07) and the transport layer being appropriately unstable (I=0.78). The score validates dependency directions but does not inspect the logic within each layer.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The service has an efferent coupling (Ce) count of 0, meaning it has no static dependencies on other services. This score does not reflect runtime coupling, which was not observed in this run, nor does it penalize for incoming (afferent) dependencies.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "No internal duplication above the penalty threshold was detected. This score does not guarantee zero internal duplication.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    }
+  ],
+  "ruleSetVersion": 5
+}

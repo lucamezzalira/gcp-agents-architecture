@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from collections.abc import Coroutine
 from typing import TypeVar
@@ -59,58 +60,118 @@ class VertexMemoryBank:
         observation: str,
         metadata: dict[str, str] | None = None,
     ) -> None:
-        add_memory = getattr(self._svc, "add_memory", None)
-        if callable(add_memory):
-            _run(_write_direct(add_memory, self._app, self._user, observation))
-            return
-        from google.adk.events import Event
-        from google.adk.sessions import Session
-        from google.genai import types
+        del metadata
+        _run(self._create_memory(observation))
 
-        session = Session(
-            id=(metadata or {}).get("runId", "run"),
-            appName=self._app,
-            userId=self._user,
-            events=[
-                Event(
-                    author="health-agent",
-                    content=types.Content(
-                        role="user",
-                        parts=[types.Part(text=observation)],
-                    ),
-                )
-            ],
+    async def _create_memory(self, observation: str) -> None:
+        engine_id = self._svc._agent_engine_id
+        if not engine_id:
+            raise RuntimeError("Agent Engine ID is required for Memory Bank.")
+        api_client = self._svc._get_api_client()
+        response = await api_client.async_request(
+            http_method="POST",
+            path=f"reasoningEngines/{engine_id}/memories",
+            request_dict=memory_create_request(observation, self._app, self._user),
         )
-        _run(self._svc.add_session_to_memory(session))
+        payload = _http_payload(response)
+        if payload.get("error"):
+            raise RuntimeError(f"Memory Bank create failed: {payload['error']}")
+        print(
+            "memory_write_kind=create "
+            f"fact_lines={observation.count(chr(10)) + 1}",
+            flush=True,
+        )
+
+    def list_facts(self) -> list[str]:
+        return [fact for _, fact in self._list_memories()]
+
+    def purge(self) -> int:
+        client, engine = self._vertex_client()
+        names = [name for name, _ in self._list_memories()]
+        if names:
+            operation = client.agent_engines.memories.purge(
+                name=engine,
+                filter='scope.user_id="health-agent"',
+                force=True,
+                config={"wait_for_completion": True},
+            )
+            response = getattr(operation, "response", None)
+            purged = getattr(response, "purge_count", None)
+            print(
+                f"memory_purge_kind=filter count={purged if purged is not None else len(names)}",
+                flush=True,
+            )
+        remaining = [name for name, _ in self._list_memories()]
+        for name in remaining:
+            client.agent_engines.memories.delete(
+                name=name,
+                config={"wait_for_completion": True},
+            )
+        if remaining:
+            print(f"memory_purge_kind=delete count={len(remaining)}", flush=True)
+        left = self._list_memories()
+        if left:
+            raise RuntimeError(
+                f"Memory Bank purge left {len(left)} entries"
+            )
+        return len(names)
+
+    def _engine_name(self) -> str:
+        project = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+        location = os.environ.get(
+            "MEMORY_BANK_LOCATION",
+            os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
+        )
+        engine_id = os.environ.get("AGENT_ENGINE_ID", "")
+        return (
+            f"projects/{project}/locations/{location}/reasoningEngines/{engine_id}"
+        )
+
+    def _vertex_client(self) -> tuple[object, str]:
+        from vertexai import Client
+
+        project = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+        location = os.environ.get(
+            "MEMORY_BANK_LOCATION",
+            os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
+        )
+        return Client(project=project, location=location), self._engine_name()
+
+    def _list_memories(self) -> list[tuple[str, str]]:
+        client, engine = self._vertex_client()
+        found: list[tuple[str, str]] = []
+        for item in client.agent_engines.memories.list(name=engine):
+            name = getattr(item, "name", None)
+            fact = getattr(item, "fact", None)
+            if isinstance(name, str) and name:
+                found.append((name, fact if isinstance(fact, str) else ""))
+        return found
 
 
-async def _write_direct(
-    add_memory: object,
+def memory_create_request(
+    observation: str,
     app_name: str,
     user_id: str,
-    observation: str,
-) -> None:
-    from google.adk.memory.memory_entry import MemoryEntry
-    from google.genai import types
+) -> dict[str, object]:
+    """Exact fact, not LLM extraction. GenerateMemories would rewrite this as prose."""
+    return {
+        "fact": observation,
+        "scope": {
+            "app_name": app_name,
+            "user_id": user_id,
+        },
+    }
 
-    entry = MemoryEntry(
-        content=types.Content(
-            role="user",
-            parts=[types.Part(text=observation)],
-        )
-    )
-    try:
-        await add_memory(  # type: ignore[misc]
-            app_name=app_name,
-            user_id=user_id,
-            memories=[entry],
-        )
-    except TypeError:
-        await add_memory(  # type: ignore[misc]
-            app_name=app_name,
-            user_id=user_id,
-            memories=[observation],
-        )
+
+def _http_payload(response: object) -> dict[str, object]:
+    body = getattr(response, "body", None)
+    if isinstance(body, str) and body.strip():
+        parsed = json.loads(body)
+        if isinstance(parsed, dict):
+            return parsed
+    if isinstance(response, dict):
+        return response
+    return {}
 
 
 def _memory_text(item: object) -> str:
@@ -148,3 +209,25 @@ def choose_memory_bank() -> MemoryBank:
     if os.environ.get("K_SERVICE"):
         raise RuntimeError("AGENT_ENGINE_ID is required on Cloud Run")
     return NoopMemoryBank()
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=["list", "purge"])
+    args = parser.parse_args()
+    bank = VertexMemoryBank()
+    if args.command == "list":
+        facts = bank.list_facts()
+        print(f"memory_count={len(facts)}")
+        for fact in facts:
+            first = fact.splitlines()[0] if fact else ""
+            print(first)
+        return
+    removed = bank.purge()
+    print(f"purged={removed} remaining={len(bank.list_facts())}")
+
+
+if __name__ == "__main__":
+    main()

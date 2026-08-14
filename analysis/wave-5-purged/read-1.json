@@ -1,0 +1,193 @@
+{
+  "runId": "bab83ea3a04bacff92616fd7ef543c1085e61760",
+  "commitSha": "bab83ea3a04bacff92616fd7ef543c1085e61760",
+  "overall": 95,
+  "characteristics": [
+    {
+      "id": "boundary-integrity",
+      "score": 100,
+      "reasoning": "The platform boundary integrity score is the mean of the individual service scores. All services currently score 100, resulting in a platform score of 100. Static analysis did not find any violations, such as domain code depending on infrastructure or services importing third-party providers outside of the infrastructure layer. This score does not cover runtime coupling; the runtime call graph was not queried for this run.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "layering",
+      "score": 100,
+      "reasoning": "All services score 100 for layering. An inspection of folder instability metrics confirms a healthy layering profile across the platform: domain layers are stable (I < 0.25) and transport layers are unstable (I > 0.66), indicating that dependencies flow in the correct direction within each service.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "coupling",
+      "score": 100,
+      "reasoning": "The score is 100 because static analysis found no efferent coupling (outgoing dependencies) between services. This metric does not account for runtime-only coupling, such as direct API calls made without a shared client, and the runtime call graph from Cloud Trace was not available to verify this.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "duplication",
+      "score": 100,
+      "reasoning": "This score aggregates duplication from within each service. Since all services individually score 100, the platform score is also 100. This score explicitly does not include cross-service duplication, which is tracked as part of cross-service integrity.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "cross-service-integrity",
+      "score": 80,
+      "reasoning": "The score is reduced by two instances of cross-service code duplication between the checkout and notification services. The following files are clones: 1) `services/checkout/src/domain/ports/logger.ts` and `services/notification/src/domain/ports/logger.ts`. 2) `services/checkout/src/infrastructure/file-body-store.ts` and `services/notification/src/infrastructure/file-body-store.ts`. This represents a form of coupling not visible in the import graph. The commit message suggests an intentional effort was made to avoid introducing new cross-service clones in the inventory service.",
+      "recommendations": [
+        "To address the duplicated logger port, extract the port definition to a shared library or decide which service should own the canonical definition from which the other imports.",
+        "Consolidate the `file-body-store.ts` logic into a shared infrastructure helper if this functionality is intended to be common across multiple services."
+      ],
+      "signalsUsed": [
+        "jscpd:cross-service:services/checkout/src/domain/ports/logger.ts|services/notification/src/domain/ports/logger.ts",
+        "jscpd:cross-service:services/checkout/src/infrastructure/file-body-store.ts|services/notification/src/infrastructure/file-body-store.ts"
+      ]
+    }
+  ],
+  "reasoner": "adk",
+  "traceId": "f9d1af2a36cfac1753bff9d8011b788a",
+  "metrics": {
+    "modules": 118,
+    "dependencies": 296,
+    "duplicationPercentage": 2.670111972437554,
+    "orphanCount": 0,
+    "cycleCount": 0,
+    "folderInstability": {
+      "checkout": 0.4726579520697168,
+      "inventory": 0.445079365079365,
+      "notification": 0.4491400916083312
+    },
+    "duplicationCounts": {
+      "internal": 3,
+      "crossService": 2,
+      "shared": 0,
+      "internalByService": {
+        "checkout": 3
+      }
+    },
+    "serviceCoupling": [
+      {
+        "service": "checkout",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "inventory",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "notification",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      }
+    ]
+  },
+  "state": "current",
+  "services": [
+    {
+      "service": "checkout",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "Static analysis found no violations of architectural boundaries in the checkout service, such as the domain layer depending on infrastructure or transport.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layering within the checkout service is healthy. Folder instability metrics show a stable domain layer (I=0.17) and an unstable transport layer (I=0.82), which aligns with the expected architectural profile.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The checkout service has an efferent coupling (Ce) of 0, indicating it has no static dependencies on any other service in the monorepo.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "No significant internal code duplication was detected. The score does not account for the cross-service clones that checkout shares with the notification service, which are factored into the platform's cross-service integrity score.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "inventory",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "Static analysis found no violations of architectural boundaries in the inventory service. The files modified and added in this commit correctly adhere to the service's internal boundaries.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layering within the inventory service is healthy. Folder instability metrics show a stable domain layer (I=0.24) and an unstable transport layer (I=0.66), which is consistent with the architectural goals.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The inventory service has an efferent coupling (Ce) of 0, indicating it has no static dependencies on any other service in the monorepo.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "No significant internal code duplication was detected in the inventory service. As noted in the commit message, the changes in this commit successfully avoided introducing new clones.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "notification",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "Static analysis found no violations of architectural boundaries in the notification service.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layering within the notification service is healthy. Folder instability metrics show a very stable domain layer (I=0.07) and an unstable transport layer (I=0.78), indicating a strong architectural profile.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The notification service has an efferent coupling (Ce) of 0, indicating it has no static dependencies on any other service in the monorepo.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "No significant internal code duplication was detected. This score does not include the cross-service clones that notification shares with the checkout service; those are measured as part of the platform's cross-service integrity.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    }
+  ],
+  "ruleSetVersion": 5
+}

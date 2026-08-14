@@ -24,14 +24,24 @@ def setup_tracing() -> TracerProvider:
             project_id=os.environ.get("GOOGLE_CLOUD_PROJECT")
         )
         provider.add_span_processor(SimpleSpanProcessor(exporter))
-    trace.set_tracer_provider(provider)
-    _provider = provider
+    _install_provider(provider)
     return provider
 
 
 def attach_test_provider(provider: TracerProvider) -> None:
+    _install_provider(provider)
+
+
+def _install_provider(provider: TracerProvider) -> None:
     global _provider
     _provider = provider
+    once = getattr(trace, "_TRACER_PROVIDER_SET_ONCE", None)
+    if once is not None and getattr(once, "_done", False):
+        once._done = False
+    setter = getattr(trace, "_set_tracer_provider", None)
+    if callable(setter):
+        setter(provider, log=False)
+        return
     trace.set_tracer_provider(provider)
 
 

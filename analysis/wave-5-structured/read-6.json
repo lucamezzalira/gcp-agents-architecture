@@ -1,0 +1,187 @@
+{
+  "runId": "c0811f7e172891ee42df1e2045891f60b023d2ba",
+  "commitSha": "c0811f7e172891ee42df1e2045891f60b023d2ba",
+  "overall": 100,
+  "characteristics": [
+    {
+      "id": "boundary-integrity",
+      "score": 100,
+      "reasoning": "The platform score is the mean of the service scores, all of which are 100. This indicates that static analysis found no instances of one service directly importing code from another service's internal modules, respecting the defined service boundaries. This score does not cover runtime communication patterns, which are observed and reported separately.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "layering",
+      "score": 100,
+      "reasoning": "The layering score is based on the instability metric (I) of the hexagonal architecture layers within each service. For all services, the `domain` layer is stable (I < 0.2), and the `transport` and `infrastructure` layers are appropriately unstable (I > 0.4), which matches the expected architectural profile. This indicates dependencies flow in the correct direction (e.g., from transport to domain). The score does not guarantee the semantic correctness of the code within those layers.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "coupling",
+      "score": 100,
+      "reasoning": "The score of 100 reflects that no service has any static dependencies (efferent coupling, Ce=0) pointing to another service. However, the runtime call graph, observed via synthetic traffic, shows that services do communicate as expected:\n- `checkout` -> `inventory` (HTTP, Pub/Sub)\n- `checkout` -> `notification` (Pub/Sub)\n- `inventory` -> `checkout` (Pub/Sub)\n- `inventory` -> `notification` (Pub/Sub)\nThe absence of static imports for these interactions indicates that communication happens through decoupled mechanisms as intended.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "duplication",
+      "score": 100,
+      "reasoning": "The platform duplication score of 100 reflects the health of duplication *within* each service boundary. It does not include cross-service duplication, which is measured under the `cross-service-integrity` characteristic. No service currently exceeds the threshold for internal code duplication penalties.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "cross-service-integrity",
+      "score": 100,
+      "reasoning": "No architecture rules governing the relationships between services (e.g., direct access, provider imports) were violated. This perfect score does not indicate a complete absence of cross-service duplication. Four cross-service clones were detected between `checkout`, `inventory`, and `notification`, but this quantity is currently within the acceptable threshold. The count of these clones has not increased in this commit.",
+      "recommendations": [],
+      "signalsUsed": []
+    }
+  ],
+  "reasoner": "adk",
+  "traceId": "91e56e7daace4b81c38d3da77c91b2e6",
+  "metrics": {
+    "modules": 137,
+    "dependencies": 331,
+    "duplicationPercentage": 3.278070836473248,
+    "orphanCount": 0,
+    "cycleCount": 0,
+    "folderInstability": {
+      "checkout": 0.4759891598915989,
+      "inventory": 0.45002145002145005,
+      "notification": 0.4491400916083312
+    },
+    "duplicationCounts": {
+      "internal": 3,
+      "crossService": 4,
+      "shared": 0,
+      "internalByService": {
+        "checkout": 3
+      }
+    },
+    "serviceCoupling": [
+      {
+        "service": "checkout",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "inventory",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "notification",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      }
+    ]
+  },
+  "state": "current",
+  "services": [
+    {
+      "service": "checkout",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "No code in the `checkout` service was found to violate its defined boundaries by importing from other services or having other services reach into its implementation details. This static analysis does not assess runtime dependencies, where `checkout` is observed to call `inventory` and `notification` via defined contracts.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layers within the `checkout` service adhere to the expected instability profile. The `domain` layer is stable (I=0.18), while the `transport` (I=0.83) and `infrastructure` (I=0.41) layers are unstable, indicating a healthy dependency flow from the outside in.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The `checkout` service has an efferent coupling (Ce) of 0, meaning it does not have any static code imports from other services. Runtime analysis shows `checkout` communicates with `inventory` (via HTTP and Pub/Sub) and `notification` (via Pub/Sub), indicating that these interactions use decoupled contracts rather than direct code coupling.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score indicates that code duplication internal to the `checkout` service is within acceptable limits. This perfect score does not mean there is zero duplication; three internal clones were detected. Cross-service duplication involving `checkout` is tracked under the platform's `cross-service-integrity` characteristic, not here.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "inventory",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "No code in the `inventory` service was found to violate its defined boundaries by importing from other services or having other services reach into its implementation details. Runtime analysis shows that `inventory` communicates with `checkout` and `notification` through defined interfaces.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layers within the `inventory` service adhere to the expected instability profile. The `domain` layer is stable (I=0.14), while the `transport` (I=0.67) and `infrastructure` (I=0.54) layers are unstable, indicating dependencies flow in the correct direction.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The `inventory` service has an efferent coupling (Ce) of 0, meaning it has no static code imports from other services. The runtime call graph shows it communicates with `checkout` (via Pub/Sub) and `notification` (via Pub/Sub), demonstrating that these interactions are decoupled.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "No internal code duplication was detected within the `inventory` service. This score does not account for cross-service duplication, which is evaluated separately at the platform level.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "notification",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The `notification` service's boundaries are respected; no code within it imports from other services, and no other services import from its internal modules. At runtime, it is a target of calls from `checkout` and `inventory` via Pub/Sub.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layers within the `notification` service adhere to the expected instability profile. The `domain` layer is stable (I=0.08), while the `transport` (I=0.79) and `infrastructure` (I=0.48) layers are unstable, indicating a healthy dependency flow.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The `notification` service has an efferent coupling (Ce) of 0, meaning it does not statically import code from any other service. It functions as a dependency for other services, as shown in the runtime graph where it receives messages from both `checkout` and `inventory`.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "No internal code duplication was detected within the `notification` service. This score does not include cross-service clones involving `notification`, which are assessed as part of the platform's `cross-service-integrity`.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    }
+  ],
+  "ruleSetVersion": 5
+}

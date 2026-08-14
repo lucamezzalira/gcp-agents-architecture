@@ -1,0 +1,38 @@
+[
+  {
+    "query": "Ask inventory for stock over HTTP before paying so checkout can refuse an empty shelf. paths: services/checkout services/inventory services/notification",
+    "count": 3,
+    "snippets": [
+      "commit edfd7d7 scored 73. layering note: The platform's layering score decreased due to a new violation. The 'checkout' service's domain layer (`services/checkout/src/domain/mark-paid.ts`) now has a dependency on an infra",
+      "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu",
+      "commit 611fc24 scored 100. layering note: The score is 100 because no layering rules were violated. A previous layering violation, noted in the Memory Bank where `checkout`'s domain layer depended on its infrastructure lay"
+    ]
+  },
+  {
+    "query": "edfd7d7",
+    "count": 3,
+    "snippets": [
+      "commit edfd7d7 scored 74. layering note: The layering score remains at 100, confirming that architectural layers are correctly separated and dependencies flow in the intended direction. This is consistent with prior obser",
+      "commit edfd7d7 scored 74. layering note: The layering score is 100. This indicates that architectural layers are correctly separated, and dependencies flow in the intended direction. This consistency aligns with prior obs",
+      "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu"
+    ]
+  },
+  {
+    "query": "layering violation checkout",
+    "count": 3,
+    "snippets": [
+      "commit 124fa31 scored 78. layering note: The score is 100 because no platform-level rules designated as 'layering' were violated. However, this score is misleading as a clear layering violation did occur within the `check",
+      "commit 4335e57 scored 92. layering note: The score is 100 because all services adhere to the layering rules, such as domain not depending on infrastructure. Memory Bank shows a past layering violation in the `checkout` se",
+      "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu"
+    ]
+  },
+  {
+    "query": "services/inventory",
+    "count": 3,
+    "snippets": [
+      "commit 4335e57 scored 92. layering note: The score is 100 because all services adhere to the layering rules, such as domain not depending on infrastructure. Memory Bank shows a past layering violation in the `checkout` se",
+      "commit 9decea8 scored 100. layering note: The platform score is 100 because all services adhere to the defined layering rules, such as domain not depending on infrastructure. Folder instability metrics show a healthy profi",
+      "commit 32018cc scored 98. layering note: The score is 100 because no layering violations were detected across any service. An analysis of folder instability shows that the layers within each service are behaving as expect"
+    ]
+  }
+]

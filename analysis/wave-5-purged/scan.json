@@ -1,0 +1,52 @@
+[
+  {
+    "commit": 1,
+    "sha": "bab83ea3a04bacff92616fd7ef543c1085e61760",
+    "overall": 95,
+    "traceId": "f9d1af2a36cfac1753bff9d8011b788a",
+    "beliefHits": []
+  },
+  {
+    "commit": 2,
+    "sha": "453a163e71623a70310ca19b4cce85c547e467f3",
+    "overall": 100,
+    "traceId": "5dc0b7eecd9a377c3cf92f7078143030",
+    "beliefHits": [
+      "The score is 100, indicating no cross-service boundary rule violations were found by the current rule set (version 5). However, the analysis continues to identify two cross-service clones between `checkout` and `notification` (for `logger.ts` and `file-body-store.ts`). In the previous commit (bab83ea), these same clones resulted in a score of 80. The improvement to 100, despite the clones persisting, suggests a change in rule configuration or thresholds rather than a code cleanup. No new cross-service clones were introduced."
+    ]
+  },
+  {
+    "commit": 3,
+    "sha": "72673d2be6683227da26d9cedbc8951289be954c",
+    "overall": 100,
+    "traceId": "bd5b9b3b485be30e4b88e038002bafbf",
+    "beliefHits": [
+      "The score is 100, indicating no cross-service violations were found by static analysis. This score does not reflect two cross-service clones between `checkout` and `notification` for `logger.ts` and `file-body-store.ts`; these are present but not currently penalized, though retrieved records from commit `bab83ea` show they previously reduced the score. The score also does not account for a new runtime-only HTTP dependency from `checkout` to `inventory` observed via Cloud Trace, which represents a cross-service interaction not visible in the import graph."
+    ]
+  },
+  {
+    "commit": 4,
+    "sha": "86487ab973c643f5bd512a4c61c50f67945a19b6",
+    "overall": 100,
+    "traceId": "d97a2d9304a9b89862f148cd1a9529cb",
+    "beliefHits": [
+      "The score is based on internal code duplication. No new internal clones were found in this commit. While three instances of internal duplication exist in `transport/order-routes.ts`, they do not currently violate any active rules. The internal clone count has held steady compared to prior commits."
+    ]
+  },
+  {
+    "commit": 5,
+    "sha": "0be862511ecc792dad0aacdd01ca3b09ef1836a7",
+    "overall": 95,
+    "traceId": "b599287706a19dadab213bb2a881b991",
+    "beliefHits": []
+  },
+  {
+    "commit": 6,
+    "sha": "c0811f7e172891ee42df1e2045891f60b023d2ba",
+    "overall": 100,
+    "traceId": "7a1262da4673a2492979f1e875fcb5f1",
+    "beliefHits": [
+      "The score is 100, which indicates that the amount of internal code duplication is within the currently configured threshold. Analysis found three instances of duplication within `checkout`'s files. The `metricDeltas` show this count has not changed from the previous run. This score does not include duplication shared with other services."
+    ]
+  }
+]

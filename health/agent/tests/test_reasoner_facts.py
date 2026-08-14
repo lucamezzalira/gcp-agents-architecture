@@ -245,6 +245,11 @@ def test_instruction_covers_efferent_level_and_existing_rules() -> None:
     assert "not an empty graph" in text
     assert "http" in text and "pub/sub" in text
     assert "do not collapse" in text
+    assert "silence about memory is a correct outcome" in collapsed
+    assert "must name the commit and come from a retrieved record" in collapsed
+    assert "never state that a commit fixed, introduced or resolved" in collapsed
+    assert "acknowledge those prior" not in collapsed
+    assert "do not ignore them" not in collapsed
 
 
 def test_metric_deltas_name_grew_held_cleaned_and_first() -> None:

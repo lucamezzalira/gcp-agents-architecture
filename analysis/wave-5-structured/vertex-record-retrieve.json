@@ -1,0 +1,47 @@
+[
+  {
+    "query": "RECORD sha=",
+    "raw": [
+      "commit a229cd9 scored 54. layering note: The platform layering score is 100, as the specific tests for this characteristic passed. However, this score is misleading. A separate `boundary-integrity` test (`rule-3`) failed",
+      "commit 611fc24 scored 100. layering note: The layering score is 100, confirming that architectural layers are correctly separated, and dependencies flow in the intended direction. The memory bank entries for commit 2b2f7f7",
+      "commit 124fa31 scored 84. layering note: The layering score is 100. This is consistent with prior observations from the Memory Bank, which noted that 'The layering score is 100, confirming that architectural layers are co"
+    ],
+    "kept": []
+  },
+  {
+    "query": "RECORD sha=bab83ea overall=95",
+    "raw": [
+      "commit 75a3809 scored 98. layering note: The score is 100 because no modules violated the defined layering rules. Folder instability metrics support this, showing stable domain layers (e.g., checkout domain I=0.12) and un",
+      "commit 4335e57 scored 92. layering note: The score is 100 because all services adhere to the layering rules, such as domain not depending on infrastructure. Memory Bank shows a past layering violation in the `checkout` se",
+      "commit 124fa31 scored 84. layering note: The layering score is 100. This is consistent with prior observations from the Memory Bank, which noted that 'The layering score is 100, confirming that architectural layers are co"
+    ],
+    "kept": []
+  },
+  {
+    "query": "RECORD sha=72673d2",
+    "raw": [
+      "commit 7002adf scored 100. layering note: The layering score is 100 as no violations were detected in any service. Folder instability metrics are consistent with the expected architectural profile for both services: transp",
+      "commit 2b2f7f7 scored 100. layering note: The layering score is 100, consistent with previous observations, including the `memoryBank` entry for commit `2b2f7f7` which highlighted the correct separation of architectural la",
+      "commit a229cd9 scored 72. layering note: The layering characteristic scores 100, indicating no architectural layering violations. This is consistent with prior observations captured in the Memory Bank (e.g., from commits"
+    ],
+    "kept": []
+  },
+  {
+    "query": "fired=none cleared=none",
+    "raw": [
+      "commit a229cd9 scored 61. layering note: The score is 100 because no layering rules were violated in this commit. This score does not cover architectural drift that complies with the rules. For example, `checkout`'s domai",
+      "commit 124fa31 scored 78. layering note: The score is 100 because no platform-level rules designated as 'layering' were violated. However, this score is misleading as a clear layering violation did occur within the `check",
+      "commit e2d3df1 scored 100. layering note: The architecture adheres perfectly to its defined layering rules, with no upward or sideways dependencies detected where only downward flow is permitted. This consistent health is"
+    ],
+    "kept": []
+  },
+  {
+    "query": "Ask inventory for stock over HTTP before paying so checkout can refuse an empty shelf. paths: services/checkout services/inventory services/notification",
+    "raw": [
+      "commit edfd7d7 scored 73. layering note: The platform's layering score decreased due to a new violation. The 'checkout' service's domain layer (`services/checkout/src/domain/mark-paid.ts`) now has a dependency on an infra",
+      "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu",
+      "commit 611fc24 scored 100. layering note: The score is 100 because no layering rules were violated. A previous layering violation, noted in the Memory Bank where `checkout`'s domain layer depended on its infrastructure lay"
+    ],
+    "kept": []
+  }
+]

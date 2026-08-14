@@ -1,0 +1,187 @@
+{
+  "runId": "72673d2be6683227da26d9cedbc8951289be954c",
+  "commitSha": "72673d2be6683227da26d9cedbc8951289be954c",
+  "overall": 100,
+  "characteristics": [
+    {
+      "id": "boundary-integrity",
+      "score": 100,
+      "reasoning": "The platform's boundary integrity score is 100 because it is the mean of the service scores, all of which are 100. This score reflects the absence of static analysis violations but does not incorporate the five runtime-only cross-service dependencies observed via Cloud Trace, including a new HTTP call from checkout to inventory.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "layering",
+      "score": 100,
+      "reasoning": "The platform layering score is 100 because no service has layering violations according to the static import graph analysis. The folder instability profiles for all services align with expectations for their respective layers, with domain layers remaining stable and transport/infrastructure layers remaining unstable.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "coupling",
+      "score": 100,
+      "reasoning": "The platform coupling score is 100 because no service has statically-detectable outgoing dependencies (efferent coupling) to another service. However, this perfect score masks runtime coupling. Synthetic traffic analysis revealed five cross-service call paths that are not visible in the import graph, including a new HTTP call from checkout to inventory introduced in this commit.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "duplication",
+      "score": 100,
+      "reasoning": "The platform duplication score is 100. This reflects that internal duplication within each service is below the penalty threshold. The score does not cover the two instances of cross-service duplication between checkout and notification, which are tracked under cross-service-integrity. The total clone count held steady in this commit.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "cross-service-integrity",
+      "score": 100,
+      "reasoning": "The score is 100 because static analysis found no direct service-to-service imports and the number of cross-service clones (2) has not increased. However, this score does not account for runtime-only dependencies. Cloud Trace found five such dependencies, including checkout calling inventory over HTTP, which bypasses static boundary checks.",
+      "recommendations": [],
+      "signalsUsed": []
+    }
+  ],
+  "reasoner": "adk",
+  "traceId": "a74a8638ae9264e62c88cb8b5dbe127c",
+  "metrics": {
+    "modules": 122,
+    "dependencies": 304,
+    "duplicationPercentage": 2.1153048527581917,
+    "orphanCount": 0,
+    "cycleCount": 0,
+    "folderInstability": {
+      "checkout": 0.4759891598915989,
+      "inventory": 0.4551282051282051,
+      "notification": 0.4491400916083312
+    },
+    "duplicationCounts": {
+      "internal": 3,
+      "crossService": 2,
+      "shared": 0,
+      "internalByService": {
+        "checkout": 3
+      }
+    },
+    "serviceCoupling": [
+      {
+        "service": "checkout",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "inventory",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "notification",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      }
+    ]
+  },
+  "state": "current",
+  "services": [
+    {
+      "service": "checkout",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 as no architecture rule violations were detected by static analysis within the checkout service. This score does not reflect runtime dependencies; Cloud Trace observed an HTTP call from checkout to inventory that was not found in the import graph.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layering score is 100 as no violations of layering rules were found in the static analysis. Folder instability metrics support this finding: the domain layer is stable (I=0.18), while the transport (I=0.83) and infrastructure (I=0.41) layers are appropriately unstable.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because static analysis found no outgoing dependencies (efferent coupling, Ce=0) from the checkout service to other services, and this count has not changed. However, this score does not account for runtime-only dependencies. Cloud Trace observed an HTTP call from checkout to inventory and a Pub/Sub message to notification, which static analysis did not detect.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because the count of internal clones (3) within the checkout service is within the acceptable threshold. The number of internal clones has not changed in this commit.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "inventory",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 as no architecture rule violations were detected by static analysis within the inventory service. The service's boundaries appear intact based on the import graph.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layering score is 100 as no violations of layering rules were found in the static analysis. Folder instability metrics are healthy: the domain layer is stable (I=0.11), while the transport (I=0.66) and infrastructure (I=0.58) layers are unstable.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because static analysis found no outgoing dependencies (efferent coupling, Ce=0) from the inventory service. This count has not changed. However, this score does not reflect runtime behavior. Cloud Trace observed Pub/Sub messages from inventory to both checkout and notification.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 as static analysis found no code duplication internal to the inventory service.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "notification",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 as no architecture rule violations were detected by static analysis within the notification service. The service's boundaries appear intact based on the import graph.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The layering score is 100 as no violations of layering rules were found in the static analysis. Folder instability metrics are healthy: the domain layer is very stable (I=0.07), and the transport (I=0.78) and infrastructure (I=0.48) layers are appropriately unstable.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because static analysis found no outgoing dependencies (efferent coupling, Ce=0) from the notification service, and this has held steady. The runtime call graph confirms no calls originated from this service.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 as static analysis found no code duplication internal to the notification service.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    }
+  ],
+  "ruleSetVersion": 5
+}

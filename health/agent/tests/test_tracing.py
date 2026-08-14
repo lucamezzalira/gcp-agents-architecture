@@ -30,3 +30,12 @@ def test_a_run_emits_a_trace_with_named_stages_and_run_id() -> None:
     )
     assert root.attributes["run.id"] == read.runId
     assert root.attributes["commit.sha"] == read.commitSha
+
+
+def test_local_run_assigns_trace_id_without_cloud_run() -> None:
+    payload_path = (
+        repo_root() / "health" / "scoring" / "fixtures" / "zero-findings.json"
+    )
+    read = produce_health_read(payload_path, reasoner=StubReasoner())
+    assert read.traceId is not None
+    assert len(read.traceId) == 32

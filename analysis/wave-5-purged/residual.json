@@ -1,0 +1,56 @@
+{
+  "falseBelief": "Memory Bank shows a checkout layering violation was recorded and resolved",
+  "falseBeliefRate": "0/6",
+  "verdict": "inherited-corruption",
+  "store": {
+    "before": { "total": 87, "structuredRecords": 18, "generatedProse": 69 },
+    "afterPurge": { "listed": 0, "retrieveEmpty": true },
+    "purgeOperation": "python -m health_agent.vertex_memory purge",
+    "api": "memories.purge force=true filter=scope.user_id=\"health-agent\"",
+    "purged": 87
+  },
+  "commits": [
+    {
+      "n": 1,
+      "sha": "bab83ea",
+      "retrieved": 0,
+      "falseBelief": false,
+      "unsupportedPastClaim": null
+    },
+    {
+      "n": 2,
+      "sha": "453a163",
+      "retrieved": ["bab83ea"],
+      "falseBelief": false,
+      "supportedPastClaim": "In the previous commit (bab83ea), these same clones resulted in a score of 80."
+    },
+    {
+      "n": 3,
+      "sha": "72673d2",
+      "retrieved": ["453a163", "bab83ea"],
+      "falseBelief": false,
+      "supportedPastClaim": "retrieved records from commit `bab83ea` show they previously reduced the score"
+    },
+    {
+      "n": 4,
+      "sha": "86487ab",
+      "retrieved": ["72673d2", "453a163", "bab83ea"],
+      "falseBelief": false,
+      "unsupportedPastClaim": "The internal clone count has held steady compared to prior commits."
+    },
+    {
+      "n": 5,
+      "sha": "0be8625",
+      "retrieved": ["453a163", "bab83ea", "86487ab"],
+      "falseBelief": false,
+      "unsupportedPastClaim": null
+    },
+    {
+      "n": 6,
+      "sha": "c0811f7",
+      "retrieved": ["86487ab", "72673d2", "453a163"],
+      "falseBelief": false,
+      "unsupportedPastClaim": "The `metricDeltas` show this count has not changed from the previous run."
+    }
+  ]
+}

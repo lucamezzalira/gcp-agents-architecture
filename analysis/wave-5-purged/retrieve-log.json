@@ -1,0 +1,49 @@
+{
+  "note": "Wave 5 from an empty Vertex Memory Bank. C1 retrieve is empty. Later commits retrieve only RECORD facts written by this run.",
+  "storeBeforeRun": 0,
+  "runs": [
+    {
+      "commit": 1,
+      "sha": "bab83ea3a04bacff92616fd7ef543c1085e61760",
+      "memory_snippets": 0,
+      "memory_structured": 0,
+      "memory_retrieved_raw": [],
+      "memory_retrieved_kept": []
+    },
+    {
+      "commit": 2,
+      "sha": "453a163e71623a70310ca19b4cce85c547e467f3",
+      "memory_snippets": 1,
+      "memory_structured": 1,
+      "keptShas": ["bab83ea"]
+    },
+    {
+      "commit": 3,
+      "sha": "72673d2be6683227da26d9cedbc8951289be954c",
+      "memory_snippets": 2,
+      "memory_structured": 2,
+      "keptShas": ["453a163", "bab83ea"]
+    },
+    {
+      "commit": 4,
+      "sha": "86487ab973c643f5bd512a4c61c50f67945a19b6",
+      "memory_snippets": 3,
+      "memory_structured": 3,
+      "keptShas": ["72673d2", "453a163", "bab83ea"]
+    },
+    {
+      "commit": 5,
+      "sha": "0be862511ecc792dad0aacdd01ca3b09ef1836a7",
+      "memory_snippets": 3,
+      "memory_structured": 3,
+      "keptShas": ["453a163", "bab83ea", "86487ab"]
+    },
+    {
+      "commit": 6,
+      "sha": "c0811f7e172891ee42df1e2045891f60b023d2ba",
+      "memory_snippets": 3,
+      "memory_structured": 3,
+      "keptShas": ["86487ab", "72673d2", "453a163"]
+    }
+  ]
+}

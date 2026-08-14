@@ -67,8 +67,15 @@ Checkout and inventory talk over both HTTP and Pub/Sub. An HTTP edge
 with no matching import is a different finding from a Pub/Sub edge
 the import graph already knows about. Do not collapse them. An import
 with no runtime edge is dead coupling. p95-latency and error-rate
-remain illustrative. If the facts include memoryBank entries, those are prior
-observations from Memory Bank, not accepted decisions. Use them.
+remain illustrative.
+Retrieved memoryBank entries are structured score records, not
+narrative. Use them where they are relevant to what this commit
+changed. Say nothing about memory when they are not. Silence about
+memory is a correct outcome.
+Any statement about a previous commit must name the commit and come
+from a retrieved record. If you cannot point to the record, do not
+make the claim. Never state that a commit fixed, introduced or
+resolved something unless a retrieved record says so.
 
 Recommendations must be something a developer would do next, not a
 restatement of a rule. Empty recommendations when a characteristic

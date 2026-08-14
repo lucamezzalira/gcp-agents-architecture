@@ -1,0 +1,192 @@
+{
+  "runId": "0be862511ecc792dad0aacdd01ca3b09ef1836a7",
+  "commitSha": "0be862511ecc792dad0aacdd01ca3b09ef1836a7",
+  "overall": 95,
+  "characteristics": [
+    {
+      "id": "boundary-integrity",
+      "score": 100,
+      "reasoning": "The platform's boundary integrity score is 100 because it is the mean of the service scores, and all services scored 100. No architecture tests for boundary violations (rules 3, 4, 5, 7) failed for any service. This score does not reflect cross-service duplication, which is measured by `cross-service-integrity`. While static analysis found no boundary violations, the runtime analysis observed service-to-service HTTP and Pub/Sub calls that do not have corresponding static imports. These do not violate the current rule set.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "layering",
+      "score": 100,
+      "reasoning": "The platform's layering score is 100, which is the mean of the individual service scores. No service had layering violations (rule 6). A perfect score does not mean the layering profile is optimal across all services. The folder instability metrics for each service's `domain` layer are low (0.18 for checkout, 0.14 for inventory, 0.08 for notification), which is healthy and expected. The `transport` layers are appropriately unstable.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "coupling",
+      "score": 100,
+      "reasoning": "The platform's coupling score is 100 because it is the mean of the service scores, and all services scored 100. No service has outgoing static dependencies (efferent coupling, Ce=0) to another service's code. This score does not account for runtime coupling. The observed runtime call graph shows multiple service-to-service dependencies over HTTP and Pub/Sub which are not prohibited by the current rule set.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "duplication",
+      "score": 100,
+      "reasoning": "The platform's duplication score is 100. This score reflects duplication *within* each service boundary, not between them. Cross-service duplication is measured by `cross-service-integrity`. Although this commit increased the number of cross-service clone groups from 2 to 4, that change affects the `cross-service-integrity` score, not this one. The `checkout` service continues to have 3 internal clones, which is within the allowed threshold.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "cross-service-integrity",
+      "score": 80,
+      "reasoning": "The score dropped because the number of cross-service clone groups grew from 2 to 4. This commit, \"Copy checkout's instruction publisher into inventory instead of sharing a package,\" introduced duplication of `http-instruction-publisher.ts` and `pubsub-instruction-publisher.ts` between the `checkout` and `inventory` services. Two prior clone groups between `checkout` and `notification` also persist.",
+      "recommendations": [
+        "Extract the duplicated `http-instruction-publisher.ts` from `checkout` and `inventory` into a new shared library or service.",
+        "Extract the duplicated `pubsub-instruction-publisher.ts` from `checkout` and `inventory` into a new shared library or service."
+      ],
+      "signalsUsed": [
+        "jscpd:cross-service-growth:2->4"
+      ]
+    }
+  ],
+  "reasoner": "adk",
+  "traceId": "f4c10f45e5b33fcef346b32ee3aff080",
+  "metrics": {
+    "modules": 135,
+    "dependencies": 327,
+    "duplicationPercentage": 3.4077555816686247,
+    "orphanCount": 0,
+    "cycleCount": 0,
+    "folderInstability": {
+      "checkout": 0.4759891598915989,
+      "inventory": 0.45002145002145005,
+      "notification": 0.4491400916083312
+    },
+    "duplicationCounts": {
+      "internal": 3,
+      "crossService": 4,
+      "shared": 0,
+      "internalByService": {
+        "checkout": 3
+      }
+    },
+    "serviceCoupling": [
+      {
+        "service": "checkout",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "inventory",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "notification",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      }
+    ]
+  },
+  "state": "current",
+  "services": [
+    {
+      "service": "checkout",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because no architecture tests for boundary violations (rules 3, 4, 5, 7) failed. The service does not have static imports reaching into other services. This score is based on static analysis and does not reflect runtime interactions. The runtime graph shows that `checkout` calls `inventory` (via HTTP and Pub/Sub) and `notification` (via Pub/Sub).",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because no layering violations (rule 6) were found. The folder instability metrics are healthy and align with the expected profile: `domain` is stable (I=0.18), `transport` is highly unstable (I=0.83), and `infrastructure` is unstable (I=0.41).",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because `checkout` has no static outgoing dependencies to other services (efferent coupling, Ce=0). This count held steady from the previous run. This score does not reflect that `inventory` calls `checkout` over Pub/Sub at runtime; that interaction pertains to `checkout`'s afferent coupling, which is an unscored observation.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because the number of internal clone groups is within the acceptable threshold. The 3 internal clones found in `transport/order-routes.ts` pre-existed this commit. This score does not cover cross-service duplication, such as the new clones shared with `inventory`, which are measured at the platform level by `cross-service-integrity`.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "inventory",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because no architecture tests for boundary violations (rules 3, 4, 5, 7) failed. The service does not have static imports reaching into other services. This score is based on static analysis and does not reflect runtime interactions. The runtime graph shows that `inventory` calls both `checkout` and `notification` over Pub/Sub.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because no layering violations (rule 6) were found. The folder instability metrics align with the expected profile: `domain` is stable (I=0.14), `transport` is unstable (I=0.67), and `infrastructure` is unstable (I=0.54).",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because `inventory` has no static outgoing dependencies to other services (efferent coupling, Ce=0). This count held steady from the previous run. This score does not reflect that `checkout` calls `inventory` over HTTP and Pub/Sub at runtime; that interaction pertains to `inventory`'s afferent coupling, which is an unscored observation.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because no internal code clones were found within the service. This score does not cover the new cross-service duplication with `checkout` (`http-instruction-publisher.ts`, `pubsub-instruction-publisher.ts`) introduced by this commit, which is measured by `cross-service-integrity`.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "notification",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because no architecture tests for boundary violations (rules 3, 4, 5, 7) failed. The service does not have static imports reaching into other services. This score is based on static analysis and does not reflect runtime interactions. The runtime graph shows `notification` receives calls from `checkout` and `inventory` over Pub/Sub.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because no layering violations (rule 6) were found. The folder instability metrics are healthy and align with the expected profile: `domain` is very stable (I=0.08), `transport` is highly unstable (I=0.79), and `infrastructure` is unstable (I=0.48).",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because `notification` has no static outgoing dependencies to other services (efferent coupling, Ce=0). This count held steady from the previous run. This score does not reflect that `checkout` and `inventory` call `notification` over Pub/Sub at runtime; that interaction pertains to `notification`'s afferent coupling, which is an unscored observation.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because no internal code clones were found within the service. This score does not cover the pre-existing cross-service duplication with `checkout` (`logger.ts`, `file-body-store.ts`), which is measured by `cross-service-integrity`.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    }
+  ],
+  "ruleSetVersion": 5
+}

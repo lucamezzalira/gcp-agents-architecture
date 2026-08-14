@@ -1,0 +1,83 @@
+{
+  "note": "Verbatim Vertex retrieve from the structured-memory wave 5 re-run. kept is empty on every commit because Vertex still returned generated prose, which the filter dropped. Writes on this run used GenerateMemories and did not land as RECORD facts.",
+  "runs": [
+    {
+      "commit": 1,
+      "sha": "bab83ea3a04bacff92616fd7ef543c1085e61760",
+      "memory_snippets": 3,
+      "memory_structured": 0,
+      "memory_query": "Keep inventory's logger and push path from cloning checkout and notification. paths: services/checkout services/inventory services/notification",
+      "memory_retrieved_raw": [
+        "commit 32018cc scored 98. layering note: The score is 100 because no layering violations were detected across any service. An analysis of folder instability shows that the layers within each service are behaving as expect",
+        "commit 9782263 scored 100. layering note: The score is 100 because no layering violations were detected across any service. The `folderInstability` metrics for both services align with the expected architectural profile: `",
+        "commit edfd7d7 scored 73. layering note: The platform's layering score decreased due to a new violation. The 'checkout' service's domain layer (`services/checkout/src/domain/mark-paid.ts`) now has a dependency on an infra"
+      ],
+      "memory_retrieved_kept": []
+    },
+    {
+      "commit": 2,
+      "sha": "453a163e71623a70310ca19b4cce85c547e467f3",
+      "memory_snippets": 3,
+      "memory_structured": 0,
+      "memory_query": "Put reservation expiry next to the store timestamps because that is where reservedAt already lives. paths: services/checkout services/inventory services/notification",
+      "memory_retrieved_raw": [
+        "commit edfd7d7 scored 73. layering note: The platform's layering score decreased due to a new violation. The 'checkout' service's domain layer (`services/checkout/src/domain/mark-paid.ts`) now has a dependency on an infra",
+        "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu",
+        "commit 1159307 scored 95. layering note: The score is 100 because no layering violations were detected in any service. Dependencies flow correctly from higher layers (like transport) to lower layers (like domain). A memor"
+      ],
+      "memory_retrieved_kept": []
+    },
+    {
+      "commit": 3,
+      "sha": "72673d2be6683227da26d9cedbc8951289be954c",
+      "memory_snippets": 3,
+      "memory_structured": 0,
+      "memory_query": "Ask inventory for stock over HTTP before paying so checkout can refuse an empty shelf. paths: services/checkout services/inventory services/notification",
+      "memory_retrieved_raw": [
+        "commit edfd7d7 scored 73. layering note: The platform's layering score decreased due to a new violation. The 'checkout' service's domain layer (`services/checkout/src/domain/mark-paid.ts`) now has a dependency on an infra",
+        "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu",
+        "commit 611fc24 scored 100. layering note: The score is 100 because no layering rules were violated. A previous layering violation, noted in the Memory Bank where `checkout`'s domain layer depended on its infrastructure lay"
+      ],
+      "memory_retrieved_kept": []
+    },
+    {
+      "commit": 4,
+      "sha": "86487ab973c643f5bd512a4c61c50f67945a19b6",
+      "memory_snippets": 3,
+      "memory_structured": 0,
+      "memory_query": "Let inventory warn ops about low stock through the same send-instruction contract checkout already uses. paths: services/checkout services/inventory services/notification",
+      "memory_retrieved_raw": [
+        "commit edfd7d7 scored 73. layering note: The platform's layering score decreased due to a new violation. The 'checkout' service's domain layer (`services/checkout/src/domain/mark-paid.ts`) now has a dependency on an infra",
+        "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu",
+        "commit 9782263 scored 95. layering note: The score is 100 because no layering violations were detected in any service. Dependencies flow correctly from transport to domain and from domain to infrastructure. Memory Bank en"
+      ],
+      "memory_retrieved_kept": []
+    },
+    {
+      "commit": 5,
+      "sha": "0be862511ecc792dad0aacdd01ca3b09ef1836a7",
+      "memory_snippets": 3,
+      "memory_structured": 0,
+      "memory_query": "Copy checkout's instruction publisher into inventory instead of sharing a package. paths: services/checkout services/inventory services/notification",
+      "memory_retrieved_raw": [
+        "commit edfd7d7 scored 73. layering note: The platform's layering score decreased due to a new violation. The 'checkout' service's domain layer (`services/checkout/src/domain/mark-paid.ts`) now has a dependency on an infra",
+        "commit 93985c8 scored 100. layering note: The platform's layering score is 100 because no layering violations were detected across any service, such as a domain module importing from an infrastructure module. Folder instab",
+        "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu"
+      ],
+      "memory_retrieved_kept": []
+    },
+    {
+      "commit": 6,
+      "sha": "c0811f7e172891ee42df1e2045891f60b023d2ba",
+      "memory_snippets": 3,
+      "memory_structured": 0,
+      "memory_query": "Let inventory interpret checkout's order snapshot so a reservation knows what it is holding. paths: services/checkout services/inventory services/notification",
+      "memory_retrieved_raw": [
+        "commit edfd7d7 scored 73. layering note: The platform's layering score decreased due to a new violation. The 'checkout' service's domain layer (`services/checkout/src/domain/mark-paid.ts`) now has a dependency on an infra",
+        "commit edfd7d7 scored 75. layering note: The layering score decreased due to a violation of `rule-8`. The file `services/checkout/src/domain/mark-paid.ts`, which belongs to the domain layer, now depends on an infrastructu",
+        "commit 611fc24 scored 100. layering note: The score is 100 because no layering rules were violated. A previous layering violation, noted in the Memory Bank where `checkout`'s domain layer depended on its infrastructure lay"
+      ],
+      "memory_retrieved_kept": []
+    }
+  ]
+}

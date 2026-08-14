@@ -1,0 +1,187 @@
+{
+  "runId": "72673d2be6683227da26d9cedbc8951289be954c",
+  "commitSha": "72673d2be6683227da26d9cedbc8951289be954c",
+  "overall": 100,
+  "characteristics": [
+    {
+      "id": "boundary-integrity",
+      "score": 100,
+      "reasoning": "The platform's boundary-integrity score is 100, representing the mean of the individual service scores, all of which are also 100. No service boundary rules were violated in the static analysis. However, this score does not reflect runtime communication that lacks a corresponding static dependency. The runtime graph shows an HTTP call from checkout to inventory that is not represented in the static import graph.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "layering",
+      "score": 100,
+      "reasoning": "The platform's layering score is 100, representing the mean of the individual service scores. All services conform to their expected layering profiles, with domain layers remaining stable and transport/infrastructure layers remaining unstable as intended.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "coupling",
+      "score": 100,
+      "reasoning": "The platform's coupling score is 100, representing the mean of the individual service scores. No service has any static efferent dependencies (Ce=0) on any other service. This score does not account for runtime coupling; runtime analysis observed an HTTP call from checkout to inventory not present in the static import graph, as well as several Pub/Sub interactions between services.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "duplication",
+      "score": 100,
+      "reasoning": "The platform's duplication score is 100, representing the mean of the individual service scores. No service has a level of internal duplication that exceeds the penalty threshold.",
+      "recommendations": [],
+      "signalsUsed": []
+    },
+    {
+      "id": "cross-service-integrity",
+      "score": 100,
+      "reasoning": "The score is 100 because no cross-service integrity rules were violated by static analysis, and the number of cross-service clones (2) is below the penalty threshold. The count of cross-service clones remains unchanged from the prior analysis. This score does not cover runtime-only dependencies; an HTTP call from checkout to inventory was observed without a corresponding static import.",
+      "recommendations": [],
+      "signalsUsed": []
+    }
+  ],
+  "reasoner": "adk",
+  "traceId": "2eca555b7503b3b90108704789a709a7",
+  "metrics": {
+    "modules": 122,
+    "dependencies": 304,
+    "duplicationPercentage": 2.1153048527581917,
+    "orphanCount": 0,
+    "cycleCount": 0,
+    "folderInstability": {
+      "checkout": 0.4759891598915989,
+      "inventory": 0.4551282051282051,
+      "notification": 0.4491400916083312
+    },
+    "duplicationCounts": {
+      "internal": 3,
+      "crossService": 2,
+      "shared": 0,
+      "internalByService": {
+        "checkout": 3
+      }
+    },
+    "serviceCoupling": [
+      {
+        "service": "checkout",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "inventory",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      },
+      {
+        "service": "notification",
+        "afferentCoupling": 0.0,
+        "efferentCoupling": 0.0
+      }
+    ]
+  },
+  "state": "current",
+  "services": [
+    {
+      "service": "checkout",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because no service boundary rules were violated. This score reflects only the static analysis of the service's imports and does not account for runtime communication. Runtime analysis observed an HTTP call from this service to the inventory service, an interaction not visible in the static dependency graph.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because no layering rules were violated. The folder instability metrics are healthy and align with the expected layering profile: the domain layer is stable (I=0.18), the infrastructure layer is unstable (I=0.41), and the transport layer is highly unstable (I=0.83).",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because checkout has no static efferent dependencies on other services (Ce=0). This score is based on the static import graph and does not include runtime interactions. Runtime analysis identified an outgoing HTTP call to the inventory service.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because the amount of internal code duplication (3 clones) is below the penalty threshold. This score does not include cross-service duplication; two clones shared with the notification service are tracked under the platform's cross-service-integrity characteristic.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "inventory",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because no service boundary rules were violated. This score reflects the service's internal dependency graph. It does not reflect that runtime analysis observed incoming HTTP requests from the checkout service.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because no layering rules were violated. The folder instability metrics are healthy and align with the expected layering profile: the domain layer is stable (I=0.11), the infrastructure layer is unstable (I=0.58), and the transport layer is appropriately unstable (I=0.66).",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because inventory has no static efferent dependencies on other services (Ce=0). This score does not cover runtime communication; runtime analysis observed this service publishing Pub/Sub messages consumed by the checkout and notification services.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because no internal or cross-service code duplication involving this service was found.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    },
+    {
+      "service": "notification",
+      "overall": 100,
+      "characteristics": [
+        {
+          "id": "boundary-integrity",
+          "score": 100,
+          "reasoning": "The score is 100 because no service boundary rules were violated. This score reflects the service's internal dependency graph and does not account for how it is invoked at runtime. Runtime analysis shows it receives Pub/Sub messages from both the checkout and inventory services.",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "layering",
+          "score": 100,
+          "reasoning": "The score is 100 because no layering rules were violated. The folder instability metrics are healthy and align with the expected layering profile: the domain layer is stable (I=0.07), the infrastructure layer is unstable (I=0.48), and the transport layer is highly unstable (I=0.78).",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "coupling",
+          "score": 100,
+          "reasoning": "The score is 100 because notification has no static efferent dependencies on other services (Ce=0).",
+          "recommendations": [],
+          "signalsUsed": []
+        },
+        {
+          "id": "duplication",
+          "score": 100,
+          "reasoning": "The score is 100 because no internal code duplication was found. This score does not include cross-service duplication; two clones shared with the checkout service are tracked under the platform's cross-service-integrity characteristic.",
+          "recommendations": [],
+          "signalsUsed": []
+        }
+      ]
+    }
+  ],
+  "ruleSetVersion": 5
+}

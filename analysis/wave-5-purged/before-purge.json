@@ -1,0 +1,27 @@
+{
+  "engine": "projects/ga-health-mezzalab/locations/us-central1/reasoningEngines/4676541261547569152",
+  "total": 87,
+  "structuredRecords": 18,
+  "generatedProse": 69,
+  "scope": {
+    "app_name": "architecture_health",
+    "user_id": "health-agent"
+  },
+  "firstLines": [
+    "RECORD sha=c0811f7 overall=100",
+    "RECORD sha=0be8625 overall=95",
+    "RECORD sha=86487ab overall=100",
+    "RECORD sha=72673d2 overall=100",
+    "RECORD sha=aaaaaaa overall=100",
+    "RECORD sha=aaaaaaa overall=100",
+    "RECORD sha=aaaaaaa overall=100",
+    "RECORD sha=453a163 overall=100",
+    "RECORD sha=bbbbbbb overall=84",
+    "RECORD sha=bab83ea overall=95",
+    "RECORD sha=aaaaaaa overall=100",
+    "RECORD sha=c0811f7 overall=100",
+    "RECORD sha=0be8625 overall=95",
+    "RECORD sha=86487ab overall=100",
+    "RECORD sha=72673d2 overall=100"
+  ]
+}
