@@ -4,9 +4,14 @@ import { createPostgresStore } from "../lib/postgres";
 import {
   buildDashboardModel,
   displayName,
+  displayedCharacteristics,
+  displayedOverall,
+  hundredNote,
   improvementCopy,
   polyline,
   ringOffset,
+  ruleSetMarkers,
+  ruleSetVersionOf,
   scoreTone,
   shortSha,
   toneColor,
@@ -14,10 +19,20 @@ import {
 } from "../lib/view";
 
 const store = createPostgresStore();
-const runs = await store.loadRuns();
+const includeSuperseded = Astro.url.searchParams.get("history") === "all";
+const runs = await store.loadRuns({ includeSuperseded });
 const requested = Astro.url.searchParams.get("commit") ?? undefined;
-const model = buildDashboardModel(runs, requested);
+const requestedRun = Astro.url.searchParams.get("run") ?? undefined;
+const requestedService = Astro.url.searchParams.get("service") ?? undefined;
+const model = buildDashboardModel(runs, requested, requestedRun, requestedService);
 const selected = model.selected;
+const selectedService = model.service;
+const overall =
+  selected === undefined ? 0 : displayedOverall(selected, selectedService);
+const characteristics =
+  selected === undefined
+    ? []
+    : displayedCharacteristics(selected, selectedService);
 const chartW = 640;
 const chartH = 180;
 const plotted = trendPoints(
@@ -25,6 +40,7 @@ const plotted = trendPoints(
   chartW,
   chartH,
 );
+const versionMarks = ruleSetMarkers(model.runs, plotted);
 const line = polyline(plotted);
 const area =
   plotted.length === 0
@@ -33,6 +49,18 @@ const area =
 const radius = 58;
 const circumference = 2 * Math.PI * radius;
 const payload = JSON.stringify(model.runs);
+const historyHref = includeSuperseded
+  ? `?${new URLSearchParams({
+      ...(requested ? { commit: requested } : {}),
+      ...(requestedRun ? { run: requestedRun } : {}),
+      ...(selectedService ? { service: selectedService } : {}),
+    }).toString()}`
+  : `?${new URLSearchParams({
+      history: "all",
+      ...(requested ? { commit: requested } : {}),
+      ...(requestedRun ? { run: requestedRun } : {}),
+      ...(selectedService ? { service: selectedService } : {}),
+    }).toString()}`;
 ---
 
 <Layout title="Architectural health">
@@ -52,7 +80,7 @@ const payload = JSON.stringify(model.runs);
         </p>
       ) : (
         <section class="hero">
-          <div class={`panel score-panel ${scoreTone(selected.overall)}`} data-score-panel>
+          <div class={`panel score-panel ${scoreTone(overall)}`} data-score-panel>
             <div class="ring-wrap">
               <svg viewBox="0 0 140 140" width="168" height="168" aria-hidden="true">
                 <circle
@@ -69,18 +97,24 @@ const payload = JSON.stringify(model.runs);
                   cy="70"
                   r={radius}
                   fill="none"
-                  stroke={toneColor(selected.overall)}
+                  stroke={toneColor(overall)}
                   stroke-width="8"
                   stroke-linecap="round"
                   stroke-dasharray={circumference}
-                  stroke-dashoffset={ringOffset(selected.overall, radius)}
+                  stroke-dashoffset={ringOffset(overall, radius)}
                 />
               </svg>
-              <div data-overall class={`value ${scoreTone(selected.overall)}`}>
-                {selected.overall}
+              <div data-overall class={`value ${scoreTone(overall)}`}>
+                {overall}
               </div>
             </div>
-            <p class="caption">Overall · click a commit on the trend to compare</p>
+            <p class="caption" data-scope-caption>
+              {
+                selectedService === undefined
+                  ? "Platform overall · click a commit on the trend to compare"
+                  : `${selectedService} overall · click platform to return`
+              }
+            </p>
           </div>
           <div class="panel">
             <div class="meta-grid">
@@ -90,7 +124,7 @@ const payload = JSON.stringify(model.runs);
               </div>
               <div>
                 <span>Overall</span>
-                <p data-overall-meta>{selected.overall} / 100</p>
+                <p data-overall-meta>{overall} / 100</p>
               </div>
               <div>
                 <span>Message</span>
@@ -108,8 +142,67 @@ const payload = JSON.stringify(model.runs);
                 <span>Trace</span>
                 <p class="sha" data-trace-id>{selected.traceId ?? "none"}</p>
               </div>
+              <div>
+                <span>Rule set</span>
+                <p data-rule-set>v{ruleSetVersionOf(selected)}</p>
+              </div>
+              <div>
+                <span>State</span>
+                <p data-state>{selected.state ?? "current"}</p>
+              </div>
             </div>
           </div>
+        </section>
+      )
+    }
+
+    {
+      selected !== undefined && (
+        <section class="panel map">
+          <h2>Services</h2>
+          <p class="signals">
+            Checkout publishes a send-instruction. Notification is the only
+            subscriber allowed to talk to the email provider.
+          </p>
+          <div class="service-map" data-service-map>
+            <a
+              class:list={[
+                "svc",
+                selectedService === "checkout" ? "is-selected" : "",
+              ]}
+              href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}&service=checkout${includeSuperseded ? "&history=all" : ""}`}
+              data-service="checkout"
+            >
+              checkout
+              <strong data-checkout-overall>
+                {selected.services.find((item) => item.service === "checkout")?.overall ?? "n/a"}
+              </strong>
+            </a>
+            <span class="edge">send-instruction topic</span>
+            <a
+              class:list={[
+                "svc",
+                selectedService === "notification" ? "is-selected" : "",
+              ]}
+              href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}&service=notification${includeSuperseded ? "&history=all" : ""}`}
+              data-service="notification"
+            >
+              notification
+              <strong data-notification-overall>
+                {selected.services.find((item) => item.service === "notification")?.overall ?? "n/a"}
+              </strong>
+            </a>
+          </div>
+          <a
+            class:list={[
+              "platform-link",
+              selectedService === undefined ? "is-selected" : "",
+            ]}
+            href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}${includeSuperseded ? "&history=all" : ""}`}
+            data-service=""
+          >
+            Platform view
+          </a>
         </section>
       )
     }
@@ -122,7 +215,15 @@ const payload = JSON.stringify(model.runs);
         ) : (
           <>
             <p class="signals">
-              Each run names its reasoner. Memory Bank holds prior observations, not accepted decisions. After platform wiring, re-reasoned history is a replay, not the original stub record.
+              Vertical marks are rule-set version changes. Scores on either side
+              are not directly comparable. Default list is current runs only.
+            </p>
+            <p class="history-toggle">
+              <a href={historyHref}>
+                {includeSuperseded
+                  ? "Hide superseded runs"
+                  : "Show superseded runs"}
+              </a>
             </p>
             <svg class="chart" viewBox={`0 0 ${chartW} ${chartH}`} role="img">
               <title>Overall score across replayed commits. Click a point to inspect that run.</title>
@@ -135,6 +236,16 @@ const payload = JSON.stringify(model.runs);
               <line class="grid" x1="12" y1="36" x2="628" y2="36" />
               <line class="grid" x1="12" y1="90" x2="628" y2="90" />
               <line class="grid" x1="12" y1="144" x2="628" y2="144" />
+              {
+                versionMarks.map((mark) => (
+                  <g class="version-mark">
+                    <line x1={mark.x} y1="12" x2={mark.x} y2="168" />
+                    <text x={mark.x + 6} y="22">
+                      v{mark.version}
+                    </text>
+                  </g>
+                ))
+              }
               <polygon class="area" points={area} />
               <polyline class="line" points={line} />
               {plotted.map((point, index) => {
@@ -142,10 +253,10 @@ const payload = JSON.stringify(model.runs);
                 if (run === undefined) {
                   return null;
                 }
-                const selectedDot = run.commitSha === selected?.commitSha;
+                const selectedDot = run.runId === selected?.runId;
                 return (
                   <g
-                    data-run={run.commitSha}
+                    data-run={run.runId}
                     class={selectedDot ? "is-selected" : ""}
                     role="button"
                     tabindex="0"
@@ -167,15 +278,17 @@ const payload = JSON.stringify(model.runs);
               {model.runs.map((run) => (
                 <button
                   type="button"
-                  data-run={run.commitSha}
+                  data-run={run.runId}
                   class:list={[
                     `${scoreTone(run.overall)}-label`,
-                    run.commitSha === selected?.commitSha ? "is-selected" : "",
+                    run.runId === selected?.runId ? "is-selected" : "",
                   ]}
-                  aria-pressed={run.commitSha === selected?.commitSha}
+                  aria-pressed={run.runId === selected?.runId}
                 >
                   <div class="sha">
                     {shortSha(run.commitSha)} · {run.overall}
+                    {run.state === "superseded" ? " · superseded" : ""}
+                    {` · v${ruleSetVersionOf(run)}`}
                   </div>
                   <p>{run.commitMessage}</p>
                 </button>
@@ -189,10 +302,19 @@ const payload = JSON.stringify(model.runs);
     {
       selected !== undefined && (
         <section class="cards" data-cards aria-label="Characteristics">
-          {selected.characteristics.map((item) => {
+          {characteristics.map((item) => {
             const recs = improvementCopy(item.score, item.recommendations);
+            const note = hundredNote(item);
             return (
-              <article class="panel card">
+              <article
+                class:list={[
+                  "panel",
+                  "card",
+                  note !== undefined && (item.suppressedBy ?? []).length > 0
+                    ? "card-suppressed"
+                    : "",
+                ]}
+              >
                 <header>
                   <h2>{displayName(item.id)}</h2>
                   <div class={`n ${scoreTone(item.score)}`}>{item.score}</div>
@@ -201,8 +323,10 @@ const payload = JSON.stringify(model.runs);
                   <span style={`width: ${item.score}%`} />
                 </div>
                 <p>{item.reasoning}</p>
-                {recs.length === 0 ? (
-                  <p class="ok-note">At 100. No changes needed.</p>
+                {note !== undefined ? (
+                  <p class={ (item.suppressedBy ?? []).length > 0 ? "suppressed-note" : "ok-note"}>
+                    {note}
+                  </p>
                 ) : (
                   <div class="improve">
                     <h3>How to improve</h3>

@@ -2,42 +2,39 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { checkArchitecture } from "./check.js";
+import { RULE_IDS } from "./version.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(here, "../..");
 
-function fixtureTsconfig(ruleId: string): string {
-  return join(here, "fixtures", ruleId, "tsconfig.json");
+function fixtureTsconfig(name: string): string {
+  return join(here, "fixtures", name, "tsconfig.json");
 }
 
-describe("architecture rules on the real services", () => {
-  it("evaluates all five rules", async () => {
-    const results = await checkArchitecture(
-      join(repoRoot, "tsconfig.arch.json"),
-    );
-    expect(results.map((item) => item.ruleId)).toEqual([
-      "rule-1",
-      "rule-2",
-      "rule-3",
-      "rule-4",
-      "rule-5",
-    ]);
-    for (const item of results) {
-      expect(typeof item.passed).toBe("boolean");
-      expect(Array.isArray(item.violations)).toBe(true);
-    }
-  });
-});
-
 describe("architecture rules on fixtures", () => {
-  it.each(["rule-1", "rule-2", "rule-3", "rule-4", "rule-5"] as const)(
-    "%s fails on its fixture",
-    async (ruleId) => {
-      const results = await checkArchitecture(fixtureTsconfig(ruleId));
-      const match = results.find((item) => item.ruleId === ruleId);
-      expect(match).toBeDefined();
-      expect(match?.passed).toBe(false);
-      expect(match?.violations.length).toBeGreaterThan(0);
-    },
-  );
+  it.each(RULE_IDS)("%s fails on its violating fixture", async (ruleId) => {
+    const results = await checkArchitecture(fixtureTsconfig(ruleId));
+    const match = results.find((item) => item.ruleId === ruleId);
+    expect(match).toBeDefined();
+    expect(match?.passed).toBe(false);
+    expect(match?.violations.length).toBeGreaterThan(0);
+  });
+
+  it.each(RULE_IDS)("%s passes on its compliant fixture", async (ruleId) => {
+    const results = await checkArchitecture(fixtureTsconfig(`${ruleId}-pass`));
+    const match = results.find((item) => item.ruleId === ruleId);
+    expect(match).toBeDefined();
+    expect(match?.passed).toBe(true);
+    expect(match?.violations).toEqual([]);
+  });
+
+  it("fails rule 2 when infrastructure imports a new domain decision", async () => {
+    const results = await checkArchitecture(
+      fixtureTsconfig("rule-2-new-decision"),
+    );
+    const match = results.find((item) => item.ruleId === "rule-2");
+    expect(match?.passed).toBe(false);
+    expect(match?.violations.some((item) => item.detail.includes("cancel-order"))).toBe(
+      true,
+    );
+  });
 });

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from health_agent.assemble import assemble, assert_scores_unchanged
 from health_agent.memory import MemoryBank, observation_from_read
 from health_agent.models import AnalysisPayload, HealthRead
+from health_agent.reasoner_facts import metrics_from_payload, prior_metrics_series
 from health_agent.reasoner import Reasoner, StubReasoner
 from health_agent.score_bridge import repo_root, score_payload
 from health_agent.tracing import current_trace_id, tracer
@@ -91,7 +92,9 @@ def produce_health_read(
         with tracer().start_as_current_span("memory_retrieve"):
             snippets = bank.retrieve(query)
         print(
-            f"reasoner={name} memory_snippets={len(snippets)} run={payload.runId}",
+            f"reasoner={name} memory_snippets={len(snippets)} "
+            f"prior_metrics={len(prior_metrics_series(priors, payload.commitSha))} "
+            f"changed_files={len(payload.changedFiles)} run={payload.runId}",
             flush=True,
         )
         with tracer().start_as_current_span("reasoning"):
@@ -108,6 +111,12 @@ def produce_health_read(
             narratives,
             reasoner=name,
             trace_id=current_trace_id(),
+        )
+        read = read.model_copy(
+            update={
+                "metrics": metrics_from_payload(payload),
+                "ruleSetVersion": payload.ruleSetVersion,
+            }
         )
         assert_scores_unchanged(scores, read)
         layering = next(

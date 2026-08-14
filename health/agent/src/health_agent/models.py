@@ -1,9 +1,10 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ArchViolation(BaseModel):
     file: str
     detail: str
+    service: str | None = None
 
 
 class ArchTestResult(BaseModel):
@@ -21,10 +22,12 @@ class Clone(BaseModel):
     files: list[str]
     lines: int = 0
     tokens: int = 0
+    classification: str | None = None
+    services: list[str] = Field(default_factory=list)
 
 
 class DuplicationPayload(BaseModel):
-    clones: list[Clone] = []
+    clones: list[Clone] = Field(default_factory=list)
     percentage: float = 0
 
 
@@ -33,11 +36,20 @@ class DependencyMetrics(BaseModel):
     dependencies: int = 0
 
 
+class FolderMetric(BaseModel):
+    folder: str
+    afferentCoupling: float = 0
+    efferentCoupling: float = 0
+    instability: float = 0
+    moduleCount: int | None = None
+
+
 class DependencyCruiserPayload(BaseModel):
-    cycles: list[dict[str, object]] = []
-    orphans: list[str] = []
-    violations: list[dict[str, object]] = []
-    metrics: DependencyMetrics = DependencyMetrics()
+    cycles: list[dict[str, object]] = Field(default_factory=list)
+    orphans: list[str] = Field(default_factory=list)
+    violations: list[dict[str, object]] = Field(default_factory=list)
+    metrics: DependencyMetrics = Field(default_factory=DependencyMetrics)
+    folderMetrics: list[FolderMetric] = Field(default_factory=list)
 
 
 class RecentCommit(BaseModel):
@@ -54,9 +66,30 @@ class AnalysisPayload(BaseModel):
     timestamp: str
     archTests: list[ArchTestResult]
     runtime: RuntimePayload
-    dependencyCruiser: DependencyCruiserPayload = DependencyCruiserPayload()
-    duplication: DuplicationPayload = DuplicationPayload()
-    recentCommits: list[RecentCommit] = []
+    services: list[str] = Field(default_factory=list)
+    dependencyCruiser: DependencyCruiserPayload = Field(
+        default_factory=DependencyCruiserPayload
+    )
+    duplication: DuplicationPayload = Field(default_factory=DuplicationPayload)
+    recentCommits: list[RecentCommit] = Field(default_factory=list)
+    changedFiles: list[str] = Field(default_factory=list)
+    ruleSetVersion: int = 1
+
+
+class DuplicationCounts(BaseModel):
+    internal: int = 0
+    crossService: int = 0
+    shared: int = 0
+
+
+class RunMetrics(BaseModel):
+    modules: int
+    dependencies: int
+    duplicationPercentage: float = 0
+    orphanCount: int = 0
+    cycleCount: int = 0
+    folderInstability: dict[str, float] = Field(default_factory=dict)
+    duplicationCounts: DuplicationCounts = Field(default_factory=DuplicationCounts)
 
 
 class CharacteristicScore(BaseModel):
@@ -66,9 +99,16 @@ class CharacteristicScore(BaseModel):
     suppressedBy: list[str] | None = None
 
 
+class ServiceScore(BaseModel):
+    service: str
+    overall: int
+    characteristics: list[CharacteristicScore]
+
+
 class ScoreResult(BaseModel):
     overall: int
     characteristics: list[CharacteristicScore]
+    services: list[ServiceScore] = Field(default_factory=list)
 
 
 class CharacteristicRead(BaseModel):
@@ -80,6 +120,12 @@ class CharacteristicRead(BaseModel):
     suppressedBy: list[str] | None = None
 
 
+class ServiceRead(BaseModel):
+    service: str
+    overall: int
+    characteristics: list[CharacteristicRead]
+
+
 class HealthRead(BaseModel):
     runId: str
     commitSha: str
@@ -87,6 +133,12 @@ class HealthRead(BaseModel):
     characteristics: list[CharacteristicRead]
     reasoner: str
     traceId: str | None = None
+    metrics: RunMetrics | None = None
+    state: str = "current"
+    supersededAt: str | None = None
+    supersededBy: str | None = None
+    services: list[ServiceRead] = Field(default_factory=list)
+    ruleSetVersion: int = 1
 
 
 class Narrative(BaseModel):

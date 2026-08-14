@@ -442,6 +442,91 @@ body {
   font-size: 0.88rem;
 }
 
+.suppressed-note {
+  margin-top: 0.75rem;
+  color: var(--mid);
+  font-size: 0.88rem;
+}
+
+.card-suppressed {
+  border-color: rgba(251, 146, 60, 0.35);
+}
+
+.map h2 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.03em;
+}
+
+.service-map {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin: 0.85rem 0;
+}
+
+.svc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 8.5rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.svc strong {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 1.15rem;
+}
+
+.svc.is-selected,
+.platform-link.is-selected {
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.edge {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--mute);
+}
+
+.platform-link {
+  display: inline-block;
+  color: var(--mute);
+  font-size: 0.85rem;
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.25rem 0.4rem;
+}
+
+.history-toggle {
+  margin: 0 0 0.75rem;
+}
+
+.history-toggle a {
+  color: var(--mute);
+  font-size: 0.85rem;
+}
+
+.chart .version-mark line {
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-dasharray: 3 4;
+  stroke-width: 1.5;
+}
+
+.chart .version-mark text {
+  fill: var(--mute);
+  font-size: 10px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
 .empty {
   border: 1px dashed var(--line);
   border-radius: var(--radius);

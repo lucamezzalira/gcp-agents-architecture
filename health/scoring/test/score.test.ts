@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { classifyClone } from "../src/classify.js";
 import { score } from "../src/score.js";
 import {
   acceptedDecisionSchema,
@@ -40,24 +41,85 @@ function characteristic(
   return found;
 }
 
+function serviceScore(
+  result: ReturnType<typeof score>,
+  name: string,
+) {
+  const found = result.services.find((item) => item.service === name);
+  if (found === undefined) {
+    throw new Error(`missing service ${name}`);
+  }
+  return found;
+}
+
+function serviceChar(
+  result: ReturnType<typeof score>,
+  name: string,
+  id: string,
+) {
+  const found = serviceScore(result, name).characteristics.find(
+    (item) => item.id === id,
+  );
+  if (found === undefined) {
+    throw new Error(`missing ${name}:${id}`);
+  }
+  return found;
+}
+
+function layerMetrics(
+  service: string,
+  instability: number,
+): AnalysisPayload["dependencyCruiser"]["folderMetrics"] {
+  return ["domain", "infrastructure", "transport"].map((layer) => ({
+    folder: `services/${service}/src/${layer}`,
+    afferentCoupling: 4,
+    efferentCoupling: 6,
+    instability,
+  }));
+}
+
+function withGraph(
+  payload: AnalysisPayload,
+  instability: { checkout: number; notification: number },
+): AnalysisPayload {
+  return {
+    ...payload,
+    services: ["checkout", "notification"],
+    dependencyCruiser: {
+      ...payload.dependencyCruiser,
+      folderMetrics: [
+        ...layerMetrics("checkout", instability.checkout),
+        ...layerMetrics("notification", instability.notification),
+      ],
+    },
+  };
+}
+
 describe("score", () => {
   it("scores every characteristic 100 when there are no findings", () => {
     const result = score(zeroFindings, []);
     expect(result.characteristics.map((item) => item.score)).toEqual([
-      100, 100, 100, 100,
+      100, 100, 100, 100, 100,
     ]);
     expect(result.overall).toBe(100);
   });
 
-  it("drops boundary-integrity for a rule-3 violation and records the signal", () => {
+  it("drops checkout boundary and platform cross-service integrity for rule-3", () => {
     const result = score(rule3Violation, []);
-    const boundary = characteristic(result, "boundary-integrity");
-    expect(boundary.score).toBeLessThan(100);
-    expect(boundary.score).toBe(60);
-    expect(boundary.signalsUsed).toContain(
+    expect(serviceChar(result, "checkout", "boundary-integrity").score).toBe(60);
+    expect(serviceChar(result, "notification", "boundary-integrity").score).toBe(
+      100,
+    );
+    expect(characteristic(result, "boundary-integrity").score).toBe(60);
+    expect(characteristic(result, "cross-service-integrity").score).toBe(60);
+    expect(
+      serviceChar(result, "checkout", "boundary-integrity").signalsUsed,
+    ).toContain(
       "ts-arch:rule-3:services/checkout/src/infrastructure/email-provider.ts",
     );
-    expect(result.overall).toBe(84);
+    expect(result.overall).toBe(78);
+    expect(serviceScore(result, "checkout").overall).toBe(84);
+    expect(serviceScore(result, "notification").overall).toBe(100);
   });
 
   it("returns byte-identical output for the same payload twice", () => {
@@ -68,12 +130,14 @@ describe("score", () => {
 
   it("suppresses the penalty when an active decision matches the violation", () => {
     const result = score(rule3Violation, [rule3Decision]);
-    const boundary = characteristic(result, "boundary-integrity");
-    expect(boundary.score).toBe(100);
-    expect(boundary.suppressedBy).toEqual([
-      "decision-rule-3-checkout-provider",
-    ]);
-    expect(boundary.signalsUsed).toEqual([]);
+    expect(serviceChar(result, "checkout", "boundary-integrity").score).toBe(100);
+    expect(
+      serviceChar(result, "checkout", "boundary-integrity").suppressedBy,
+    ).toEqual(["decision-rule-3-checkout-provider"]);
+    expect(characteristic(result, "cross-service-integrity").score).toBe(100);
+    expect(characteristic(result, "cross-service-integrity").suppressedBy).toEqual(
+      ["decision-rule-3-checkout-provider"],
+    );
     expect(result.overall).toBe(100);
   });
 
@@ -95,9 +159,195 @@ describe("score", () => {
     const result = score(rule3Violation, [
       { ...rule3Decision, active: false },
     ]);
-    expect(characteristic(result, "boundary-integrity").score).toBe(60);
+    expect(serviceChar(result, "checkout", "boundary-integrity").score).toBe(60);
     expect(
-      characteristic(result, "boundary-integrity").suppressedBy,
+      serviceChar(result, "checkout", "boundary-integrity").suppressedBy,
     ).toBeUndefined();
+  });
+
+  it("moves coupling when folder instability changes without a cycle", () => {
+    const quieter = score(withGraph(zeroFindings, { checkout: 0.2, notification: 0.2 }), []);
+    const noisier = score(withGraph(zeroFindings, { checkout: 0.6, notification: 0.2 }), []);
+    expect(quieter.services.find((item) => item.service === "checkout")?.characteristics.find((item) => item.id === "coupling")?.score).toBe(92);
+    expect(noisier.services.find((item) => item.service === "checkout")?.characteristics.find((item) => item.id === "coupling")?.score).toBe(76);
+    expect(characteristic(noisier, "coupling").score).not.toBe(
+      characteristic(quieter, "coupling").score,
+    );
+    expect(noisier.overall).not.toBe(quieter.overall);
+  });
+
+  it("scores internal clones on the service and cross-service clones on the platform", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      duplication: {
+        percentage: 4.2,
+        clones: [
+          {
+            files: [
+              "services/checkout/src/domain/order.ts",
+              "services/checkout/src/domain/order-copy.ts",
+            ],
+            lines: 12,
+            tokens: 80,
+            classification: "internal",
+            services: ["checkout"],
+          },
+          {
+            files: [
+              "services/checkout/src/domain/send-instruction.ts",
+              "services/notification/src/domain/send-instruction.ts",
+            ],
+            lines: 20,
+            tokens: 90,
+            classification: "cross-service",
+            services: ["checkout", "notification"],
+          },
+        ],
+      },
+    };
+    const result = score(payload, []);
+    expect(serviceChar(result, "checkout", "duplication").score).toBe(92);
+    expect(serviceChar(result, "notification", "duplication").score).toBe(100);
+    expect(characteristic(result, "cross-service-integrity").score).toBe(90);
+  });
+
+  it("suppresses a platform-scoped cross-service clone decision", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      duplication: {
+        percentage: 1,
+        clones: [
+          {
+            files: [
+              "services/checkout/src/domain/send-instruction.ts",
+              "services/notification/src/domain/send-instruction.ts",
+            ],
+            lines: 20,
+            tokens: 90,
+          },
+        ],
+      },
+    };
+    const decision: AcceptedDecision = {
+      id: "decision-cross-service-send-instruction",
+      ruleId: "duplication-cross-service",
+      pathGlob: "**/send-instruction.ts",
+      decision: "accept",
+      rationale: "each service renders its own email",
+      decidedBy: "test",
+      decidedAt: "2026-01-01T00:00:00.000Z",
+      active: true,
+      scope: "platform",
+    };
+    const result = score(payload, [decision]);
+    expect(characteristic(result, "cross-service-integrity").score).toBe(100);
+    expect(characteristic(result, "cross-service-integrity").suppressedBy).toEqual([
+      "decision-cross-service-send-instruction",
+    ]);
+  });
+
+  it("drops layering when domain imports transport or infrastructure", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      archTests: [
+        {
+          ruleId: "rule-6",
+          passed: false,
+          violations: [
+            {
+              file: "services/checkout/src/domain/mark-paid.ts",
+              detail: "depends on transport",
+              service: "checkout",
+            },
+          ],
+        },
+        {
+          ruleId: "rule-8",
+          passed: false,
+          violations: [
+            {
+              file: "services/checkout/src/domain/mark-paid.ts",
+              detail: "depends on infrastructure",
+              service: "checkout",
+            },
+          ],
+        },
+        {
+          ruleId: "rule-9",
+          passed: false,
+          violations: [
+            {
+              file: "services/checkout/src/infrastructure/order-store.ts",
+              detail: "depends on transport",
+              service: "checkout",
+            },
+          ],
+        },
+      ],
+    };
+    const result = score(payload, []);
+    expect(serviceChar(result, "checkout", "layering").score).toBe(40);
+    expect(characteristic(result, "layering").score).toBe(70);
+    expect(characteristic(result, "cross-service-integrity").score).toBe(100);
+  });
+
+  it("drops checkout boundary and platform CSI when transport imports another service", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      archTests: [
+        {
+          ruleId: "rule-7",
+          passed: false,
+          violations: [
+            {
+              file: "services/checkout/src/transport/http.ts",
+              detail: "depends on notification transport",
+              service: "checkout",
+            },
+          ],
+        },
+      ],
+    };
+    const result = score(payload, []);
+    expect(serviceChar(result, "checkout", "boundary-integrity").score).toBe(75);
+    expect(serviceChar(result, "notification", "boundary-integrity").score).toBe(
+      100,
+    );
+    expect(characteristic(result, "cross-service-integrity").score).toBe(75);
+  });
+});
+
+describe("classifyClone", () => {
+  it("labels a self-clone internal", () => {
+    expect(
+      classifyClone([
+        "services/checkout/src/a.ts",
+        "services/checkout/src/b.ts",
+      ]),
+    ).toEqual({ classification: "internal", services: ["checkout"] });
+  });
+
+  it("labels a clone spanning two services as cross-service", () => {
+    expect(
+      classifyClone([
+        "services/checkout/src/domain/send-instruction.ts",
+        "services/notification/src/domain/send-instruction.ts",
+      ]),
+    ).toEqual({
+      classification: "cross-service",
+      services: ["checkout", "notification"],
+    });
+  });
+
+  it("labels a clone that leaves services/ as shared", () => {
+    expect(
+      classifyClone([
+        "services/checkout/src/app.ts",
+        "health/scoring/src/cli.ts",
+      ]),
+    ).toEqual({ classification: "shared", services: ["checkout"] });
   });
 });

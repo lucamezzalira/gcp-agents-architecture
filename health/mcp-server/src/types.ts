@@ -4,6 +4,13 @@ export type CharacteristicRead = {
   reasoning: string;
   recommendations: string[];
   signalsUsed: string[];
+  suppressedBy?: string[];
+};
+
+export type ServiceRead = {
+  service: string;
+  overall: number;
+  characteristics: CharacteristicRead[];
 };
 
 export type LatestHealth = {
@@ -14,7 +21,10 @@ export type LatestHealth = {
   overall: number;
   reasoner?: string;
   traceId?: string;
+  ruleSetVersion?: number;
+  state?: string;
   characteristics: CharacteristicRead[];
+  services: ServiceRead[];
 };
 
 export type AcceptedDecision = {
@@ -36,7 +46,10 @@ export type HealthRunSummary = {
   overall: number;
   reasoner?: string;
   traceId?: string;
+  ruleSetVersion?: number;
+  state?: string;
   characteristics: Array<{ id: string; score: number }>;
+  services: Array<{ service: string; overall: number }>;
 };
 
 export type HealthStore = {
@@ -48,7 +61,7 @@ export type HealthStore = {
 export const CHARACTERISTICS = [
   {
     id: "boundary-integrity",
-    what: "Whether service boundaries hold, especially provider access",
+    what: "Whether a service's own files respect declared boundaries",
   },
   {
     id: "layering",
@@ -56,10 +69,14 @@ export const CHARACTERISTICS = [
   },
   {
     id: "coupling",
-    what: "Structural coupling between and within services",
+    what: "Cycles, orphans, and folder instability inside a service",
   },
   {
     id: "duplication",
-    what: "Repeated code across the codebase",
+    what: "Internal clones inside one service",
+  },
+  {
+    id: "cross-service-integrity",
+    what: "Rules 3 to 5 and 7, plus clones that span services",
   },
 ] as const;

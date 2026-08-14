@@ -3,6 +3,7 @@
   "commitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "commitMessage": "checkout calls the provider directly",
   "timestamp": "2026-01-02T00:00:00.000Z",
+  "services": ["checkout", "notification"],
   "archTests": [
     {
       "ruleId": "rule-3",

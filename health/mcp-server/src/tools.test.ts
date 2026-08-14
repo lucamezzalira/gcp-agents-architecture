@@ -14,6 +14,8 @@ const latest: LatestHealth = {
   commitMessage: "Regression: checkout imports the email provider",
   createdAt: "2026-08-13T12:00:00.000Z",
   overall: 74,
+  ruleSetVersion: 2,
+  state: "current",
   characteristics: [
     {
       id: "boundary-integrity",
@@ -32,6 +34,54 @@ const latest: LatestHealth = {
       reasoning: "layering is 100",
       recommendations: [],
       signalsUsed: [],
+    },
+    {
+      id: "cross-service-integrity",
+      score: 60,
+      reasoning: "the relationship failed",
+      recommendations: ["Keep provider access inside notification."],
+      signalsUsed: [
+        "ts-arch:rule-3:services/checkout/src/domain/mark-paid.ts",
+      ],
+    },
+  ],
+  services: [
+    {
+      service: "checkout",
+      overall: 74,
+      characteristics: [
+        {
+          id: "boundary-integrity",
+          score: 35,
+          reasoning: "checkout imported the email provider",
+          recommendations: [
+            "Keep provider access inside services/notification.",
+          ],
+          signalsUsed: [
+            "ts-arch:rule-3:services/checkout/src/domain/mark-paid.ts",
+          ],
+        },
+        {
+          id: "layering",
+          score: 100,
+          reasoning: "layering holds inside checkout",
+          recommendations: [],
+          signalsUsed: [],
+        },
+      ],
+    },
+    {
+      service: "notification",
+      overall: 100,
+      characteristics: [
+        {
+          id: "boundary-integrity",
+          score: 100,
+          reasoning: "notification still owns the provider",
+          recommendations: [],
+          signalsUsed: [],
+        },
+      ],
     },
   ],
 };
@@ -64,8 +114,11 @@ describe("get_health", () => {
       throw new Error("expected a health read");
     }
     expect(result.scope).toBe("path");
+    expect(result.service).toBe("checkout");
+    expect(result.overall).toBe(74);
     expect(result.characteristics.map((item) => item.id)).toEqual([
       "boundary-integrity",
+      "layering",
     ]);
   });
 
@@ -108,6 +161,11 @@ describe("list_health_runs", () => {
     expect(result[0]?.characteristics).toEqual([
       { id: "boundary-integrity", score: 35 },
       { id: "layering", score: 100 },
+      { id: "cross-service-integrity", score: 60 },
+    ]);
+    expect(result[0]?.services).toEqual([
+      { service: "checkout", overall: 74 },
+      { service: "notification", overall: 100 },
     ]);
   });
 });
@@ -156,12 +214,13 @@ describe("get_prior_decisions", () => {
 });
 
 describe("list_characteristics", () => {
-  it("lists the four tracked characteristics", () => {
+  it("lists the tracked characteristics including cross-service integrity", () => {
     expect(listCharacteristics().map((item) => item.id)).toEqual([
       "boundary-integrity",
       "layering",
       "coupling",
       "duplication",
+      "cross-service-integrity",
     ]);
   });
 });

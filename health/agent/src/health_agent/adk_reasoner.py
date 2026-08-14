@@ -8,9 +8,10 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from health_agent.adk_agent import INSTRUCTION, root_agent
+from health_agent.adk_agent import INSTRUCTION, build_root_agent
 from health_agent.models import AnalysisPayload, Narrative, ScoreResult
 from health_agent.reasoner import Reasoner
+from health_agent.reasoner_facts import build_facts
 
 
 class AdkReasoner(Reasoner):
@@ -23,52 +24,19 @@ class AdkReasoner(Reasoner):
         prior_reads: list | None = None,
         memory_snippets: list[str] | None = None,
     ) -> list[Narrative]:
-        facts = {
-            "overall": scores.overall,
-            "characteristics": [
-                {
-                    "id": item.id,
-                    "score": item.score,
-                    "signalsUsed": item.signalsUsed,
-                    "suppressedBy": item.suppressedBy,
-                }
-                for item in scores.characteristics
-            ],
-            "failedRules": [
-                {
-                    "ruleId": item.ruleId,
-                    "files": [violation.file for violation in item.violations],
-                    "details": [violation.detail for violation in item.violations],
-                }
-                for item in payload.archTests
-                if not item.passed
-            ],
-            "commitMessage": payload.commitMessage,
-            "recentCommits": [item.message for item in payload.recentCommits],
-            "duplication": {
-                "percentage": payload.duplication.percentage,
-                "clones": [item.files for item in payload.duplication.clones],
-            },
-            "couplingMetrics": {
-                "modules": payload.dependencyCruiser.metrics.modules,
-                "dependencies": payload.dependencyCruiser.metrics.dependencies,
-            },
-            "priorOverall": [item.overall for item in (prior_reads or [])][-6:],
-            "memoryBank": memory_snippets or [],
-            "runtimeIllustrative": payload.runtime.illustrative,
-        }
+        facts = build_facts(payload, scores, prior_reads, memory_snippets)
         prompt = (
             f"{INSTRUCTION}\n\n"
-            "These scores are facts. Copy each id. Do not change a score.\n"
+            "These scores are facts. Copy each id in narrativeIds. Do not change a score.\n"
+            "Platform characteristics use the id as given. Service characteristics "
+            "use service:id (example checkout:coupling).\n"
             "Return JSON: {\"narratives\": [{\"id\": \"\", \"reasoning\": \"\", \"recommendations\": []}]}\n"
-            "Empty recommendations when score is 100. Reasoning may still "
-            "describe drift when rules pass. If memoryBank is non-empty, "
-            "acknowledge those prior observations in the prose.\n\n"
+            "Empty recommendations when score is 100.\n\n"
             f"{json.dumps(facts)}"
         )
         session_service = InMemorySessionService()
         runner = Runner(
-            agent=root_agent,
+            agent=build_root_agent(),
             app_name="architecture_health",
             session_service=session_service,
         )
@@ -92,11 +60,17 @@ class AdkReasoner(Reasoner):
         narratives = [Narrative.model_validate(item) for item in parsed["narratives"]]
         by_id = {item.id: item for item in narratives}
         ordered: list[Narrative] = []
-        for scored in scores.characteristics:
-            found = by_id.get(scored.id)
+        required: list[str] = [item.id for item in scores.characteristics]
+        required.extend(
+            f"{service.service}:{item.id}"
+            for service in scores.services
+            for item in service.characteristics
+        )
+        for key in required:
+            found = by_id.get(key)
             if found is None:
-                raise RuntimeError(f"ADK omitted narrative for {scored.id}")
-            ordered.append(found)
+                raise RuntimeError(f"ADK omitted narrative for {key}")
+            ordered.append(found.model_copy(update={"id": key}))
         return ordered
 
 

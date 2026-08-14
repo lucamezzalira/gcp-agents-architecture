@@ -35,16 +35,25 @@ export function globMatch(glob: string, filePath: string): boolean {
 export type MatchableFinding = {
   ruleId: string;
   paths: string[];
+  service?: string;
 };
 
 export function matchingDecision(
   finding: MatchableFinding,
   decisions: AcceptedDecision[],
 ): AcceptedDecision | undefined {
-  return decisions.find(
-    (decision) =>
-      decision.active &&
-      decision.ruleId === finding.ruleId &&
-      finding.paths.some((path) => globMatch(decision.pathGlob, path)),
-  );
+  return decisions.find((decision) => {
+    if (!decision.active || decision.ruleId !== finding.ruleId) {
+      return false;
+    }
+    const scope = decision.scope ?? "platform";
+    if (
+      scope !== "platform" &&
+      finding.service !== undefined &&
+      scope !== finding.service
+    ) {
+      return false;
+    }
+    return finding.paths.some((path) => globMatch(decision.pathGlob, path));
+  });
 }

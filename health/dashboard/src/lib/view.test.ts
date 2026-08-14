@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildDashboardModel,
   easeOutCubic,
+  hundredNote,
   improvementCopy,
   lerp,
   polyline,
+  ruleSetMarkers,
   scoreTone,
   selectRun,
   shortSha,
@@ -28,6 +30,7 @@ const restore: HealthRun = {
       signalsUsed: [],
     },
   ],
+  services: [],
 };
 
 const regression: HealthRun = {
@@ -45,6 +48,7 @@ const regression: HealthRun = {
       signalsUsed: ["ts-arch:rule-3:services/checkout/src/domain/mark-paid.ts"],
     },
   ],
+  services: [],
 };
 
 const baseline: HealthRun = {
@@ -105,5 +109,25 @@ describe("buildDashboardModel", () => {
     expect(lerp(100, 74, 1)).toBe(74);
     expect(easeOutCubic(0)).toBe(0);
     expect(easeOutCubic(1)).toBe(1);
+  });
+
+  it("marks the trend where the rule set version changes", () => {
+    const versioned = [
+      { ...baseline, ruleSetVersion: 1 },
+      { ...regression, ruleSetVersion: 1 },
+      { ...restore, ruleSetVersion: 2 },
+    ];
+    const points = trendPoints([100, 74, 100], 200, 80);
+    expect(ruleSetMarkers(versioned, points)).toEqual([
+      { x: points[2]?.x, version: 2 },
+    ]);
+  });
+
+  it("distinguishes a clean 100 from a suppressed 100", () => {
+    expect(hundredNote({ score: 100 })).toBe("At 100. No changes needed.");
+    expect(
+      hundredNote({ score: 100, suppressedBy: ["decision-dup"] }),
+    ).toBe("At 100 because accepted decisions suppress findings.");
+    expect(hundredNote({ score: 74, suppressedBy: ["decision-dup"] })).toBeUndefined();
   });
 });

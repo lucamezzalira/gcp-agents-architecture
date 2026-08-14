@@ -10,12 +10,14 @@ import {
 export type HealthToolResult = {
   path: string | undefined;
   scope: "path" | "system";
+  service?: string;
   runId: string;
   commitSha: string;
   commitMessage: string;
   overall: number;
   reasoner?: string;
   traceId?: string;
+  ruleSetVersion?: number;
   characteristics: CharacteristicRead[];
 };
 
@@ -23,6 +25,12 @@ export type GetHealthOptions = {
   path?: string;
   commitSha?: string;
 };
+
+export function serviceNameFromPath(path: string): string | undefined {
+  const normalised = path.replace(/\\/g, "/");
+  const match = normalised.match(/(?:^|\/)services\/([^/]+)/);
+  return match?.[1];
+}
 
 export async function getHealth(
   store: HealthStore,
@@ -41,15 +49,26 @@ export async function getHealth(
   }
   const path = options.path;
   if (path === undefined || path.length === 0) {
-    return toResult(run, undefined, "system", run.characteristics);
+    return toResult(run, undefined, "system", run.characteristics, run.overall);
+  }
+  const serviceName = serviceNameFromPath(path);
+  const service =
+    serviceName === undefined
+      ? undefined
+      : run.services.find((item) => item.service === serviceName);
+  if (service !== undefined) {
+    return {
+      ...toResult(run, path, "path", service.characteristics, service.overall),
+      service: service.service,
+    };
   }
   const matched = run.characteristics.filter((item) =>
     item.signalsUsed.some((signal) => signalTouchesPath(signal, path)),
   );
   if (matched.length === 0) {
-    return toResult(run, path, "system", run.characteristics);
+    return toResult(run, path, "system", run.characteristics, run.overall);
   }
-  return toResult(run, path, "path", matched);
+  return toResult(run, path, "path", matched, run.overall);
 }
 
 export async function listHealthRuns(
@@ -64,9 +83,15 @@ export async function listHealthRuns(
     overall: run.overall,
     reasoner: run.reasoner,
     traceId: run.traceId,
+    ruleSetVersion: run.ruleSetVersion,
+    state: run.state,
     characteristics: run.characteristics.map((item) => ({
       id: item.id,
       score: item.score,
+    })),
+    services: run.services.map((item) => ({
+      service: item.service,
+      overall: item.overall,
     })),
   }));
 }
@@ -101,6 +126,7 @@ function toResult(
   path: string | undefined,
   scope: "path" | "system",
   characteristics: CharacteristicRead[],
+  overall: number,
 ): HealthToolResult {
   return {
     path,
@@ -108,9 +134,10 @@ function toResult(
     runId: latest.runId,
     commitSha: latest.commitSha,
     commitMessage: latest.commitMessage,
-    overall: latest.overall,
+    overall,
     reasoner: latest.reasoner,
     traceId: latest.traceId,
+    ruleSetVersion: latest.ruleSetVersion,
     characteristics,
   };
 }

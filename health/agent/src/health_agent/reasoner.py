@@ -113,41 +113,54 @@ class StubReasoner(Reasoner):
         priors = prior_reads or []
         narratives: list[Narrative] = []
         rules_hold = _all_rules_passed(payload)
+
+        def emit(char_id: str, score: int, signals: list[str]) -> Narrative:
+            is_boundary = char_id == "boundary-integrity" or char_id.endswith(
+                ":boundary-integrity"
+            )
+            is_csi = char_id == "cross-service-integrity"
+            if (is_boundary or is_csi) and not rules_hold:
+                item = _boundary_narrative(payload, score, signals)
+                return item.model_copy(update={"id": char_id})
+            if score == 100 or rules_hold:
+                item = drift_narrative(
+                    char_id,
+                    score,
+                    payload,
+                    priors,
+                    _runtime_note(payload),
+                )
+                return item.model_copy(update={"id": char_id})
+            return Narrative(
+                id=char_id,
+                reasoning=(
+                    f"{char_id} is {score} because of "
+                    f"{', '.join(signals) or 'tool findings'}."
+                    + _runtime_note(payload)
+                ),
+                recommendations=[
+                    "Inspect the named signals. Do not extract a shared package "
+                    "to silence duplication between these services."
+                ],
+            )
+
         for characteristic in scores.characteristics:
-            if characteristic.id == "boundary-integrity" and not rules_hold:
+            narratives.append(
+                emit(
+                    characteristic.id,
+                    characteristic.score,
+                    characteristic.signalsUsed,
+                )
+            )
+        for service in scores.services:
+            for characteristic in service.characteristics:
                 narratives.append(
-                    _boundary_narrative(
-                        payload,
+                    emit(
+                        f"{service.service}:{characteristic.id}",
                         characteristic.score,
                         characteristic.signalsUsed,
                     )
                 )
-                continue
-            if characteristic.score == 100 or rules_hold:
-                narratives.append(
-                    drift_narrative(
-                        characteristic.id,
-                        characteristic.score,
-                        payload,
-                        priors,
-                        _runtime_note(payload),
-                    )
-                )
-                continue
-            narratives.append(
-                Narrative(
-                    id=characteristic.id,
-                    reasoning=(
-                        f"{characteristic.id} is {characteristic.score} because of "
-                        f"{', '.join(characteristic.signalsUsed) or 'tool findings'}."
-                        + _runtime_note(payload)
-                    ),
-                    recommendations=[
-                        "Inspect the named signals. Do not extract a shared package "
-                        "to silence duplication between these services."
-                    ],
-                )
-            )
         if memory_snippets:
             note = " Prior memory: " + " | ".join(memory_snippets)
             narratives = [

@@ -1,9 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { classifyClone } from "@health/scoring/classify";
 import { analysisPayloadSchema } from "@health/scoring/schemas";
-import { checkArchitecture } from "./arch-tests/check.js";
+import { serviceFromPath } from "@health/scoring/types";
+import { checkArchitecture, RULE_SET_VERSION } from "./arch-tests/check.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const defaultRoot = join(here, "..");
@@ -22,11 +24,21 @@ function git(command: string[]): string {
   }
 }
 
+type FolderRecord = {
+  afferentCouplings?: number;
+  efferentCouplings?: number;
+  instability?: number;
+  moduleCount?: number;
+  name?: string;
+};
+
 type DepcruiseJson = {
   modules?: Array<{
     source: string;
+    orphan?: boolean;
     dependencies?: Array<{ circular?: boolean; resolved?: string }>;
   }>;
+  folders?: Record<string, FolderRecord> | FolderRecord[];
   summary?: {
     violations?: Array<{
       from: string;
@@ -57,6 +69,7 @@ function runDepcruise(): DepcruiseJson {
     [
       "--config",
       join(here, ".dependency-cruiser.js"),
+      "--metrics",
       "--output-type",
       "json",
       "services",
@@ -64,6 +77,14 @@ function runDepcruise(): DepcruiseJson {
     { cwd: repoRoot, encoding: "utf8" },
   );
   return JSON.parse(raw) as DepcruiseJson;
+}
+
+function changedFiles(): string[] {
+  const raw = git(["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"]);
+  if (raw.length === 0) {
+    return [];
+  }
+  return raw.split("\n").filter((line) => line.length > 0);
 }
 
 function recentCommits(): Array<{ sha: string; message: string }> {
@@ -107,22 +128,55 @@ function runJscpd(): JscpdJson {
   }
 }
 
-function scoredOrphan(
-  source: string,
-  referenced: Set<string>,
-  dependencies: Array<{ circular?: boolean; resolved?: string }> | undefined,
-): boolean {
-  const normalised = source.replace(/\\/g, "/");
-  if (!normalised.includes("/src/")) {
-    return false;
+function relativize(file: string): string {
+  const normalised = file.replace(/\\/g, "/");
+  const rootNorm = repoRoot.replace(/\\/g, "/").replace(/\/$/, "");
+  if (normalised.startsWith(`${rootNorm}/`)) {
+    return normalised.slice(rootNorm.length + 1);
   }
-  if (normalised.includes(".test.")) {
-    return false;
+  const servicesAt = normalised.indexOf("/services/");
+  if (servicesAt >= 0) {
+    return normalised.slice(servicesAt + 1);
   }
-  if ((dependencies?.length ?? 0) > 0) {
-    return false;
+  return normalised;
+}
+
+function listedServices(): string[] {
+  try {
+    return readdirSync(join(repoRoot, "services"), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+      .map((entry) => entry.name)
+      .sort();
+  } catch {
+    return [];
   }
-  return !referenced.has(source);
+}
+
+function folderMetrics(
+  depcruise: DepcruiseJson,
+): Array<{
+  folder: string;
+  afferentCoupling: number;
+  efferentCoupling: number;
+  instability: number;
+  moduleCount?: number;
+}> {
+  const folders = depcruise.folders;
+  if (folders === undefined) {
+    return [];
+  }
+  const entries: Array<[string, FolderRecord]> = Array.isArray(folders)
+    ? folders.map((item) => [item.name ?? "", item])
+    : Object.entries(folders);
+  return entries
+    .filter(([folder]) => folder.length > 0)
+    .map(([folder, item]) => ({
+      folder: relativize(folder),
+      afferentCoupling: item.afferentCouplings ?? 0,
+      efferentCoupling: item.efferentCouplings ?? 0,
+      instability: item.instability ?? 0,
+      moduleCount: item.moduleCount,
+    }));
 }
 
 function cyclesFrom(depcruise: DepcruiseJson): Array<{ path: string[] }> {
@@ -144,31 +198,54 @@ function cyclesFrom(depcruise: DepcruiseJson): Array<{ path: string[] }> {
 
 async function main(): Promise<void> {
   const tsconfig = join(repoRoot, "tsconfig.arch.json");
-  const archTests = await checkArchitecture(tsconfig);
+  const archTests = (await checkArchitecture(tsconfig)).map((test) => ({
+    ...test,
+    violations: test.violations.map((violation) => ({
+      ...violation,
+      file: relativize(violation.file),
+      service: serviceFromPath(relativize(violation.file)),
+    })),
+  }));
   const depcruise = runDepcruise();
   const jscpd = runJscpd();
 
   const modules = depcruise.modules ?? [];
-  const referenced = new Set(
-    modules.flatMap((module) =>
-      (module.dependencies ?? [])
-        .map((dep) => dep.resolved)
-        .filter((item): item is string => item !== undefined),
-    ),
-  );
-  const orphans = modules
-    .filter((module) => scoredOrphan(module.source, referenced, module.dependencies))
-    .map((module) => module.source);
+  const orphanViolations = (depcruise.summary?.violations ?? [])
+    .filter((item) => item.rule.name === "no-orphans")
+    .map((item) => item.from);
+  const orphans = [
+    ...new Set([
+      ...orphanViolations,
+      ...modules
+        .filter((module) => module.orphan === true)
+        .map((module) => module.source),
+    ]),
+  ].sort();
   const dependencyCount = modules.reduce(
     (sum, module) => sum + (module.dependencies?.length ?? 0),
     0,
   );
+
+  const clones = (jscpd.duplicates ?? []).map((dup) => {
+    const files = [dup.firstFile?.name ?? "", dup.secondFile?.name ?? ""]
+      .filter((name) => name.length > 0)
+      .map(relativize);
+    const classified = classifyClone(files);
+    return {
+      files,
+      lines: dup.lines ?? 0,
+      tokens: dup.tokens ?? 0,
+      classification: classified.classification,
+      services: classified.services,
+    };
+  });
 
   const payload = analysisPayloadSchema.parse({
     runId: git(["rev-parse", "HEAD"]) || "local",
     commitSha: git(["rev-parse", "HEAD"]) || "local",
     commitMessage: git(["log", "-1", "--format=%s"]) || "uncommitted",
     timestamp: new Date().toISOString(),
+    services: listedServices(),
     archTests,
     dependencyCruiser: {
       cycles: cyclesFrom(depcruise),
@@ -182,15 +259,10 @@ async function main(): Promise<void> {
         modules: modules.length,
         dependencies: dependencyCount,
       },
+      folderMetrics: folderMetrics(depcruise),
     },
     duplication: {
-      clones: (jscpd.duplicates ?? []).map((dup) => ({
-        files: [dup.firstFile?.name ?? "", dup.secondFile?.name ?? ""].filter(
-          (name) => name.length > 0,
-        ),
-        lines: dup.lines ?? 0,
-        tokens: dup.tokens ?? 0,
-      })),
+      clones,
       percentage: jscpd.statistics?.total?.percentage ?? 0,
     },
     runtime: {
@@ -201,6 +273,8 @@ async function main(): Promise<void> {
       ],
     },
     recentCommits: recentCommits(),
+    changedFiles: changedFiles(),
+    ruleSetVersion: RULE_SET_VERSION,
   });
 
   writeFileSync(outPath, JSON.stringify(payload, null, 2) + "\n");

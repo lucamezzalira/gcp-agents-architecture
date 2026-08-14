@@ -4,6 +4,13 @@ export type CharacteristicRead = {
   reasoning: string;
   recommendations: string[];
   signalsUsed: string[];
+  suppressedBy?: string[];
+};
+
+export type ServiceRead = {
+  service: string;
+  overall: number;
+  characteristics: CharacteristicRead[];
 };
 
 export type HealthRun = {
@@ -14,11 +21,16 @@ export type HealthRun = {
   overall: number;
   reasoner?: string;
   traceId?: string;
+  ruleSetVersion?: number;
+  state?: string;
+  supersededAt?: string;
+  supersededBy?: string;
   characteristics: CharacteristicRead[];
+  services: ServiceRead[];
 };
 
 export type HealthStore = {
-  loadRuns(): Promise<HealthRun[]>;
+  loadRuns(options?: { includeSuperseded?: boolean }): Promise<HealthRun[]>;
 };
 
 export const CHARACTERISTIC_ORDER = [
@@ -26,4 +38,5 @@ export const CHARACTERISTIC_ORDER = [
   "layering",
   "coupling",
   "duplication",
+  "cross-service-integrity",
 ] as const;

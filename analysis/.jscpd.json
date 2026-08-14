@@ -1,6 +1,16 @@
 {
-  "ignore": ["**/*.test.ts", "**/node_modules/**", "**/dist/**"],
+  "format": ["typescript"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.test.ts",
+    "**/*.config.ts",
+    "**/*.d.ts"
+  ],
   "minLines": 5,
-  "minTokens": 50,
-  "reporters": ["console"]
+  "minTokens": 70,
+  "mode": "strict",
+  "absolute": true,
+  "gitignore": true,
+  "reporters": ["json", "console"]
 }

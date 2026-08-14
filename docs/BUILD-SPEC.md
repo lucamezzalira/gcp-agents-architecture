@@ -97,25 +97,51 @@ type AnalysisPayload = {
   commitSha: string;
   commitMessage: string;
   timestamp: string;               // ISO 8601
+  ruleSetVersion: number;          // incremented when a rule is added, removed, or changes meaning
+  services: string[];              // service folders present in this commit
   archTests: {
     ruleId: string;                // matches SCORING.md
     passed: boolean;
-    violations: Array<{ file: string; detail: string }>;
+    violations: Array<{ file: string; detail: string; service?: string }>;
   }[];
   dependencyCruiser: {
     cycles: Array<{ path: string[] }>;
     orphans: string[];
     violations: Array<{ rule: string; from: string; to: string }>;
     metrics: { modules: number; dependencies: number };
+    folderMetrics: Array<{
+      folder: string;
+      afferentCoupling: number;
+      efferentCoupling: number;
+      instability: number;
+      moduleCount?: number;
+    }>;
   };
   duplication: {
-    clones: Array<{ files: string[]; lines: number; tokens: number }>;
+    clones: Array<{
+      files: string[];
+      lines: number;
+      tokens: number;
+      classification?: "internal" | "cross-service" | "shared";
+      services?: string[];
+    }>;
     percentage: number;
   };
   runtime: {                       // ILLUSTRATIVE
     illustrative: true;
     signals: Array<{ name: string; value: number; unit: string }>;
   };
+  recentCommits?: Array<{ sha: string; message: string }>;
+  changedFiles?: string[];
+  priorMetrics?: Array<{
+    commitSha: string;
+    modules: number;
+    dependencies: number;
+    folderInstability: Record<string, number>;
+    duplicationCounts: { internal: number; crossService: number; shared: number };
+    orphanCount: number;
+    cycleCount: number;
+  }>;
 };
 ```
 
@@ -127,14 +153,28 @@ type AnalysisPayload = {
 type HealthRead = {
   runId: string;
   commitSha: string;
-  overall: number;                 // 0-100
-  characteristics: Array<{
+  overall: number;                 // 0-100, platform
+  ruleSetVersion: number;
+  state: "current" | "superseded";
+  characteristics: Array<{         // platform, including cross-service-integrity
     id: string;
     score: number;                 // 0-100, deterministic
     reasoning: string;             // agent-authored
     recommendations: string[];     // agent-authored, empty when score is 100
     signalsUsed: string[];
     suppressedBy?: string[];       // decision ids
+  }>;
+  services: Array<{
+    service: string;
+    overall: number;
+    characteristics: Array<{
+      id: string;
+      score: number;
+      reasoning: string;
+      recommendations: string[];
+      signalsUsed: string[];
+      suppressedBy?: string[];
+    }>;
   }>;
 };
 ```
@@ -143,21 +183,32 @@ type HealthRead = {
 
 ```sql
 create table health_run (
-  run_id        text primary key,
-  commit_sha    text not null,
-  commit_message text,
-  created_at    timestamptz not null default now(),
-  overall_score int not null
+  run_id           text primary key,          -- {sha}:{uuid} so rescores do not collide
+  commit_sha       text not null,
+  commit_message   text,
+  created_at       timestamptz not null default now(),
+  scored_at        timestamptz not null default now(),
+  overall_score    int not null,
+  reasoner         text,
+  trace_id         text,
+  state            text not null default 'current',
+  superseded_at    timestamptz,
+  superseded_by    text,
+  service_overalls jsonb not null default '{}'::jsonb,
+  metrics          jsonb,
+  rule_set_version int not null default 1
 );
 
 create table health_characteristic (
   run_id          text references health_run(run_id),
+  scope           text not null default 'platform',  -- platform or a service name
   characteristic  text not null,
   score           int not null,
   reasoning       text,
   recommendations jsonb,
   signals_used    jsonb,
-  primary key (run_id, characteristic)
+  suppressed_by   jsonb,
+  unique (run_id, scope, characteristic)
 );
 
 create table accepted_decision (
@@ -168,9 +219,12 @@ create table accepted_decision (
   rationale   text not null,
   decided_by  text not null,
   decided_at  timestamptz not null default now(),
-  active      boolean not null default true
+  active      boolean not null default true,
+  scope       text not null default 'platform'
 );
 ```
+
+A rescore inserts a new row and marks the previous current row `state=superseded`. Nothing is updated in place. The new row copies `created_at` from the superseded row so chronological order stays. Default reads are `state=current`.
 
 ## Scoring model
 
@@ -198,21 +252,30 @@ The agent receives the computed scores and writes reasoning and recommendations 
 - Checkout never imports the provider client. Enforced by ts-arch rule 3.
 
 **Architecture tests**
-- Each of the five rules has at least one passing case and one deliberately failing fixture.
+- Each rule has a fixture that passes and a fixture that fails. A rule whose pattern matches everything, or nothing, cannot pass the suite.
+- The guard (`analysis/arch-tests/guard.test.ts`) asserts every rule passes on the real services. It fails on the regression commit `124fa31` and passes on `main`.
+- The collector (`analysis/collect-payload.ts`) calls the same `checkArchitecture` and never fails, so a commit containing a deliberate regression can still publish a payload.
+- Rule 2 is a dependency-direction rule, not a filename list. A new domain use case imported by infrastructure fails without a rule change.
+- The rule set is versioned. The version is on every payload and persisted run. The dashboard marks the trend where it changes.
 
 **Pipeline**
-- A push produces an `AnalysisPayload` on the health topic within 90 seconds.
+- A push produces an `AnalysisPayload` on the health topic within 90 seconds. Collection does not fail when a rule fails.
+- The guard is a separate CI step that blocks when a rule is violated.
 - The agent produces a `HealthRead` persisted to Postgres.
-- Replay across N commits produces N rows in `health_run`.
+- Replay across N commits produces N current rows in `health_run`. A rescore supersedes the previous current row for that SHA.
 
 **MCP server**
-- `get_health` for a path returns the latest score, reasoning and recommendations. An optional `commitSha` loads that run instead.
-- `list_health_runs` returns overall and characteristic scores for every persisted run, oldest first.
+- `get_health` for a path returns the latest score, reasoning and recommendations. `services/checkout` returns that service. An optional `commitSha` loads that run instead.
+- `list_health_runs` returns current runs only, oldest first, including `cross-service-integrity` and per-service overalls.
 - `get_prior_decisions` returns only active decisions matching the path.
+- `list_characteristics` includes `cross-service-integrity`.
 
 **Dashboard**
-- Shows overall and per-characteristic scores for the latest run.
-- Shows the trend across all runs.
+- Platform default: five characteristics including `cross-service-integrity`, trend, and a service map.
+- Service drill-down shows that service's four characteristics.
+- A 100 with `suppressedBy` is visually distinct from a 100 with no findings.
+- Superseded runs are hidden by default, with a toggle to compare.
+- The trend marks the point where `ruleSetVersion` changes.
 - Runtime signals stay in the payload with `illustrative: true`. They do not appear on the dashboard and they do not move a score.
 
 ## Build order

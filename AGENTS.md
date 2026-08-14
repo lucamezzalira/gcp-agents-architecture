@@ -36,11 +36,15 @@ pnpm jscpd              # duplication
 
 ## Architecture rules — these are enforced by tests
 
-1. Transport must not import provider or storage clients directly.
-2. Infrastructure must not contain domain decisions.
+1. Transport must not import provider or storage clients directly, and must not depend on the `infrastructure` folder.
+2. Infrastructure must not import domain use cases. Ports (store, provider, publisher, lookup, mailer) stay allowed.
 3. **Only `services/notification` may import or call the email provider.**
 4. No service reads another service's data store. Each service has its own Firestore database.
 5. No service imports another service's internal modules.
+6. Domain must not depend on transport types.
+7. Transport in one service must not depend on transport in another.
+8. Domain must not depend on infrastructure.
+9. Infrastructure must not depend on transport.
 
 Layer directory names (`transport/`, `domain/`, `infrastructure/`) are load-bearing. The architecture tests are written against them. NEVER rename or restructure them.
 

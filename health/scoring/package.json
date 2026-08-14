@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/score.ts",
     "./schemas": "./src/schemas.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./classify": "./src/classify.ts"
   },
   "scripts": {
     "test": "vitest run",

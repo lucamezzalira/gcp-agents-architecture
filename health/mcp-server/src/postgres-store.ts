@@ -1,6 +1,6 @@
 import postgres from "postgres";
 import { z } from "zod";
-import type { HealthStore, LatestHealth } from "./types.js";
+import type { CharacteristicRead, HealthStore, LatestHealth, ServiceRead } from "./types.js";
 import { acceptedDecisionSchema } from "./schemas.js";
 
 const runRowSchema = z.object({
@@ -11,14 +11,20 @@ const runRowSchema = z.object({
   overall_score: z.coerce.number(),
   reasoner: z.string().nullable().optional(),
   trace_id: z.string().nullable().optional(),
+  rule_set_version: z.coerce.number().nullable().optional(),
+  state: z.string().nullable().optional(),
+  service_overalls: z.unknown().optional(),
 });
 
 const characteristicRowSchema = z.object({
+  run_id: z.string().optional(),
+  scope: z.string().nullable().optional(),
   characteristic: z.string(),
   score: z.coerce.number(),
   reasoning: z.string().nullable(),
   recommendations: z.unknown(),
   signals_used: z.unknown(),
+  suppressed_by: z.unknown().optional(),
 });
 
 function asIso(value: string | Date): string {
@@ -31,6 +37,41 @@ function asStringArray(value: unknown): string[] {
     return [];
   }
   return parsed.data;
+}
+
+function asOveralls(value: unknown): Record<string, number> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+  const result: Record<string, number> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === "number") {
+      result[key] = item;
+    }
+  }
+  return result;
+}
+
+function toCharacteristic(row: {
+  characteristic: string;
+  score: number;
+  reasoning: string | null;
+  recommendations: unknown;
+  signals_used: unknown;
+  suppressed_by?: unknown;
+}): CharacteristicRead {
+  const suppressedBy = asStringArray(row.suppressed_by);
+  const characteristic: CharacteristicRead = {
+    id: row.characteristic,
+    score: row.score,
+    reasoning: row.reasoning ?? "",
+    recommendations: asStringArray(row.recommendations),
+    signalsUsed: asStringArray(row.signals_used),
+  };
+  if (suppressedBy.length > 0) {
+    characteristic.suppressedBy = suppressedBy;
+  }
+  return characteristic;
 }
 
 export function databaseUrl(): string {
@@ -79,6 +120,34 @@ function sqlClient(url: string) {
   });
 }
 
+function mapRun(
+  run: z.infer<typeof runRowSchema>,
+  platform: CharacteristicRead[],
+  serviceChars: Map<string, CharacteristicRead[]>,
+): LatestHealth {
+  const overalls = asOveralls(run.service_overalls);
+  const services: ServiceRead[] = [...serviceChars.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, characteristics]) => ({
+      service: name,
+      overall: overalls[name] ?? 0,
+      characteristics,
+    }));
+  return {
+    runId: run.run_id,
+    commitSha: run.commit_sha,
+    commitMessage: run.commit_message ?? "",
+    createdAt: asIso(run.created_at),
+    overall: run.overall_score,
+    reasoner: run.reasoner ?? undefined,
+    traceId: run.trace_id ?? undefined,
+    ruleSetVersion: run.rule_set_version ?? 1,
+    state: run.state ?? "current",
+    characteristics: platform,
+    services,
+  };
+}
+
 export function createPostgresStore(url = databaseUrl()): HealthStore {
   const sql = sqlClient(url);
 
@@ -86,8 +155,9 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
     async loadRuns(): Promise<LatestHealth[]> {
       const runRows = await sql`
         select run_id, commit_sha, commit_message, created_at, overall_score,
-               reasoner, trace_id
+               reasoner, trace_id, rule_set_version, state, service_overalls
         from health_run
+        where coalesce(state, 'current') = 'current'
         order by created_at asc
       `;
       const runs = z.array(runRowSchema).parse(runRows);
@@ -95,73 +165,37 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
         return [];
       }
       const charRows = await sql`
-        select run_id, characteristic, score, reasoning, recommendations, signals_used
+        select run_id, coalesce(scope, 'platform') as scope, characteristic, score,
+               reasoning, recommendations, signals_used, suppressed_by
         from health_characteristic
       `;
-      const grouped = new Map<string, LatestHealth["characteristics"]>();
+      const platform = new Map<string, CharacteristicRead[]>();
+      const byService = new Map<string, Map<string, CharacteristicRead[]>>();
       for (const row of z
         .array(characteristicRowSchema.extend({ run_id: z.string() }))
         .parse(charRows)) {
-        const list = grouped.get(row.run_id) ?? [];
-        list.push({
-          id: row.characteristic,
-          score: row.score,
-          reasoning: row.reasoning ?? "",
-          recommendations: asStringArray(row.recommendations),
-          signalsUsed: asStringArray(row.signals_used),
-        });
-        grouped.set(row.run_id, list);
+        const characteristic = toCharacteristic(row);
+        const scope = row.scope ?? "platform";
+        if (scope === "platform") {
+          const list = platform.get(row.run_id) ?? [];
+          list.push(characteristic);
+          platform.set(row.run_id, list);
+          continue;
+        }
+        const services = byService.get(row.run_id) ?? new Map();
+        const list = services.get(scope) ?? [];
+        list.push(characteristic);
+        services.set(scope, list);
+        byService.set(row.run_id, services);
       }
-      return runs.map((run) => ({
-        runId: run.run_id,
-        commitSha: run.commit_sha,
-        commitMessage: run.commit_message ?? "",
-        createdAt: asIso(run.created_at),
-        overall: run.overall_score,
-        reasoner: run.reasoner ?? undefined,
-        traceId: run.trace_id ?? undefined,
-        characteristics: grouped.get(run.run_id) ?? [],
-      }));
+      return runs.map((run) =>
+        mapRun(run, platform.get(run.run_id) ?? [], byService.get(run.run_id) ?? new Map()),
+      );
     },
 
     async loadLatest(): Promise<LatestHealth | undefined> {
-      const runs = await sql`
-        select run_id, commit_sha, commit_message, created_at, overall_score,
-               reasoner, trace_id
-        from health_run
-        order by created_at desc
-        limit 1
-      `;
-      const runParsed = z.array(runRowSchema).safeParse(runs);
-      const run = runParsed.success ? runParsed.data[0] : undefined;
-      if (run === undefined) {
-        return undefined;
-      }
-      const rows = await sql`
-        select characteristic, score, reasoning, recommendations, signals_used
-        from health_characteristic
-        where run_id = ${run.run_id}
-      `;
-      const characteristics = z
-        .array(characteristicRowSchema)
-        .parse(rows)
-        .map((row) => ({
-          id: row.characteristic,
-          score: row.score,
-          reasoning: row.reasoning ?? "",
-          recommendations: asStringArray(row.recommendations),
-          signalsUsed: asStringArray(row.signals_used),
-        }));
-      return {
-        runId: run.run_id,
-        commitSha: run.commit_sha,
-        commitMessage: run.commit_message ?? "",
-        createdAt: asIso(run.created_at),
-        overall: run.overall_score,
-        reasoner: run.reasoner ?? undefined,
-        traceId: run.trace_id ?? undefined,
-        characteristics,
-      };
+      const runs = await this.loadRuns();
+      return runs.at(-1);
     },
 
     async loadActiveDecisions() {

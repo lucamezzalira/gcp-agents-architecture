@@ -5,6 +5,7 @@ import {
   type CharacteristicRead,
   type HealthRun,
   type HealthStore,
+  type ServiceRead,
 } from "./types.js";
 
 const runRowSchema = z.object({
@@ -15,15 +16,22 @@ const runRowSchema = z.object({
   overall_score: z.coerce.number(),
   reasoner: z.string().nullable().optional(),
   trace_id: z.string().nullable().optional(),
+  rule_set_version: z.coerce.number().nullable().optional(),
+  state: z.string().nullable().optional(),
+  superseded_at: z.union([z.string(), z.date()]).nullable().optional(),
+  superseded_by: z.string().nullable().optional(),
+  service_overalls: z.unknown().optional(),
 });
 
 const characteristicRowSchema = z.object({
   run_id: z.string(),
+  scope: z.string().nullable().optional(),
   characteristic: z.string(),
   score: z.coerce.number(),
   reasoning: z.string().nullable(),
   recommendations: z.unknown(),
   signals_used: z.unknown(),
+  suppressed_by: z.unknown().optional(),
 });
 
 function asIso(value: string | Date): string {
@@ -35,6 +43,19 @@ function asStringArray(value: unknown): string[] {
   return parsed.success ? parsed.data : [];
 }
 
+function asOveralls(value: unknown): Record<string, number> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+  const result: Record<string, number> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === "number") {
+      result[key] = item;
+    }
+  }
+  return result;
+}
+
 function sortCharacteristics(
   items: CharacteristicRead[],
 ): CharacteristicRead[] {
@@ -42,10 +63,34 @@ function sortCharacteristics(
     CHARACTERISTIC_ORDER.map((id, index) => [id, index] as const),
   );
   return [...items].sort((left, right) => {
-    const leftRank = rank.get(left.id as (typeof CHARACTERISTIC_ORDER)[number]) ?? 99;
-    const rightRank = rank.get(right.id as (typeof CHARACTERISTIC_ORDER)[number]) ?? 99;
+    const leftRank =
+      rank.get(left.id as (typeof CHARACTERISTIC_ORDER)[number]) ?? 99;
+    const rightRank =
+      rank.get(right.id as (typeof CHARACTERISTIC_ORDER)[number]) ?? 99;
     return leftRank - rightRank;
   });
+}
+
+function toCharacteristic(row: {
+  characteristic: string;
+  score: number;
+  reasoning: string | null;
+  recommendations: unknown;
+  signals_used: unknown;
+  suppressed_by?: unknown;
+}): CharacteristicRead {
+  const suppressedBy = asStringArray(row.suppressed_by);
+  const characteristic: CharacteristicRead = {
+    id: row.characteristic,
+    score: row.score,
+    reasoning: row.reasoning ?? "",
+    recommendations: asStringArray(row.recommendations),
+    signalsUsed: asStringArray(row.signals_used),
+  };
+  if (suppressedBy.length > 0) {
+    characteristic.suppressedBy = suppressedBy;
+  }
+  return characteristic;
 }
 
 export function databaseUrl(): string {
@@ -98,43 +143,79 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
   const sql = sqlClient(url);
 
   return {
-    async loadRuns(): Promise<HealthRun[]> {
-      const runRows = await sql`
-        select run_id, commit_sha, commit_message, created_at, overall_score,
-               reasoner, trace_id
-        from health_run
-        order by created_at asc
-      `;
+    async loadRuns(options?: { includeSuperseded?: boolean }): Promise<HealthRun[]> {
+      const includeSuperseded = options?.includeSuperseded === true;
+      const runRows = includeSuperseded
+        ? await sql`
+            select run_id, commit_sha, commit_message, created_at, overall_score,
+                   reasoner, trace_id, rule_set_version, state, superseded_at,
+                   superseded_by, service_overalls
+            from health_run
+            order by created_at asc
+          `
+        : await sql`
+            select run_id, commit_sha, commit_message, created_at, overall_score,
+                   reasoner, trace_id, rule_set_version, state, superseded_at,
+                   superseded_by, service_overalls
+            from health_run
+            where coalesce(state, 'current') = 'current'
+            order by created_at asc
+          `;
       const runs = z.array(runRowSchema).parse(runRows);
       if (runs.length === 0) {
         return [];
       }
       const charRows = await sql`
-        select run_id, characteristic, score, reasoning, recommendations, signals_used
+        select run_id, coalesce(scope, 'platform') as scope, characteristic, score,
+               reasoning, recommendations, signals_used, suppressed_by
         from health_characteristic
       `;
-      const grouped = new Map<string, CharacteristicRead[]>();
+      const platform = new Map<string, CharacteristicRead[]>();
+      const byService = new Map<string, Map<string, CharacteristicRead[]>>();
       for (const row of z.array(characteristicRowSchema).parse(charRows)) {
-        const list = grouped.get(row.run_id) ?? [];
-        list.push({
-          id: row.characteristic,
-          score: row.score,
-          reasoning: row.reasoning ?? "",
-          recommendations: asStringArray(row.recommendations),
-          signalsUsed: asStringArray(row.signals_used),
-        });
-        grouped.set(row.run_id, list);
+        const characteristic = toCharacteristic(row);
+        const scope = row.scope ?? "platform";
+        if (scope === "platform") {
+          const list = platform.get(row.run_id) ?? [];
+          list.push(characteristic);
+          platform.set(row.run_id, list);
+          continue;
+        }
+        const services = byService.get(row.run_id) ?? new Map();
+        const list = services.get(scope) ?? [];
+        list.push(characteristic);
+        services.set(scope, list);
+        byService.set(row.run_id, services);
       }
-      return runs.map((run) => ({
-        runId: run.run_id,
-        commitSha: run.commit_sha,
-        commitMessage: run.commit_message ?? "",
-        createdAt: asIso(run.created_at),
-        overall: run.overall_score,
-        reasoner: run.reasoner ?? undefined,
-        traceId: run.trace_id ?? undefined,
-        characteristics: sortCharacteristics(grouped.get(run.run_id) ?? []),
-      }));
+      return runs.map((run) => {
+        const overalls = asOveralls(run.service_overalls);
+        const serviceChars = byService.get(run.run_id) ?? new Map();
+        const services: ServiceRead[] = [...serviceChars.entries()]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([name, characteristics]) => ({
+            service: name,
+            overall: overalls[name] ?? 0,
+            characteristics: sortCharacteristics(characteristics),
+          }));
+        return {
+          runId: run.run_id,
+          commitSha: run.commit_sha,
+          commitMessage: run.commit_message ?? "",
+          createdAt: asIso(run.created_at),
+          overall: run.overall_score,
+          reasoner: run.reasoner ?? undefined,
+          traceId: run.trace_id ?? undefined,
+          ruleSetVersion: run.rule_set_version ?? 1,
+          state: run.state ?? "current",
+          supersededAt:
+            run.superseded_at === null || run.superseded_at === undefined
+              ? undefined
+              : asIso(run.superseded_at),
+          supersededBy: run.superseded_by ?? undefined,
+          characteristics: sortCharacteristics(platform.get(run.run_id) ?? []),
+          services,
+        };
+      });
     },
   };
 }
