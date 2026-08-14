@@ -39,10 +39,13 @@ import {
 
 const store = createPostgresStore();
 const includeSuperseded = Astro.url.searchParams.get("history") === "all";
-const runs = await store.loadRuns({ includeSuperseded });
 const requested = Astro.url.searchParams.get("commit") ?? undefined;
 const requestedRun = Astro.url.searchParams.get("run") ?? undefined;
 const requestedService = Astro.url.searchParams.get("service") ?? undefined;
+const runs = await store.loadRuns({
+  includeSuperseded,
+  detailRunId: requestedRun ?? requested,
+});
 const model = buildDashboardModel(runs, requested, requestedRun, requestedService);
 const selected = model.selected;
 const selectedService = model.service;

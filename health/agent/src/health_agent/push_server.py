@@ -8,6 +8,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from psycopg import Connection
+
 from health_agent.persist import (
     connect,
     insert_health_read,
@@ -47,14 +49,17 @@ class PushHandler(BaseHTTPRequestHandler):
                 handle.write(data)
                 path = Path(handle.name)
             decisions_path: Path | None = None
+            conn: Connection | None = None
             try:
                 conn = connect()
-                migrate(conn)
                 decisions = load_active_decisions(conn)
                 with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
                     handle.write(json.dumps(decisions))
                     decisions_path = Path(handle.name)
                 prior_reads = load_recent_reads(conn)
+                conn.commit()
+                conn.close()
+                conn = None
                 if SELECTED_REASONER is None:
                     raise RuntimeError("reasoner was not initialised at startup")
                 read = produce_health_read(
@@ -64,9 +69,13 @@ class PushHandler(BaseHTTPRequestHandler):
                     prior_reads=prior_reads,
                     memory=choose_memory_bank(),
                 )
+                conn = connect()
                 insert_health_read(conn, read, str(payload.get("commitMessage", "")))
                 conn.close()
+                conn = None
             finally:
+                if conn is not None:
+                    conn.close()
                 path.unlink(missing_ok=True)
                 if decisions_path is not None:
                     decisions_path.unlink(missing_ok=True)

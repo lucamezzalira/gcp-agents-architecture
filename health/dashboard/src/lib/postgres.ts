@@ -22,18 +22,21 @@ const runRowSchema = z.object({
   superseded_at: z.union([z.string(), z.date()]).nullable().optional(),
   superseded_by: z.string().nullable().optional(),
   service_overalls: z.unknown().optional(),
-  metrics: z.unknown().optional(),
+  runtime_edges: z.unknown().optional(),
 });
 
-const characteristicRowSchema = z.object({
+const scoreRowSchema = z.object({
   run_id: z.string(),
   scope: z.string().nullable().optional(),
   characteristic: z.string(),
   score: z.coerce.number(),
-  reasoning: z.string().nullable(),
-  recommendations: z.unknown(),
-  signals_used: z.unknown(),
   suppressed_by: z.unknown().optional(),
+});
+
+const characteristicRowSchema = scoreRowSchema.extend({
+  reasoning: z.string().nullable().optional(),
+  recommendations: z.unknown().optional(),
+  signals_used: z.unknown().optional(),
 });
 
 function asIso(value: string | Date): string {
@@ -46,10 +49,13 @@ function asStringArray(value: unknown): string[] {
 }
 
 function asRuntimeEdges(value: unknown): ObservedRuntimeEdge[] {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return [];
-  }
-  const metrics = value as { runtimeEdges?: unknown };
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === "object" &&
+        value !== null &&
+        "runtimeEdges" in value
+      ? (value as { runtimeEdges?: unknown }).runtimeEdges
+      : undefined;
   const parsed = z
     .array(
       z.object({
@@ -60,7 +66,7 @@ function asRuntimeEdges(value: unknown): ObservedRuntimeEdge[] {
         count: z.number().optional(),
       }),
     )
-    .safeParse(metrics.runtimeEdges);
+    .safeParse(raw);
   if (!parsed.success) {
     return [];
   }
@@ -111,9 +117,9 @@ function sortCharacteristics(
 function toCharacteristic(row: {
   characteristic: string;
   score: number;
-  reasoning: string | null;
-  recommendations: unknown;
-  signals_used: unknown;
+  reasoning?: string | null;
+  recommendations?: unknown;
+  signals_used?: unknown;
   suppressed_by?: unknown;
 }): CharacteristicRead {
   const suppressedBy = asStringArray(row.suppressed_by);
@@ -166,17 +172,29 @@ type Sql = ReturnType<typeof postgres>;
 
 const clients = new Map<string, Sql>();
 
+function dropClient(url: string): void {
+  const existing = clients.get(url);
+  if (existing === undefined) {
+    return;
+  }
+  clients.delete(url);
+  void existing.end({ timeout: 1 }).catch(() => undefined);
+}
+
 function sqlClient(url: string): Sql {
   const existing = clients.get(url);
   if (existing !== undefined) {
     return existing;
   }
   const options = {
-    max: 1,
-    idle_timeout: 0,
-    connect_timeout: 8,
+    max: 2,
+    idle_timeout: 10,
+    max_lifetime: 60,
+    connect_timeout: 5,
+    prepare: false,
     connection: {
       statement_timeout: 8000,
+      lock_timeout: 3000,
     },
   } as const;
   const target = postgresTarget(url);
@@ -194,86 +212,187 @@ function sqlClient(url: string): Sql {
   return sql;
 }
 
-export function createPostgresStore(url = databaseUrl()): HealthStore {
-  const sql = sqlClient(url);
+function attachCharacteristics(
+  runs: z.infer<typeof runRowSchema>[],
+  charRows: Array<{
+    run_id: string;
+    scope?: string | null;
+    characteristic: string;
+    score: number;
+    reasoning?: string | null;
+    recommendations?: unknown;
+    signals_used?: unknown;
+    suppressed_by?: unknown;
+  }>,
+): HealthRun[] {
+  const platform = new Map<string, CharacteristicRead[]>();
+  const byService = new Map<string, Map<string, CharacteristicRead[]>>();
+  for (const row of charRows) {
+    const characteristic = toCharacteristic(row);
+    const scope = row.scope ?? "platform";
+    if (scope === "platform") {
+      const list = platform.get(row.run_id) ?? [];
+      list.push(characteristic);
+      platform.set(row.run_id, list);
+      continue;
+    }
+    const services = byService.get(row.run_id) ?? new Map();
+    const list = services.get(scope) ?? [];
+    list.push(characteristic);
+    services.set(scope, list);
+    byService.set(row.run_id, services);
+  }
+  return runs.map((run) => {
+    const overalls = asOveralls(run.service_overalls);
+    const serviceChars = byService.get(run.run_id) ?? new Map();
+    const services: ServiceRead[] = [...serviceChars.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, characteristics]) => ({
+        service: name,
+        overall: overalls[name] ?? 0,
+        characteristics: sortCharacteristics(characteristics),
+      }));
+    const runtimeEdges = asRuntimeEdges(run.runtime_edges);
+    return {
+      runId: run.run_id,
+      commitSha: run.commit_sha,
+      commitMessage: run.commit_message ?? "",
+      createdAt: asIso(run.created_at),
+      overall: run.overall_score,
+      reasoner: run.reasoner ?? undefined,
+      traceId: run.trace_id ?? undefined,
+      ruleSetVersion: run.rule_set_version ?? 1,
+      state: run.state ?? "current",
+      supersededAt:
+        run.superseded_at === null || run.superseded_at === undefined
+          ? undefined
+          : asIso(run.superseded_at),
+      supersededBy: run.superseded_by ?? undefined,
+      characteristics: sortCharacteristics(platform.get(run.run_id) ?? []),
+      services,
+      runtimeEdges: runtimeEdges.length > 0 ? runtimeEdges : undefined,
+    };
+  });
+}
 
-  return {
-    async loadRuns(options?: { includeSuperseded?: boolean }): Promise<HealthRun[]> {
-      const includeSuperseded = options?.includeSuperseded === true;
-      const runRows = includeSuperseded
-        ? await sql`
-            select run_id, commit_sha, commit_message, created_at, overall_score,
-                   reasoner, trace_id, rule_set_version, state, superseded_at,
-                   superseded_by, service_overalls, metrics
-            from health_run
-            order by created_at asc
-          `
-        : await sql`
-            select run_id, commit_sha, commit_message, created_at, overall_score,
-                   reasoner, trace_id, rule_set_version, state, superseded_at,
-                   superseded_by, service_overalls, metrics
-            from health_run
-            where coalesce(state, 'current') = 'current'
-            order by created_at asc
-          `;
-      const runs = z.array(runRowSchema).parse(runRows);
-      if (runs.length === 0) {
-        return [];
-      }
-      const charRows = await sql`
-        select run_id, coalesce(scope, 'platform') as scope, characteristic, score,
-               reasoning, recommendations, signals_used, suppressed_by
-        from health_characteristic
-        where run_id in ${sql(runs.map((run) => run.run_id))}
+async function queryRuns(
+  sql: Sql,
+  includeSuperseded: boolean,
+): Promise<{ rows: z.infer<typeof runRowSchema>[]; runs: HealthRun[] }> {
+  const runRows = includeSuperseded
+    ? await sql`
+        select run_id, commit_sha, commit_message, created_at, overall_score,
+               reasoner, trace_id, rule_set_version, state, superseded_at,
+               superseded_by, service_overalls,
+               metrics->'runtimeEdges' as runtime_edges
+        from health_run
+        order by created_at asc
+      `
+    : await sql`
+        select run_id, commit_sha, commit_message, created_at, overall_score,
+               reasoner, trace_id, rule_set_version, state, superseded_at,
+               superseded_by, service_overalls,
+               metrics->'runtimeEdges' as runtime_edges
+        from health_run
+        where coalesce(state, 'current') = 'current'
+        order by created_at asc
       `;
-      const platform = new Map<string, CharacteristicRead[]>();
-      const byService = new Map<string, Map<string, CharacteristicRead[]>>();
-      for (const row of z.array(characteristicRowSchema).parse(charRows)) {
-        const characteristic = toCharacteristic(row);
-        const scope = row.scope ?? "platform";
-        if (scope === "platform") {
-          const list = platform.get(row.run_id) ?? [];
-          list.push(characteristic);
-          platform.set(row.run_id, list);
-          continue;
+  const rows = z.array(runRowSchema).parse(runRows);
+  if (rows.length === 0) {
+    return { rows, runs: [] };
+  }
+  const charRows = await sql`
+    select run_id, coalesce(scope, 'platform') as scope, characteristic, score,
+           suppressed_by
+    from health_characteristic
+    where run_id in ${sql(rows.map((run) => run.run_id))}
+  `;
+  return {
+    rows,
+    runs: attachCharacteristics(rows, z.array(scoreRowSchema).parse(charRows)),
+  };
+}
+
+function pickDetailRun(
+  runs: HealthRun[],
+  detailRunId?: string,
+): HealthRun | undefined {
+  if (detailRunId !== undefined && detailRunId.length > 0) {
+    const exact = runs.find((run) => run.runId === detailRunId);
+    if (exact !== undefined) {
+      return exact;
+    }
+    const bySha = [...runs]
+      .reverse()
+      .find(
+        (run) =>
+          run.commitSha === detailRunId ||
+          run.commitSha.startsWith(detailRunId),
+      );
+    if (bySha !== undefined) {
+      return bySha;
+    }
+  }
+  return runs.at(-1);
+}
+
+async function hydrateDetail(
+  sql: Sql,
+  rows: z.infer<typeof runRowSchema>[],
+  runs: HealthRun[],
+  detailRunId?: string,
+): Promise<HealthRun[]> {
+  const target = pickDetailRun(runs, detailRunId);
+  if (target === undefined) {
+    return runs;
+  }
+  const charRows = await sql`
+    select run_id, coalesce(scope, 'platform') as scope, characteristic, score,
+           reasoning, recommendations, signals_used, suppressed_by
+    from health_characteristic
+    where run_id = ${target.runId}
+  `;
+  const detailed = attachCharacteristics(
+    rows.filter((row) => row.run_id === target.runId),
+    z.array(characteristicRowSchema).parse(charRows),
+  )[0];
+  if (detailed === undefined) {
+    return runs;
+  }
+  return runs.map((run) => (run.runId === detailed.runId ? detailed : run));
+}
+
+function shouldRetry(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("EPIPE") ||
+    message.includes("ECONNRESET") ||
+    message.includes("CONNECTION_CLOSED") ||
+    message.includes("connect")
+  );
+}
+
+export function createPostgresStore(url = databaseUrl()): HealthStore {
+  return {
+    async loadRuns(options?: {
+      includeSuperseded?: boolean;
+      detailRunId?: string;
+    }): Promise<HealthRun[]> {
+      const includeSuperseded = options?.includeSuperseded === true;
+      const load = async (): Promise<HealthRun[]> => {
+        const sql = sqlClient(url);
+        const { rows, runs } = await queryRuns(sql, includeSuperseded);
+        return hydrateDetail(sql, rows, runs, options?.detailRunId);
+      };
+      try {
+        return await load();
+      } catch (error) {
+        dropClient(url);
+        if (!shouldRetry(error)) {
+          throw error;
         }
-        const services = byService.get(row.run_id) ?? new Map();
-        const list = services.get(scope) ?? [];
-        list.push(characteristic);
-        services.set(scope, list);
-        byService.set(row.run_id, services);
+        return await load();
       }
-      return runs.map((run) => {
-        const overalls = asOveralls(run.service_overalls);
-        const serviceChars = byService.get(run.run_id) ?? new Map();
-        const services: ServiceRead[] = [...serviceChars.entries()]
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([name, characteristics]) => ({
-            service: name,
-            overall: overalls[name] ?? 0,
-            characteristics: sortCharacteristics(characteristics),
-          }));
-        const runtimeEdges = asRuntimeEdges(run.metrics);
-        return {
-          runId: run.run_id,
-          commitSha: run.commit_sha,
-          commitMessage: run.commit_message ?? "",
-          createdAt: asIso(run.created_at),
-          overall: run.overall_score,
-          reasoner: run.reasoner ?? undefined,
-          traceId: run.trace_id ?? undefined,
-          ruleSetVersion: run.rule_set_version ?? 1,
-          state: run.state ?? "current",
-          supersededAt:
-            run.superseded_at === null || run.superseded_at === undefined
-              ? undefined
-              : asIso(run.superseded_at),
-          supersededBy: run.superseded_by ?? undefined,
-          characteristics: sortCharacteristics(platform.get(run.run_id) ?? []),
-          services,
-          runtimeEdges: runtimeEdges.length > 0 ? runtimeEdges : undefined,
-        };
-      });
     },
   };
 }

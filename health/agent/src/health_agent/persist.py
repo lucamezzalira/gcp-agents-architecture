@@ -28,13 +28,52 @@ def connect() -> psycopg.Connection:
 
 
 def migrate(conn: psycopg.Connection) -> None:
+    conn.execute(
+        """
+        create table if not exists schema_migrations (
+          id text primary key,
+          applied_at timestamptz not null default now()
+        )
+        """
+    )
+    conn.commit()
     folder = repo_root() / "health" / "agent" / "migrations"
-    for path in sorted(folder.glob("*.sql")):
+    files = sorted(folder.glob("*.sql"))
+    already = conn.execute(
+        """
+        select 1 from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'health_characteristic'
+          and column_name = 'scope'
+        """
+    ).fetchone()
+    if already is not None:
+        for path in files:
+            conn.execute(
+                """
+                insert into schema_migrations (id) values (%s)
+                on conflict (id) do nothing
+                """,
+                (path.name,),
+            )
+        conn.commit()
+        return
+    for path in files:
+        applied = conn.execute(
+            "select 1 from schema_migrations where id = %s",
+            (path.name,),
+        ).fetchone()
+        if applied is not None:
+            continue
         for statement in path.read_text().split(";"):
             sql = statement.strip()
             if sql:
                 conn.execute(sql)
-    conn.commit()
+        conn.execute(
+            "insert into schema_migrations (id) values (%s)",
+            (path.name,),
+        )
+        conn.commit()
 
 
 def _metrics_payload(read: HealthRead) -> dict[str, object] | None:

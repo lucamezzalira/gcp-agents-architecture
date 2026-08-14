@@ -346,6 +346,14 @@ export function mountBoard(runs: HealthRun[]): void {
     if (run === undefined || run.runId === currentRunId) {
       return;
     }
+    const hasDetail = run.characteristics.some(
+      (item) => item.reasoning.length > 0 || item.recommendations.length > 0,
+    );
+    if (!hasDetail) {
+      writeUrl(run, service);
+      window.location.assign(window.location.href);
+      return;
+    }
     currentRunId = run.runId;
     paintCopy(run, service, runs);
     tweenOverall(displayedOverall(run, service));

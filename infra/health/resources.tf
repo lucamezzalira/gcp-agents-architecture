@@ -55,7 +55,7 @@ resource "google_sql_database_instance" "health" { #tfsec:ignore:google-sql-no-p
   database_version = "POSTGRES_16"
   region           = var.region
   settings {
-    tier              = "db-f1-micro"
+    tier              = "db-custom-1-3840"
     edition           = "ENTERPRISE"
     availability_type = "ZONAL"
     disk_type         = "PD_SSD"

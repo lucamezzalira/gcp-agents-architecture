@@ -6,7 +6,7 @@ resource "google_cloud_run_v2_service" "dashboard" {
   ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
-    timeout                          = "30s"
+    timeout                          = "60s"
     max_instance_request_concurrency = 8
     service_account                  = google_service_account.dashboard.email
     scaling {

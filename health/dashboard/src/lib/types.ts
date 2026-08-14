@@ -38,7 +38,10 @@ export type HealthRun = {
 };
 
 export type HealthStore = {
-  loadRuns(options?: { includeSuperseded?: boolean }): Promise<HealthRun[]>;
+  loadRuns(options?: {
+    includeSuperseded?: boolean;
+    detailRunId?: string;
+  }): Promise<HealthRun[]>;
 };
 
 export const CHARACTERISTIC_ORDER = [
