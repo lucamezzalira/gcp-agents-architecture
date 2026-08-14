@@ -39,6 +39,12 @@ export const DESIGNED_RUNTIME_EDGES: RuntimeEdgeView[] = [
     protocol: "pubsub",
     purpose: "low-stock alert",
   },
+  {
+    from: "checkout",
+    to: "audit",
+    protocol: "pubsub",
+    purpose: "instruction tape",
+  },
 ];
 
 export type ObservedRuntimeEdge = {
@@ -132,15 +138,16 @@ export type RuntimeGraphLayout = {
 const NODE_W = 148;
 const NODE_H = 44;
 const WIDTH = 720;
-const HEIGHT = 280;
+const HEIGHT = 340;
 
 const NODE_POSITIONS: Record<string, { x: number; y: number }> = {
   checkout: { x: 36, y: 132 },
   inventory: { x: 286, y: 132 },
   notification: { x: 536, y: 132 },
+  audit: { x: 36, y: 248 },
 };
 
-type Lane = "skip-top" | "upper-far" | "upper-near" | "lower";
+type Lane = "skip-top" | "upper-far" | "upper-near" | "lower" | "drop";
 
 const EDGE_LANES: Record<string, Lane> = {
   "checkout->notification:pubsub": "skip-top",
@@ -148,6 +155,7 @@ const EDGE_LANES: Record<string, Lane> = {
   "inventory->notification:pubsub": "upper-near",
   "checkout->inventory:http": "upper-near",
   "inventory->checkout:pubsub": "lower",
+  "checkout->audit:pubsub": "drop",
 };
 
 function box(id: string):
@@ -201,6 +209,9 @@ function route(
   }
   if (lane === "skip-top") {
     return curve(start.cx, start.top, end.cx, end.top, 28);
+  }
+  if (lane === "drop") {
+    return curve(start.cx, start.bottom, end.cx, end.top, 212);
   }
   if (lane === "lower") {
     const goingRight = start.cx < end.cx;

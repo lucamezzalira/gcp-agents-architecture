@@ -33,7 +33,12 @@ export type CloudTrace = {
   spans?: TraceSpan[];
 };
 
-const KNOWN_SERVICES = new Set(["checkout", "notification", "inventory"]);
+const DEFAULT_SERVICES = new Set([
+  "checkout",
+  "notification",
+  "inventory",
+  "audit",
+]);
 const PROTOCOL_VALUES = new Set(["http", "pubsub"]);
 
 export function importServiceEdges(
@@ -95,14 +100,21 @@ function protocolOf(span: TraceSpan): "http" | "pubsub" {
   return "http";
 }
 
-function known(name: string | undefined): string | undefined {
-  if (name === undefined || !KNOWN_SERVICES.has(name)) {
+function known(
+  name: string | undefined,
+  allowed: Set<string>,
+): string | undefined {
+  if (name === undefined || !allowed.has(name)) {
     return undefined;
   }
   return name;
 }
 
-export function edgesFromSpans(traces: CloudTrace[]): RuntimeEdge[] {
+export function edgesFromSpans(
+  traces: CloudTrace[],
+  services: Iterable<string> = DEFAULT_SERVICES,
+): RuntimeEdge[] {
+  const allowed = new Set(services);
   const counts = new Map<string, RuntimeEdge>();
   const add = (from: string, to: string, protocol: "http" | "pubsub"): void => {
     if (from === to) {
@@ -123,8 +135,8 @@ export function edgesFromSpans(traces: CloudTrace[]): RuntimeEdge[] {
       if (span.spanId !== undefined) {
         byId.set(span.spanId, span);
       }
-      const service = known(label(span, "ga.service"));
-      const peer = known(label(span, "ga.peer"));
+      const service = known(label(span, "ga.service"), allowed);
+      const peer = known(label(span, "ga.peer"), allowed);
       const kind = label(span, "ga.kind");
       if (service !== undefined && peer !== undefined) {
         if (kind === "client" || kind === "producer") {
@@ -142,8 +154,8 @@ export function edgesFromSpans(traces: CloudTrace[]): RuntimeEdge[] {
       if (parent === undefined) {
         continue;
       }
-      const childService = known(label(span, "ga.service"));
-      const parentService = known(label(parent, "ga.service"));
+      const childService = known(label(span, "ga.service"), allowed);
+      const parentService = known(label(parent, "ga.service"), allowed);
       if (
         childService === undefined ||
         parentService === undefined ||
@@ -292,6 +304,7 @@ export async function buildRuntimePayload(options: {
     dependencies?: Array<{ resolved?: string }>;
   }>;
   relativize: (file: string) => string;
+  services?: string[];
   projectId?: string;
   now?: Date;
   windowMinutes?: number;
@@ -327,7 +340,11 @@ export async function buildRuntimePayload(options: {
     }
   }
   const traffic = options.traffic ?? trafficFromEnv(queried);
-  const edges = edgesFromSpans(traces);
+  const allowed =
+    options.services !== undefined && options.services.length > 0
+      ? options.services
+      : DEFAULT_SERVICES;
+  const edges = edgesFromSpans(traces, allowed);
   const imports = importServiceEdges(options.modules, options.relativize);
   const vsImports = queried
     ? diffAgainstImports(edges, imports)

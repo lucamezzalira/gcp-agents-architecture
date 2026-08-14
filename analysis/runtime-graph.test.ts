@@ -73,6 +73,30 @@ describe("runtime call graph vs imports", () => {
     expect(diff.importOnly).toEqual([]);
   });
 
+  it("includes a fourth service when it is in the allowed set", () => {
+    const runtime = edgesFromSpans(
+      [
+        {
+          spans: [
+            {
+              spanId: "1",
+              labels: {
+                "ga.service": "audit",
+                "ga.peer": "checkout",
+                "ga.protocol": "pubsub",
+                "ga.kind": "consumer",
+              },
+            },
+          ],
+        },
+      ],
+      ["checkout", "notification", "inventory", "audit"],
+    );
+    expect(runtime).toEqual([
+      { from: "checkout", to: "audit", protocol: "pubsub", count: 1 },
+    ]);
+  });
+
   it("flags an import with no runtime edge as dead coupling", () => {
     const imports = importServiceEdges(
       [

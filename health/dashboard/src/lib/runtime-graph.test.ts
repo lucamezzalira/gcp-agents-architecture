@@ -32,12 +32,13 @@ describe("mergeRuntimeEdges", () => {
 });
 
 describe("layoutRuntimeGraph", () => {
-  it("places checkout, inventory, and notification", () => {
+  it("places checkout, inventory, notification, and audit", () => {
     const layout = layoutRuntimeGraph(DESIGNED_RUNTIME_EDGES);
     expect(layout.nodes.map((node) => node.id)).toEqual([
       "checkout",
       "inventory",
       "notification",
+      "audit",
     ]);
     expect(layout.links).toHaveLength(DESIGNED_RUNTIME_EDGES.length);
     expect(layout.links.every((link) => link.d.startsWith("M "))).toBe(true);

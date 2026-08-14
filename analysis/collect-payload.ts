@@ -308,6 +308,7 @@ async function main(): Promise<void> {
     runtime: await buildRuntimePayload({
       modules,
       relativize,
+      services: listedServices(),
     }),
     recentCommits: recentCommits(),
     changedFiles: changedFiles(),
