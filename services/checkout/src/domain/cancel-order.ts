@@ -22,7 +22,7 @@ export async function cancelOrder(
   }
   const cancelled = applyTransition(order, "cancelled");
   await deps.orderStore.save(cancelled);
-  await deps.stockReservations.publish(releaseCommand(orderId));
+  await deps.stockReservations.publish(releaseCommand(cancelled));
   log.info("stock.release-published");
   return { status: "cancelled" };
 }

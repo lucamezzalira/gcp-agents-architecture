@@ -51,7 +51,21 @@ describe("markPaid", () => {
     expect(result.instruction.bodyRef).toBe(confirmationBodyRef(order.id));
     expect(deps.publisher.published).toEqual([result.instruction]);
     expect(deps.stockReservations.published).toEqual([
-      { action: "confirm", orderId: order.id, sku: "standard-item", units: 1 },
+      {
+        action: "confirm",
+        orderId: order.id,
+        sku: "standard-item",
+        units: 1,
+        order: {
+          id: order.id,
+          email: order.email,
+          status: "paid",
+          shippingTier: "standard",
+          lineItems: [
+            { sku: "standard-item", units: 1, name: "Standard item" },
+          ],
+        },
+      },
     ]);
 
     const stored = await deps.bodyStore.get(result.instruction.bodyRef);

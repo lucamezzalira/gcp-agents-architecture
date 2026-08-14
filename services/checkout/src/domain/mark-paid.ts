@@ -84,7 +84,7 @@ export async function markPaid(
     bodyRef,
   };
   await deps.publisher.publish(instruction);
-  await deps.stockReservations.publish(confirmCommand(paid.id));
+  await deps.stockReservations.publish(confirmCommand(paid));
   log.info("instruction.published");
   return { status: "paid", instruction };
 }

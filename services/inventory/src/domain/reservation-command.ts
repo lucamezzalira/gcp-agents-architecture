@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { orderSchema } from "./order.js";
 
 export const reservationCommandSchema = z.object({
   action: z.enum(["reserve", "release", "confirm"]),
   orderId: z.string().min(1),
   sku: z.string().min(1),
   units: z.number().int().positive(),
+  order: orderSchema.optional(),
 });
 
 export type ReservationCommand = z.infer<typeof reservationCommandSchema>;

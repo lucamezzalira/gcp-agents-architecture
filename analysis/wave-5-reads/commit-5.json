@@ -1,0 +1,35 @@
+{
+  "commit": 5,
+  "commitSha": "0be862511ecc792dad0aacdd01ca3b09ef1836a7",
+  "commitMessage": "Copy checkout's instruction publisher into inventory instead of sharing a package.",
+  "runId": "0be862511ecc792dad0aacdd01ca3b09ef1836a7:cedb491c35c040889ed408c300a48f58",
+  "reasoner": "adk",
+  "ruleSetVersion": 5,
+  "overall": 95,
+  "services": { "checkout": 100, "inventory": 100, "notification": 100 },
+  "characteristics": {
+    "boundary-integrity": 100,
+    "layering": 100,
+    "coupling": 100,
+    "duplication": 100,
+    "cross-service-integrity": 80
+  },
+  "csi": {
+    "score": 80,
+    "priorCrossServiceClones": 2,
+    "currentCrossServiceClones": 4,
+    "growthSignal": "jscpd:cross-service-growth:2->4",
+    "suppressedBy": null,
+    "newClones": [
+      ["services/checkout/src/infrastructure/http-instruction-publisher.ts", "services/inventory/src/infrastructure/http-instruction-publisher.ts"],
+      ["services/checkout/src/infrastructure/pubsub-instruction-publisher.ts", "services/inventory/src/infrastructure/pubsub-instruction-publisher.ts"]
+    ],
+    "preexistingClones": [
+      ["services/checkout/src/domain/ports/logger.ts", "services/notification/src/domain/ports/logger.ts"],
+      ["services/checkout/src/infrastructure/file-body-store.ts", "services/notification/src/infrastructure/file-body-store.ts"]
+    ],
+    "sendInstructionClone": false
+  },
+  "decisionDidNotSuppressPublisher": true,
+  "findings": "Publisher clones classified cross-service. Accepted decision on **/send-instruction.ts did not suppress them (suppressedBy null). CSI 100 to 80 from clone growth 2 to 4. The score is still one number for every relationship. Agent (adk) named the checkout-inventory publisher files and recommended a shared package, which this estate forbids for rendering and did not accept for publishers."
+}

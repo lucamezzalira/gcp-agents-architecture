@@ -40,7 +40,21 @@ describe("checkout HTTP", () => {
     });
     expect(created.statusCode).toBe(201);
     expect(app.stockReservations.published).toEqual([
-      { action: "reserve", orderId: "ord-1", sku: "standard-item", units: 1 },
+      {
+        action: "reserve",
+        orderId: "ord-1",
+        sku: "standard-item",
+        units: 1,
+        order: {
+          id: "ord-1",
+          email: "buyer@example.com",
+          status: "pending",
+          shippingTier: "standard",
+          lineItems: [
+            { sku: "standard-item", units: 1, name: "Standard item" },
+          ],
+        },
+      },
     ]);
 
     const paid = await app.server.inject({

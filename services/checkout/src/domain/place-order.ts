@@ -16,6 +16,6 @@ export async function placeOrder(
 ): Promise<void> {
   const log = deps.logger.withCorrelation(order.id);
   await deps.orderStore.save(order);
-  await deps.stockReservations.publish(reserveCommand(order.id));
+  await deps.stockReservations.publish(reserveCommand(order));
   log.info("stock.reserve-published");
 }

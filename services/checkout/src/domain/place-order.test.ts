@@ -32,6 +32,15 @@ describe("placeOrder", () => {
         orderId: order.id,
         sku: CHECKOUT_SKU,
         units: CHECKOUT_UNITS,
+        order: {
+          id: order.id,
+          email: order.email,
+          status: order.status,
+          shippingTier: order.shippingTier,
+          lineItems: [
+            { sku: CHECKOUT_SKU, units: CHECKOUT_UNITS, name: "Standard item" },
+          ],
+        },
       },
     ]);
   });

@@ -3,6 +3,7 @@ import type { Log } from "./ports/logger.js";
 import type { OutcomePublisher } from "./ports/outcome-publisher.js";
 import type { ReservationStore } from "./ports/reservation-store.js";
 import type { StockStore } from "./ports/stock-store.js";
+import { skuFromOrder, unitsFromOrder } from "./order.js";
 import type { ReservationCommand } from "./reservation-command.js";
 import type { Reservation } from "./reservation.js";
 import { InsufficientStockError } from "./insufficient-stock.js";
@@ -26,29 +27,50 @@ async function restoreUnits(
   await stock.save({ sku, available });
 }
 
+function requestedSku(command: ReservationCommand): string {
+  return command.order !== undefined
+    ? skuFromOrder(command.order)
+    : command.sku;
+}
+
+function requestedUnits(command: ReservationCommand): number {
+  return command.order !== undefined
+    ? unitsFromOrder(command.order)
+    : command.units;
+}
+
 export async function handleReservation(
   command: ReservationCommand,
   deps: HandleReservationDeps,
 ): Promise<void> {
   const log = deps.logger.bind(command.orderId);
+  const sku = requestedSku(command);
+  const units = requestedUnits(command);
+  if (command.order !== undefined) {
+    log.info("order.snapshot", {
+      email: command.order.email,
+      status: command.order.status,
+      shipping: command.order.shippingTier,
+    });
+  }
   if (command.action === "reserve") {
-    const level = await deps.stock.get(command.sku);
+    const level = await deps.stock.get(sku);
     const available = level?.available ?? 0;
-    if (available < command.units) {
-      log.warn("reserve.rejected", { sku: command.sku, available });
+    if (available < units) {
+      log.warn("reserve.rejected", { sku, available });
       await deps.outcomes.publish({
         orderId: command.orderId,
         result: "rejected",
-        sku: command.sku,
-        units: command.units,
+        sku,
+        units,
       });
       return;
     }
-    await deps.stock.save({ sku: command.sku, available: available - command.units });
+    await deps.stock.save({ sku, available: available - units });
     const held: Reservation = {
       orderId: command.orderId,
-      sku: command.sku,
-      units: command.units,
+      sku,
+      units,
       status: "held",
       reservedAt: deps.now().toISOString(),
     };
@@ -56,14 +78,14 @@ export async function handleReservation(
     await deps.outcomes.publish({
       orderId: command.orderId,
       result: "reserved",
-      sku: command.sku,
-      units: command.units,
+      sku,
+      units,
     });
-    log.info("reserve.held", { sku: command.sku, units: command.units });
-    const remaining = available - command.units;
+    log.info("reserve.held", { sku, units });
+    const remaining = available - units;
     if (deps.lowStock !== undefined) {
       const instruction = await alertLowStock(
-        command.sku,
+        sku,
         remaining,
         deps.lowStock,
         deps.now(),

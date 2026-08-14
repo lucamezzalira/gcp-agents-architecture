@@ -69,6 +69,38 @@ describe("handleReservation", () => {
     expect(deps.outcomes.published.at(-1)?.result).toBe("released");
   });
 
+  it("reads sku and units from an attached order snapshot", async () => {
+    const deps = setup();
+    await deps.stock.save({ sku: "standard-item", available: 8 });
+
+    await handleReservation(
+      {
+        action: "reserve",
+        orderId: "ord-5",
+        sku: "ignored-sku",
+        units: 99,
+        order: {
+          id: "ord-5",
+          email: "buyer@example.com",
+          status: "pending",
+          shippingTier: "standard",
+          lineItems: [
+            { sku: "standard-item", units: 2, name: "Standard item" },
+          ],
+        },
+      },
+      deps,
+    );
+
+    expect((await deps.stock.get("standard-item"))?.available).toBe(6);
+    expect(deps.outcomes.published[0]).toEqual({
+      orderId: "ord-5",
+      result: "reserved",
+      sku: "standard-item",
+      units: 2,
+    });
+  });
+
   it("keeps stock decremented on confirm", async () => {
     const deps = setup();
     await deps.stock.save({ sku: "standard-item", available: 5 });
