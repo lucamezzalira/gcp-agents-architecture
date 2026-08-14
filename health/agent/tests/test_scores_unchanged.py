@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+from tempfile import NamedTemporaryFile
 
 from health_agent.assemble import assert_scores_unchanged
 from health_agent.models import AnalysisPayload
@@ -21,3 +23,48 @@ def test_agent_does_not_change_scores() -> None:
     assert payload.runtime.callGraph.illustrative is False
     assert any(item.illustrative for item in payload.runtime.signals)
     assert "illustrative" in boundary.reasoning
+
+
+def test_produce_health_read_accepts_runtime_edges() -> None:
+    payload_path = (
+        repo_root() / "health" / "scoring" / "fixtures" / "zero-findings.json"
+    )
+    payload = json.loads(payload_path.read_text())
+    payload["runtime"]["callGraph"] = {
+        "illustrative": False,
+        "synthetic": True,
+        "description": "synthetic smoke",
+        "window": {
+            "start": "2026-01-01T00:00:00.000Z",
+            "end": "2026-01-01T00:30:00.000Z",
+        },
+        "traffic": "this-run",
+        "queried": True,
+        "edges": [
+            {
+                "from": "checkout",
+                "to": "inventory",
+                "protocol": "http",
+                "count": 1,
+            }
+        ],
+    }
+    payload["runtime"]["vsImports"] = {
+        "runtimeOnly": [
+            {"from": "checkout", "to": "inventory", "protocol": "http"}
+        ],
+        "importOnly": [],
+    }
+    with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+        handle.write(json.dumps(payload))
+        temp = Path(handle.name)
+    try:
+        scores = score_payload(temp)
+        read = produce_health_read(temp)
+        assert_scores_unchanged(scores, read)
+        assert any(
+            "checkout -> inventory" in item.reasoning
+            for item in read.characteristics
+        )
+    finally:
+        temp.unlink(missing_ok=True)

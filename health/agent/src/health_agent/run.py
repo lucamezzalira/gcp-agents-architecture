@@ -94,7 +94,7 @@ def produce_health_read(
         root.set_attribute("reasoner", name)
         enriched = enrich_payload_with_priors(payload, priors)
         with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
-            handle.write(enriched.model_dump_json(exclude_none=True))
+            handle.write(enriched.model_dump_json(by_alias=True, exclude_none=True))
             scored_path = Path(handle.name)
         try:
             with tracer().start_as_current_span("scoring"):
