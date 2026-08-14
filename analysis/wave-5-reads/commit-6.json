@@ -1,0 +1,32 @@
+{
+  "commit": 6,
+  "commitSha": "c0811f7e172891ee42df1e2045891f60b023d2ba",
+  "commitMessage": "Let inventory interpret checkout's order snapshot so a reservation knows what it is holding.",
+  "runId": "c0811f7e172891ee42df1e2045891f60b023d2ba:a8f8def8d05e45f7a4aa0b76035564e9",
+  "reasoner": "adk",
+  "ruleSetVersion": 5,
+  "overall": 100,
+  "services": { "checkout": 100, "inventory": 100, "notification": 100 },
+  "characteristics": {
+    "boundary-integrity": 100,
+    "layering": 100,
+    "coupling": 100,
+    "duplication": 100,
+    "cross-service-integrity": 100
+  },
+  "csi": {
+    "score": 100,
+    "crossServiceClones": 4,
+    "growth": 0,
+    "note": "Publisher clones from commit 5 still exist. Growth-only CSI returned to 100 because the count did not rise again."
+  },
+  "orderCloneDetected": false,
+  "archFailed": [],
+  "agentQuotes": {
+    "boundary-integrity": "This score does not account for more subtle forms of coupling, such as the one suggested by the commit message \"Let inventory interpret checkout's order snapshot so a reservation knows what it is holding\", where one service must understand another's data structures without a direct import.",
+    "coupling": "The score is based solely on efferent coupling growth and does not reflect changes in afferent coupling or the introduction of semantic coupling, where inventory now depends on the data format of checkout's order snapshot.",
+    "cross-service-integrity": "The analysis shows four existing cross-service clones: a logger port and file body store between checkout and notification, and two instruction publishers between checkout and inventory. The score does not measure the new data dependency of inventory on checkout's order snapshot.",
+    "inventory-layering": "The score does not evaluate the architectural choice of placing an interpretation of checkout's data (order.ts) inside inventory's domain layer."
+  },
+  "findings": "No rule caught concept ownership. order.ts did not clone (inventory added line items and a status machine checkout's type does not have). CSI returned to 100 because clone count stayed at 4. Agent (adk) named semantic coupling and inventory's copy of checkout's order. It also listed two clone pairs by relationship. The CSI score itself is still one number and forgot the strained publisher pair as soon as growth stopped."
+}
