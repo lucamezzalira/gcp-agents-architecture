@@ -6,10 +6,12 @@ resource "google_cloud_run_v2_service" "dashboard" {
   ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.dashboard.email
+    timeout                          = "30s"
+    max_instance_request_concurrency = 8
+    service_account                  = google_service_account.dashboard.email
     scaling {
-      min_instance_count = 0
-      max_instance_count = 1
+      min_instance_count = 1
+      max_instance_count = 3
     }
     volumes {
       name = "cloudsql"
@@ -24,7 +26,8 @@ resource "google_cloud_run_v2_service" "dashboard" {
           cpu    = "1"
           memory = "512Mi"
         }
-        cpu_idle = true
+        cpu_idle          = false
+        startup_cpu_boost = true
       }
       ports {
         container_port = 8080

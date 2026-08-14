@@ -162,18 +162,36 @@ export function postgresTarget(url: string): PostgresTarget {
   };
 }
 
-function sqlClient(url: string) {
-  const target = postgresTarget(url);
-  if (target.kind === "url") {
-    return postgres(target.url, { max: 4 });
+type Sql = ReturnType<typeof postgres>;
+
+const clients = new Map<string, Sql>();
+
+function sqlClient(url: string): Sql {
+  const existing = clients.get(url);
+  if (existing !== undefined) {
+    return existing;
   }
-  return postgres({
-    host: target.host,
-    database: target.database,
-    username: target.username,
-    password: target.password,
-    max: 4,
-  });
+  const options = {
+    max: 1,
+    idle_timeout: 0,
+    connect_timeout: 8,
+    connection: {
+      statement_timeout: 8000,
+    },
+  } as const;
+  const target = postgresTarget(url);
+  const sql =
+    target.kind === "url"
+      ? postgres(target.url, options)
+      : postgres({
+          host: target.host,
+          database: target.database,
+          username: target.username,
+          password: target.password,
+          ...options,
+        });
+  clients.set(url, sql);
+  return sql;
 }
 
 export function createPostgresStore(url = databaseUrl()): HealthStore {
@@ -206,6 +224,7 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
         select run_id, coalesce(scope, 'platform') as scope, characteristic, score,
                reasoning, recommendations, signals_used, suppressed_by
         from health_characteristic
+        where run_id in ${sql(runs.map((run) => run.run_id))}
       `;
       const platform = new Map<string, CharacteristicRead[]>();
       const byService = new Map<string, Map<string, CharacteristicRead[]>>();
