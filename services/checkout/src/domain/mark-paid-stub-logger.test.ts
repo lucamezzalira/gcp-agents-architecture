@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BodyStore } from "./ports/body-store.js";
 import type { InstructionPublisher } from "./ports/instruction-publisher.js";
-import type { CorrelatedLogger, Logger } from "./ports/logger.js";
+import type { CorrelatedLogger, Logger } from "@observability/runtime";
 import { markPaid } from "./mark-paid.js";
 import type { Order } from "./order.js";
 import { OrderNotFoundError } from "./order-not-found.js";

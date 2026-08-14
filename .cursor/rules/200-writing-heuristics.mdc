@@ -15,7 +15,7 @@ Ask what it decides. If it decides nothing and only moves data, it is infrastruc
 
 ## Is this finding a problem
 
-Not every finding is a defect. Duplication between services is the accepted price of autonomy here. A finding is a problem when it moves the system away from its intended architecture, not merely when a tool reports it.
+Not every finding is a defect. Duplication of email rendering and send-instruction publishers between services is the accepted price of autonomy here. Logger and tracing belong in `packages/observability`; that sharing is the intended platform library, not a clone to extract later. A finding is a problem when it moves the system away from its intended architecture, not merely when a tool reports it.
 
 If a deviation is genuinely acceptable, record it as an accepted decision with a rationale rather than silencing the check.
 

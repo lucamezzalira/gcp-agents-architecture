@@ -8,7 +8,7 @@ import {
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 
-let serviceName = "inventory";
+let serviceName = "service";
 let started = false;
 
 export function currentService(): string {

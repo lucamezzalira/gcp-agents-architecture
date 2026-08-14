@@ -4,7 +4,7 @@ import { BodyNotFoundError } from "./body-not-found.js";
 import { deliver } from "./deliver.js";
 import type { DeliveryStore } from "./ports/delivery-store.js";
 import type { EmailMessage, EmailProvider } from "./ports/email-provider.js";
-import type { CorrelatedLogger, Logger } from "./ports/logger.js";
+import type { CorrelatedLogger, Logger } from "@observability/runtime";
 import type { SendInstruction } from "./send-instruction.js";
 
 const instruction: SendInstruction = {

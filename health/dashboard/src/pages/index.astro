@@ -27,6 +27,10 @@ import {
   trendScores,
 } from "../lib/view";
 import {
+  layoutRuntimeGraph,
+  mergeRuntimeEdges,
+} from "../lib/runtime-graph";
+import {
   ARCH_RULES,
   METRIC_SIGNALS,
   RULE_COUNT,
@@ -58,6 +62,9 @@ const line = polyline(plotted);
 const area = trendArea(plotted);
 const radius = 58;
 const circumference = 2 * Math.PI * radius;
+const runtimeGraph = layoutRuntimeGraph(
+  mergeRuntimeEdges(selected?.runtimeEdges ?? []),
+);
 const payload = JSON.stringify(model.runs);
 const historyHref = includeSuperseded
   ? `?${new URLSearchParams({
@@ -222,10 +229,12 @@ const historyHref = includeSuperseded
         <section class="panel map">
           <h2>Services</h2>
           <p class="signals">
-            Checkout publishes send-instructions to notification and stock
-            reservations to inventory. Inventory publishes reservation
-            outcomes back. Notification is the only subscriber allowed to
-            talk to the email provider.
+            Checkout publishes send-instructions to notification when an order
+            is paid, and stock reservations to inventory. Inventory publishes
+            reservation outcomes back, and its own send-instructions when stock
+            is low. Notification is the only subscriber allowed to talk to the
+            email provider. Pub/Sub is the contract. Those edges do not appear
+            as static imports.
           </p>
           <div class="service-map" data-service-map>
             <a
@@ -252,7 +261,6 @@ const historyHref = includeSuperseded
                 {selected.services.find((item) => item.service === "checkout")?.overall ?? "n/a"}
               </strong>
             </a>
-            <span class="edge">reservations</span>
             <a
               class:list={[
                 "svc",
@@ -266,7 +274,6 @@ const historyHref = includeSuperseded
                 {selected.services.find((item) => item.service === "inventory")?.overall ?? "n/a"}
               </strong>
             </a>
-            <span class="edge">send-instruction topic</span>
             <a
               class:list={[
                 "svc",
@@ -281,6 +288,50 @@ const historyHref = includeSuperseded
               </strong>
             </a>
           </div>
+          <svg
+            class="runtime-graph"
+            data-runtime-graph
+            viewBox={`0 0 ${runtimeGraph.width} ${runtimeGraph.height}`}
+            role="img"
+            aria-label="Runtime communication between checkout, inventory, and notification"
+          >
+            <defs>
+              <marker
+                id="runtime-arrow"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="7"
+                markerHeight="7"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            {
+              runtimeGraph.links.map((link) => (
+                <g class:list={["runtime-link", `is-${link.protocol}`]}>
+                  <path d={link.d} marker-end="url(#runtime-arrow)"></path>
+                  <text x={link.labelX} y={link.labelY}>
+                    {link.protocol}
+                    {link.count !== undefined ? ` · ${link.count}` : ""}
+                    {" · "}
+                    {link.purpose}
+                  </text>
+                </g>
+              ))
+            }
+            {
+              runtimeGraph.nodes.map((node) => (
+                <g class="runtime-node" transform={`translate(${node.x} ${node.y})`}>
+                  <rect width={node.width} height={node.height} rx="12"></rect>
+                  <text x={node.width / 2} y={node.height / 2 + 5}>
+                    {node.id}
+                  </text>
+                </g>
+              ))
+            }
+          </svg>
         </section>
       )
     }

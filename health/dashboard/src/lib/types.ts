@@ -13,6 +13,13 @@ export type ServiceRead = {
   characteristics: CharacteristicRead[];
 };
 
+export type ObservedRuntimeEdge = {
+  from: string;
+  to: string;
+  protocol: string;
+  count?: number;
+};
+
 export type HealthRun = {
   runId: string;
   commitSha: string;
@@ -27,6 +34,7 @@ export type HealthRun = {
   supersededBy?: string;
   characteristics: CharacteristicRead[];
   services: ServiceRead[];
+  runtimeEdges?: ObservedRuntimeEdge[];
 };
 
 export type HealthStore = {

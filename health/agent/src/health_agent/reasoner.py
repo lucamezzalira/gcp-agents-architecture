@@ -41,10 +41,16 @@ def _runtime_note(payload: AnalysisPayload) -> str:
                 parts.append(f" Trace window {start} to {end}.")
             if vs_imports is not None:
                 for edge in vs_imports.runtimeOnly:
-                    parts.append(
-                        f" Runtime-only {edge.protocol} edge {edge.from_service} -> "
-                        f"{edge.to} has no corresponding import."
-                    )
+                    if edge.protocol == "pubsub":
+                        parts.append(
+                            f" Designed Pub/Sub {edge.from_service} -> {edge.to} "
+                            "(no static import; eventing is the contract)."
+                        )
+                    else:
+                        parts.append(
+                            f" Runtime-only {edge.protocol} edge {edge.from_service} -> "
+                            f"{edge.to} has no corresponding import."
+                        )
                 for edge in vs_imports.importOnly:
                     parts.append(
                         f" Import {edge.from_service} -> {edge.to} has no observed "

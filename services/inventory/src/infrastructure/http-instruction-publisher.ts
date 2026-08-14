@@ -1,6 +1,6 @@
 import type { InstructionPublisher } from "../domain/ports/instruction-publisher.js";
 import type { SendInstruction } from "../domain/ports/instruction-publisher.js";
-import { tracedFetch } from "./tracing.js";
+import { tracedFetch } from "@observability/runtime";
 
 export class HttpInstructionPublisher implements InstructionPublisher {
   constructor(private readonly instructionsUrl: string) {}

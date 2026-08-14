@@ -1,4 +1,4 @@
-import type { Log } from "../domain/ports/logger.js";
+import type { Logger } from "@observability/runtime";
 import type { OutcomePublisher } from "../domain/ports/outcome-publisher.js";
 import type { ReservationStore } from "../domain/ports/reservation-store.js";
 import type { Reservation } from "../domain/ports/reservation-store.js";
@@ -10,7 +10,7 @@ export type ExpireHeldStores = {
   stock: StockStore;
   reservations: ReservationStore;
   outcomes: OutcomePublisher;
-  log: Log;
+  log: Logger;
 };
 
 function pastTtl(row: Reservation, now: Date, ttlMs: number): boolean {
@@ -47,7 +47,7 @@ export async function expireHeldInAdapter(
       sku: row.sku,
       units: row.units,
     });
-    stores.log.bind(row.orderId).info("held.expired");
+    stores.log.withCorrelation(row.orderId).info("held.expired");
     released += 1;
   }
   return released;

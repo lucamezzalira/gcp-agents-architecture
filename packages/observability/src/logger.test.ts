@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { JsonLogger } from "./json-logger.js";
+import { createJsonLogger, silentLogger } from "./logger.js";
 
-describe("JsonLogger", () => {
-  it("writes the correlation id on every line", () => {
+describe("createJsonLogger", () => {
+  it("writes the correlation id and service on every line", () => {
     const lines: string[] = [];
-    const logger = new JsonLogger((line) => {
+    const logger = createJsonLogger("checkout", (line) => {
       lines.push(line);
     });
     const log = logger.withCorrelation("ord-1");
@@ -20,5 +20,10 @@ describe("JsonLogger", () => {
         correlationId: "ord-1",
       });
     }
+  });
+
+  it("is a sealed factory, not a class to subclass", () => {
+    expect(typeof createJsonLogger).toBe("function");
+    expect(typeof silentLogger).toBe("function");
   });
 });

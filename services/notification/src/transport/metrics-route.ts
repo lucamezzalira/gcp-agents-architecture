@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { getDeliveryStats } from "../domain/delivery-stats.js";
 import type { DeliveryStatsSource } from "../domain/delivery-stats.js";
-import type { Logger } from "../domain/ports/logger.js";
+import type { Logger } from "@observability/runtime";
 
 export function registerMetricsRoute(
   app: FastifyInstance,

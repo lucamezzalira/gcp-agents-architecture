@@ -1,9 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { Logger } from "../domain/ports/logger.js";
+import { withPubSubConsume, type Logger } from "@observability/runtime";
 import type { StockOutcomeSink } from "../domain/ports/stock-outcome-sink.js";
 import { parseStockOutcome } from "../domain/stock-outcome.js";
-import { withPubSubConsume } from "./trace-context.js";
 
 const envelopeSchema = z.object({
   message: z.object({
@@ -18,7 +17,7 @@ export function registerOutcomePushRoute(
   logger: Logger,
 ): void {
   app.post("/reservation-outcomes", async (request, reply) => {
-    return withPubSubConsume(request, async () => {
+    return withPubSubConsume(request, "checkout", async () => {
     const parsed = envelopeSchema.safeParse(request.body);
     if (!parsed.success) {
       logger.withCorrelation("unparsed").warn("outcome.invalid");

@@ -21,7 +21,7 @@ Companion to `PRD.md`. That document says what and why. This one says where, in 
 | Static analysis | dependency-cruiser |
 | Duplication | jscpd |
 
-Checkout, notification and inventory do not share a database. Project B has one Firestore database per service (`checkout`, `notification`, `inventory`). If one is unavailable, the other services' state stays up. Notification may `GetObject` by `bodyRef`. It must never query checkout's Firestore. Inventory never queries checkout's Firestore either. Health history stays in its own Postgres in project A.
+Checkout, notification, inventory and audit do not share a database. Project B has one Firestore database per service (`checkout`, `notification`, `inventory`, `audit`). If one is unavailable, the other services' state stays up. Notification may `GetObject` by `bodyRef`. It must never query checkout's Firestore. Inventory never queries checkout's Firestore either. Audit only writes its own tape. Health history stays in its own Postgres in project A.
 
 ## Directory tree
 
@@ -36,6 +36,8 @@ Checkout, notification and inventory do not share a database. Project B has one 
 │   ├── PRD.md
 │   ├── BUILD-SPEC.md
 │   └── SCORING.md                # weights, published
+├── packages/
+│   └── observability/            # logger, tracing; import as-is
 ├── services/
 │   ├── notification/
 │   │   ├── AGENTS.md
@@ -51,12 +53,19 @@ Checkout, notification and inventory do not share a database. Project B has one 
 │   │   │   ├── domain/           # order state, notify decision, rendering
 │   │   │   └── infrastructure/
 │   │   └── test/
-│   └── inventory/
+│   ├── inventory/
+│   │   ├── AGENTS.md
+│   │   ├── src/
+│   │   │   ├── transport/
+│   │   │   ├── domain/           # stock, reservations, expiry
+│   │   │   └── infrastructure/
+│   │   └── test/
+│   └── audit/
 │       ├── AGENTS.md
 │       ├── src/
-│       │   ├── transport/
-│       │   ├── domain/           # stock, reservations, expiry
-│       │   └── infrastructure/
+│       │   ├── transport/        # push intake
+│       │   ├── domain/           # record arrivals
+│       │   └── infrastructure/   # this service's Firestore tape
 │       └── test/
 ├── health/
 │   ├── agent/                    # Python, ADK

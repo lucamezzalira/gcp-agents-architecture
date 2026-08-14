@@ -1,7 +1,7 @@
 import { PubSub } from "@google-cloud/pubsub";
 import type { StockReservationPublisher } from "../domain/ports/stock-reservation-publisher.js";
 import type { StockCommand } from "../domain/ports/stock-reservation-publisher.js";
-import { withProducerSpan } from "./tracing.js";
+import { withProducerSpan } from "@observability/runtime";
 
 type TopicHandle = {
   publishMessage(message: {

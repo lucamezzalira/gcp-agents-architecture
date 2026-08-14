@@ -170,6 +170,61 @@ def test_runtime_only_checkout_inventory_edge_is_named() -> None:
     assert "illustrative" in boundary.reasoning
 
 
+def test_pubsub_runtime_only_edge_is_designed_eventing() -> None:
+    payload = AnalysisPayload.model_validate(
+        {
+            "runId": "r",
+            "commitSha": "a" * 40,
+            "commitMessage": "ok",
+            "timestamp": "2026-01-01T00:00:00.000Z",
+            "archTests": [
+                {"ruleId": f"rule-{n}", "passed": True, "violations": []}
+                for n in range(1, 10)
+            ],
+            "runtime": {
+                "callGraph": {
+                    "illustrative": False,
+                    "synthetic": True,
+                    "description": "synthetic smoke",
+                    "window": {
+                        "start": "2026-01-01T00:00:00.000Z",
+                        "end": "2026-01-01T00:30:00.000Z",
+                    },
+                    "traffic": "this-run",
+                    "edges": [
+                        {
+                            "from": "checkout",
+                            "to": "notification",
+                            "protocol": "pubsub",
+                            "count": 3,
+                        }
+                    ],
+                    "queried": True,
+                },
+                "vsImports": {
+                    "runtimeOnly": [
+                        {
+                            "from": "checkout",
+                            "to": "notification",
+                            "protocol": "pubsub",
+                        }
+                    ],
+                    "importOnly": [],
+                },
+                "signals": [],
+            },
+        }
+    )
+    boundary = next(
+        item
+        for item in StubReasoner().reason(payload, _scores(100, []))
+        if item.id == "boundary-integrity"
+    )
+    assert "checkout -> notification" in boundary.reasoning
+    assert "Designed Pub/Sub" in boundary.reasoning
+    assert "hidden" not in boundary.reasoning.lower()
+
+
 def test_unqueried_runtime_graph_is_not_an_empty_result() -> None:
     payload = AnalysisPayload.model_validate(
         {

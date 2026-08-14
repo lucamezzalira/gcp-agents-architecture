@@ -5,6 +5,7 @@ import {
   type CharacteristicRead,
   type HealthRun,
   type HealthStore,
+  type ObservedRuntimeEdge,
   type ServiceRead,
 } from "./types.js";
 
@@ -21,6 +22,7 @@ const runRowSchema = z.object({
   superseded_at: z.union([z.string(), z.date()]).nullable().optional(),
   superseded_by: z.string().nullable().optional(),
   service_overalls: z.unknown().optional(),
+  metrics: z.unknown().optional(),
 });
 
 const characteristicRowSchema = z.object({
@@ -41,6 +43,41 @@ function asIso(value: string | Date): string {
 function asStringArray(value: unknown): string[] {
   const parsed = z.array(z.string()).safeParse(value);
   return parsed.success ? parsed.data : [];
+}
+
+function asRuntimeEdges(value: unknown): ObservedRuntimeEdge[] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return [];
+  }
+  const metrics = value as { runtimeEdges?: unknown };
+  const parsed = z
+    .array(
+      z.object({
+        from: z.string().optional(),
+        from_service: z.string().optional(),
+        to: z.string(),
+        protocol: z.string(),
+        count: z.number().optional(),
+      }),
+    )
+    .safeParse(metrics.runtimeEdges);
+  if (!parsed.success) {
+    return [];
+  }
+  const edges: ObservedRuntimeEdge[] = [];
+  for (const item of parsed.data) {
+    const from = item.from ?? item.from_service;
+    if (from === undefined) {
+      continue;
+    }
+    edges.push({
+      from,
+      to: item.to,
+      protocol: item.protocol,
+      count: item.count,
+    });
+  }
+  return edges;
 }
 
 function asOveralls(value: unknown): Record<string, number> {
@@ -149,14 +186,14 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
         ? await sql`
             select run_id, commit_sha, commit_message, created_at, overall_score,
                    reasoner, trace_id, rule_set_version, state, superseded_at,
-                   superseded_by, service_overalls
+                   superseded_by, service_overalls, metrics
             from health_run
             order by created_at asc
           `
         : await sql`
             select run_id, commit_sha, commit_message, created_at, overall_score,
                    reasoner, trace_id, rule_set_version, state, superseded_at,
-                   superseded_by, service_overalls
+                   superseded_by, service_overalls, metrics
             from health_run
             where coalesce(state, 'current') = 'current'
             order by created_at asc
@@ -197,6 +234,7 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
             overall: overalls[name] ?? 0,
             characteristics: sortCharacteristics(characteristics),
           }));
+        const runtimeEdges = asRuntimeEdges(run.metrics);
         return {
           runId: run.run_id,
           commitSha: run.commit_sha,
@@ -214,6 +252,7 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
           supersededBy: run.superseded_by ?? undefined,
           characteristics: sortCharacteristics(platform.get(run.run_id) ?? []),
           services,
+          runtimeEdges: runtimeEdges.length > 0 ? runtimeEdges : undefined,
         };
       });
     },

@@ -2,7 +2,7 @@ import type { BodyStore } from "./ports/body-store.js";
 import { BodyNotFoundError } from "./body-not-found.js";
 import type { DeliveryStore } from "./ports/delivery-store.js";
 import type { EmailProvider } from "./ports/email-provider.js";
-import type { Logger } from "./ports/logger.js";
+import type { Logger } from "@observability/runtime";
 import type { SendInstruction } from "./send-instruction.js";
 
 export type DeliverResult = {

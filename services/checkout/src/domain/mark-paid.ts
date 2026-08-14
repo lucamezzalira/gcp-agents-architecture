@@ -1,7 +1,7 @@
 import type { BodyStore } from "./ports/body-store.js";
 import { confirmationMessageId } from "./get-order-view.js";
 import type { InstructionPublisher } from "./ports/instruction-publisher.js";
-import type { Logger } from "./ports/logger.js";
+import type { Logger } from "@observability/runtime";
 import type { StockLookup } from "./ports/stock-lookup.js";
 import type { StockReservationPublisher } from "./ports/stock-reservation-publisher.js";
 import { InvalidTransitionError } from "./invalid-transition.js";

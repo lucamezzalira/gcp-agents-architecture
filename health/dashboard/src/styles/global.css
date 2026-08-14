@@ -595,10 +595,41 @@ a.sha:hover {
   background: rgba(74, 222, 128, 0.08);
 }
 
-.edge {
+.runtime-graph {
+  display: block;
+  width: 100%;
+  max-width: 700px;
+  height: auto;
+  margin: 0.4rem 0 0;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.runtime-node rect {
+  fill: rgba(255, 255, 255, 0.04);
+  stroke: var(--line);
+}
+
+.runtime-node text {
+  fill: currentColor;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.72rem;
-  color: var(--mute);
+  font-size: 13px;
+  text-anchor: middle;
+}
+
+.runtime-link path {
+  fill: none;
+  stroke: rgba(148, 163, 184, 0.75);
+  stroke-width: 1.4;
+}
+
+.runtime-link.is-http path {
+  stroke-dasharray: 5 4;
+}
+
+.runtime-link text {
+  fill: var(--mute);
+  font-size: 10px;
+  text-anchor: middle;
 }
 
 .history-toggle {

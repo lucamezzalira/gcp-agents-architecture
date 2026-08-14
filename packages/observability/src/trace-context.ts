@@ -1,8 +1,6 @@
 import { context, propagation, trace } from "@opentelemetry/api";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
-const SERVICE = "notification";
-
 function headerValue(
   value: string | string[] | undefined,
 ): string | undefined {
@@ -12,14 +10,14 @@ function headerValue(
   return undefined;
 }
 
-export function registerTraceHook(app: FastifyInstance): void {
+export function registerTraceHook(app: FastifyInstance, service: string): void {
   app.addHook("onRequest", (request, _reply, done) => {
     const span = trace.getActiveSpan();
     if (span === undefined) {
       done();
       return;
     }
-    span.setAttribute("ga.service", SERVICE);
+    span.setAttribute("ga.service", service);
     span.setAttribute("ga.kind", "server");
     span.setAttribute("ga.protocol", "http");
     const caller = headerValue(request.headers["x-ga-service"]);
@@ -32,16 +30,17 @@ export function registerTraceHook(app: FastifyInstance): void {
 
 export async function withPubSubConsumeFromAttributes<T>(
   attributes: Record<string, string> | undefined,
+  service: string,
   work: () => Promise<T>,
 ): Promise<T> {
   const extracted = propagation.extract(context.active(), attributes ?? {}, {
     get: (map, key) => map[key],
     keys: (map) => Object.keys(map),
   });
-  const tracer = trace.getTracer(SERVICE);
+  const tracer = trace.getTracer(service);
   return context.with(extracted, () =>
     tracer.startActiveSpan("pubsub.consume", async (span) => {
-      span.setAttribute("ga.service", SERVICE);
+      span.setAttribute("ga.service", service);
       span.setAttribute("ga.protocol", "pubsub");
       span.setAttribute("ga.kind", "consumer");
       const peer = attributes?.["ga.service"];
@@ -59,10 +58,12 @@ export async function withPubSubConsumeFromAttributes<T>(
 
 export async function withPubSubConsume<T>(
   request: FastifyRequest,
+  service: string,
   work: () => Promise<T>,
 ): Promise<T> {
   return withPubSubConsumeFromAttributes(
     pubsubAttributesFrom(request.body),
+    service,
     work,
   );
 }

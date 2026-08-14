@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { StockLookup } from "../domain/ports/stock-lookup.js";
-import { tracedFetch } from "./tracing.js";
+import { tracedFetch } from "@observability/runtime";
 
 const levelSchema = z.object({
   sku: z.string().min(1),

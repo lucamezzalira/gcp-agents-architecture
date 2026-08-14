@@ -1,7 +1,12 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { LowStockMailer } from "./domain/alert-low-stock.js";
 import { handleReservation } from "./domain/handle-reservation.js";
-import { quietLog, type Log } from "./domain/ports/logger.js";
+import {
+  createJsonLogger,
+  registerTraceHook,
+  silentLogger,
+  type Logger,
+} from "@observability/runtime";
 import type { OutcomePublisher } from "./domain/ports/outcome-publisher.js";
 import type { ReservationStore } from "./domain/ports/reservation-store.js";
 import type { StockStore } from "./domain/ports/stock-store.js";
@@ -16,7 +21,6 @@ import {
 } from "./infrastructure/firestore-inventory.js";
 import { GcsHtml } from "./infrastructure/gcs-html.js";
 import { HttpInstructionPublisher } from "./infrastructure/http-instruction-publisher.js";
-import { LineLogger } from "./infrastructure/line-logger.js";
 import { MemoryHtml } from "./infrastructure/memory-html.js";
 import { MemoryMail } from "./infrastructure/memory-mail.js";
 import { MemoryOutcomes } from "./infrastructure/memory-outcomes.js";
@@ -25,7 +29,6 @@ import { MemoryStock } from "./infrastructure/memory-stock.js";
 import { PubSubOutcomes } from "./infrastructure/pubsub-outcomes.js";
 import { PubSubInstructionPublisher } from "./infrastructure/pubsub-instruction-publisher.js";
 import { registerHealthRoute } from "./transport/health-route.js";
-import { registerTraceHook } from "./transport/trace-context.js";
 import {
   registerReservationPushRoute,
   type ReservationHandler,
@@ -45,7 +48,7 @@ function buildServer(
   stock: StockStore,
   reservations: ReservationStore,
   outcomes: OutcomePublisher,
-  logger: Log,
+  logger: Logger,
   ttlMs: number,
   lowStock?: LowStockMailer,
 ): FastifyInstance {
@@ -65,7 +68,7 @@ function buildServer(
     });
   };
   const server = Fastify();
-  registerTraceHook(server);
+  registerTraceHook(server, "inventory");
   registerHealthRoute(server);
   registerStockRoutes(server, stock, logger);
   registerReservationPushRoute(server, handle, logger);
@@ -80,7 +83,7 @@ function buildServer(
   return server;
 }
 
-export function createApp(logger: Log = quietLog()): InventoryApp {
+export function createApp(logger: Logger = silentLogger()): InventoryApp {
   const stock = new MemoryStock();
   const reservations = new MemoryReservations();
   const outcomes = new MemoryOutcomes();
@@ -116,7 +119,7 @@ export function createLocalApp(): FastifyInstance {
     stock,
     new MemoryReservations(),
     new MemoryOutcomes(),
-    new LineLogger("inventory"),
+    createJsonLogger("inventory"),
     HELD_TTL_MS,
     { html, mailer },
   );
@@ -140,7 +143,7 @@ export function createCloudApp(): FastifyInstance {
     firestore,
     asReservationStore(firestore),
     PubSubOutcomes.forTopic(requireEnv("RESERVATION_OUTCOMES_TOPIC")),
-    new LineLogger("inventory"),
+    createJsonLogger("inventory"),
     Number(process.env.RESERVATION_TTL_MS ?? HELD_TTL_MS),
     lowStock,
   );

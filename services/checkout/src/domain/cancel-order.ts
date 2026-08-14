@@ -1,4 +1,4 @@
-import type { Logger } from "./ports/logger.js";
+import type { Logger } from "@observability/runtime";
 import type { OrderStore } from "./ports/order-store.js";
 import type { StockReservationPublisher } from "./ports/stock-reservation-publisher.js";
 import { OrderNotFoundError } from "./order-not-found.js";

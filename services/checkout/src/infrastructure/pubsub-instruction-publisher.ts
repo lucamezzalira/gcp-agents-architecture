@@ -1,7 +1,7 @@
 import { PubSub } from "@google-cloud/pubsub";
 import type { InstructionPublisher } from "../domain/ports/instruction-publisher.js";
 import type { SendInstruction } from "../domain/ports/instruction-publisher.js";
-import { withProducerSpan } from "./tracing.js";
+import { withProducerSpan } from "@observability/runtime";
 
 export type PublishableTopic = {
   publishMessage(message: {

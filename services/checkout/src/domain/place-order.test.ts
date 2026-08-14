@@ -5,7 +5,7 @@ import { cancelOrder } from "./cancel-order.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
-import { silentLogger } from "./ports/logger.js";
+import { silentLogger } from "@observability/runtime";
 import { placeOrder } from "./place-order.js";
 import { CHECKOUT_SKU, CHECKOUT_UNITS } from "./stock-command.js";
 

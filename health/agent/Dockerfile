@@ -9,6 +9,7 @@ RUN ln -sf ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY health/scoring ./health/scoring
 COPY health/agent ./health/agent
+COPY packages/observability/package.json packages/observability/package.json
 RUN pnpm install --frozen-lockfile --filter @health/scoring...
 WORKDIR /repo/health/agent
 RUN python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e ".[adk]"

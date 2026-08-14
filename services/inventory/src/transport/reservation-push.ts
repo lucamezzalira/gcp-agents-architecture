@@ -1,10 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import type { Log } from "../domain/ports/logger.js";
+import { withPubSubConsume, type Logger } from "@observability/runtime";
 import {
   parseReservationCommand,
   type ReservationCommand,
 } from "../domain/reservation-command.js";
-import { withPubSubConsume } from "./trace-context.js";
 
 export type ReservationHandler = (command: ReservationCommand) => Promise<void>;
 
@@ -26,25 +25,25 @@ function decodePushBody(body: unknown): Buffer | undefined {
 export async function processReservationBytes(
   data: Buffer,
   handle: ReservationHandler,
-  log: Log,
+  log: Logger,
 ): Promise<"ack" | "nack"> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(data.toString("utf8")) as unknown;
   } catch {
-    log.bind("unparsed").warn("reservation.invalid");
+    log.withCorrelation("unparsed").warn("reservation.invalid");
     return "ack";
   }
   const command = parseReservationCommand(parsed);
   if (command === undefined) {
-    log.bind("unparsed").warn("reservation.invalid");
+    log.withCorrelation("unparsed").warn("reservation.invalid");
     return "ack";
   }
   try {
     await handle(command);
     return "ack";
   } catch {
-    log.bind(command.orderId).error("reservation.nacked");
+    log.withCorrelation(command.orderId).error("reservation.nacked");
     return "nack";
   }
 }
@@ -52,13 +51,13 @@ export async function processReservationBytes(
 export function registerReservationPushRoute(
   app: FastifyInstance,
   handle: ReservationHandler,
-  log: Log,
+  log: Logger,
 ): void {
   app.post("/pubsub", async (request, reply) => {
-    return withPubSubConsume(request, async () => {
+    return withPubSubConsume(request, "inventory", async () => {
       const bytes = decodePushBody(request.body);
       if (bytes === undefined) {
-        log.bind("unparsed").warn("pubsub.invalid");
+        log.withCorrelation("unparsed").warn("pubsub.invalid");
         return reply.code(400).send({ error: "invalid pubsub envelope" });
       }
       const decision = await processReservationBytes(bytes, handle, log);

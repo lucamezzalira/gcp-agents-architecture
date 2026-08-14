@@ -8,6 +8,7 @@ Owns stock levels and reservations. Checkout reserves stock when an order is pla
 - NEVER read another service's data store. This service has its own Firestore database named `inventory`.
 - NEVER import another service's internal modules.
 - NEVER extract rendering into a shared package.
+- Import `@observability/runtime` as-is for logging and tracing. Do not subclass or wrap it.
 
 ## Layers
 

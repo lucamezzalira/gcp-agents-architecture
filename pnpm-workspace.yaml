@@ -1,4 +1,5 @@
 packages:
+  - "packages/*"
   - "services/*"
   - "health/scoring"
   - "health/mcp-server"

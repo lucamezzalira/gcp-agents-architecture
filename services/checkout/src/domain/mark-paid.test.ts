@@ -4,7 +4,7 @@ import { InMemoryInstructionPublisher } from "../infrastructure/in-memory-instru
 import { MemoryStockLookup } from "../infrastructure/memory-stock-lookup.js";
 import { MemoryStockReservations } from "../infrastructure/memory-stock-reservations.js";
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
-import { silentLogger } from "./ports/logger.js";
+import { silentLogger } from "@observability/runtime";
 import { markPaid } from "./mark-paid.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";

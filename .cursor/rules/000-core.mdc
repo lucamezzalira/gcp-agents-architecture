@@ -9,7 +9,8 @@ Monorepo: two services under migration plus a health system measuring them. See 
 
 - Layer directories `transport/`, `domain/`, `infrastructure/` are load-bearing. Architecture tests are written against them. NEVER rename or restructure.
 - NEVER import the email provider outside `services/notification`.
-- NEVER create a shared rendering package. Duplication between services is deliberate.
+- NEVER create a shared rendering package. Duplication of email HTML between services is deliberate.
+- Observability lives in `packages/observability`. Services import `@observability/runtime` as-is. Do not subclass or wrap it.
 - NEVER let the health agent compute or modify a score. Scores are deterministic.
 - No `any`. Use `unknown` and narrow. Parse unknown input with Zod.
 - Domain defines interfaces; infrastructure implements them.

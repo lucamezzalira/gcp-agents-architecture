@@ -8,6 +8,7 @@ Owns orders through payment. When an order is paid, renders a confirmation email
 - NEVER read another service's data store.
 - NEVER import another service's internal modules.
 - NEVER extract rendering into a shared package. Checkout owns its rendering. Duplication with other services is deliberate and accepted.
+- Import `@observability/runtime` as-is for logging and tracing. Do not subclass or wrap it.
 
 ## Layers
 

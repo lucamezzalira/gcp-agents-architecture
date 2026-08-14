@@ -20,6 +20,7 @@ type SendInstruction = {
 - NEVER render HTML. It receives a pointer to already-rendered content.
 - NEVER hold or interpret templates.
 - NEVER know anything about orders, subscriptions or any calling domain. If you find yourself adding a domain concept here, the design has drifted.
+- Import `@observability/runtime` as-is for logging and tracing. Do not subclass or wrap it.
 
 ## Layers
 

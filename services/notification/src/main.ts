@@ -1,4 +1,4 @@
-import { startTracing } from "./infrastructure/tracing.js";
+import { startTracing } from "@observability/runtime";
 
 await startTracing("notification");
 const { createRuntimeApp } = await import("./app.js");

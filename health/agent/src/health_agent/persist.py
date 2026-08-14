@@ -40,7 +40,7 @@ def migrate(conn: psycopg.Connection) -> None:
 def _metrics_payload(read: HealthRead) -> dict[str, object] | None:
     if read.metrics is None:
         return None
-    return read.metrics.model_dump()
+    return read.metrics.model_dump(by_alias=True)
 
 
 def insert_health_read(

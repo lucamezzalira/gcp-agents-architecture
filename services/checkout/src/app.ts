@@ -6,7 +6,12 @@ import { placeOrder } from "./domain/place-order.js";
 import type { BodyStore } from "./domain/ports/body-store.js";
 import type { DeliveryStatusLookup } from "./domain/ports/delivery-status-lookup.js";
 import type { InstructionPublisher } from "./domain/ports/instruction-publisher.js";
-import { silentLogger, type Logger } from "./domain/ports/logger.js";
+import {
+  createJsonLogger,
+  registerTraceHook,
+  silentLogger,
+  type Logger,
+} from "@observability/runtime";
 import type { OrderStore } from "./domain/ports/order-store.js";
 import type { StockLookup } from "./domain/ports/stock-lookup.js";
 import type { StockOutcomeSink } from "./domain/ports/stock-outcome-sink.js";
@@ -20,7 +25,6 @@ import { InMemoryBodyStore } from "./infrastructure/in-memory-body-store.js";
 import { InMemoryDeliveryStatusLookup } from "./infrastructure/in-memory-delivery-status-lookup.js";
 import { InMemoryInstructionPublisher } from "./infrastructure/in-memory-instruction-publisher.js";
 import { InMemoryOrderStore } from "./infrastructure/in-memory-order-store.js";
-import { JsonLogger } from "./infrastructure/json-logger.js";
 import { MemoryStockLookup } from "./infrastructure/memory-stock-lookup.js";
 import { MemoryStockOutcomes } from "./infrastructure/memory-stock-outcomes.js";
 import { MemoryStockReservations } from "./infrastructure/memory-stock-reservations.js";
@@ -29,7 +33,6 @@ import { PubSubStockReservations } from "./infrastructure/pubsub-stock-reservati
 import { registerHealthRoute } from "./transport/health-route.js";
 import { registerOrderRoutes } from "./transport/order-routes.js";
 import { registerOutcomePushRoute } from "./transport/outcome-push.js";
-import { registerTraceHook } from "./transport/trace-context.js";
 
 export type CheckoutApp = {
   server: FastifyInstance;
@@ -53,7 +56,7 @@ function buildServer(
   logger: Logger,
 ): FastifyInstance {
   const server = Fastify();
-  registerTraceHook(server);
+  registerTraceHook(server, "checkout");
   registerHealthRoute(server);
   registerOrderRoutes(
     server,
@@ -124,7 +127,7 @@ export function createLocalApp(): FastifyInstance {
     new MemoryStockOutcomes(),
     stockLookup,
     new InMemoryDeliveryStatusLookup(),
-    new JsonLogger(),
+    createJsonLogger("checkout"),
   );
 }
 
@@ -149,7 +152,7 @@ export function createCloudApp(): FastifyInstance {
         : "http://127.0.0.1:3002",
     ),
     new InMemoryDeliveryStatusLookup(),
-    new JsonLogger(),
+    createJsonLogger("checkout"),
   );
 }
 

@@ -6,9 +6,11 @@ Read `docs/PRD.md` for what this is, `docs/BUILD-SPEC.md` for the tree, contract
 
 ## Layout
 
+- `packages/observability` — sealed logger and tracing. Services import it as-is.
 - `services/notification` — the only service allowed to talk to the email provider
 - `services/checkout` — owns orders, renders its own emails, publishes send instructions, reserves stock through inventory
 - `services/inventory` — owns stock levels and reservations, publishes reservation outcomes
+- `services/audit` — append-only log of send-instructions already on the bus
 - `health/scoring` — deterministic scoring, pure TypeScript, no I/O
 - `health/agent` — Python ADK agent, writes reasoning around the computed scores
 - `health/mcp-server`, `health/dashboard`
@@ -53,6 +55,7 @@ Layer directory names (`transport/`, `domain/`, `infrastructure/`) are load-bear
 
 - NEVER import the email provider outside `services/notification`.
 - NEVER create a shared rendering package. Each service renders its own email. The duplication is deliberate.
+- Observability is shared: import `@observability/runtime`. Do not subclass or wrap it.
 - NEVER let the health agent compute or modify a score. Scores are deterministic and come from `health/scoring`.
 - NEVER add barrel files that re-export across layer boundaries.
 - NEVER use `any`.

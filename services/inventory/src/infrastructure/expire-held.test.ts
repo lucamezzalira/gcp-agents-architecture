@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { quietLog } from "../domain/ports/logger.js";
+import { silentLogger } from "@observability/runtime";
 import { expireHeldInAdapter } from "./expire-held.js";
 import { MemoryOutcomes } from "./memory-outcomes.js";
 import { MemoryReservations } from "./memory-reservations.js";
@@ -20,7 +20,7 @@ describe("expireHeldInAdapter", () => {
     });
 
     const count = await expireHeldInAdapter(
-      { stock, reservations, outcomes, log: quietLog() },
+      { stock, reservations, outcomes, log: silentLogger() },
       new Date("2026-08-14T09:20:00.000Z"),
       15 * 60 * 1000,
     );
@@ -45,7 +45,7 @@ describe("expireHeldInAdapter", () => {
     });
 
     const count = await expireHeldInAdapter(
-      { stock, reservations, outcomes, log: quietLog() },
+      { stock, reservations, outcomes, log: silentLogger() },
       new Date("2026-08-14T09:20:00.000Z"),
       15 * 60 * 1000,
     );

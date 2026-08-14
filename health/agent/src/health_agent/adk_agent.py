@@ -63,11 +63,20 @@ one. traffic this-run means this collect generated the smoke;
 inherited means the window covers earlier activity.
 
 When queried is true, name each runtime-only edge with its protocol.
-Checkout and inventory talk over both HTTP and Pub/Sub. An HTTP edge
-with no matching import is a different finding from a Pub/Sub edge
-the import graph already knows about. Do not collapse them. An import
-with no runtime edge is dead coupling. p95-latency and error-rate
-remain illustrative.
+Checkout talks to inventory over HTTP (stock lookup) and Pub/Sub
+(reservations). Checkout talks to notification over Pub/Sub when an
+order is paid (send-instruction). Inventory talks to checkout over
+Pub/Sub (reservation outcomes) and may publish its own send-instruction
+when stock is low. A Pub/Sub edge with no matching import is designed eventing, not a hidden or undeclared dependency. Do not recommend adding
+a static import for it. An HTTP edge with no matching import is a
+runtime call the import graph cannot see. Name it. It is still not a
+scored violation. Do not collapse HTTP and Pub/Sub. An import with no
+runtime edge is dead coupling. p95-latency and error-rate remain
+illustrative.
+Observability (logger and tracing) lives in packages/observability.
+Services import that package as-is. They must not subclass or wrap it.
+Email rendering and send-instruction publishers stay duplicated on
+purpose.
 Retrieved memoryBank entries are structured score records, not
 narrative. Use them where they are relevant to what this commit
 changed. Say nothing about memory when they are not. Silence about

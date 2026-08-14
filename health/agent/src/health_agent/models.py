@@ -143,6 +143,7 @@ class RunMetrics(BaseModel):
     folderInstability: dict[str, float] = Field(default_factory=dict)
     duplicationCounts: DuplicationCounts = Field(default_factory=DuplicationCounts)
     serviceCoupling: list[ServiceCouplingMetric] = Field(default_factory=list)
+    runtimeEdges: list[RuntimeEdge] = Field(default_factory=list)
 
 
 class CharacteristicScore(BaseModel):

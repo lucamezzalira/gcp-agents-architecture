@@ -245,6 +245,10 @@ def test_instruction_covers_efferent_level_and_existing_rules() -> None:
     assert "not an empty graph" in text
     assert "http" in text and "pub/sub" in text
     assert "do not collapse" in text
+    assert "designed eventing" in text
+    assert "not a hidden" in text
+    assert "packages/observability" in text
+    assert "must not subclass" in text
     assert "silence about memory is a correct outcome" in collapsed
     assert "must name the commit and come from a retrieved record" in collapsed
     assert "never state that a commit fixed, introduced or resolved" in collapsed
@@ -395,6 +399,10 @@ def test_facts_include_runtime_call_graph_and_vs_imports() -> None:
     assert vs_imports["runtimeOnly"][0]["protocol"] == "http"
     assert facts["runtimeIllustrativeSignals"] == ["p95-latency"]
     assert facts["runtimeIllustrative"] is True
+    metrics = metrics_from_payload(payload)
+    assert metrics.runtimeEdges[0].from_service == "checkout"
+    assert metrics.runtimeEdges[0].to == "inventory"
+    assert metrics.runtimeEdges[0].protocol == "http"
 
 
 def test_facts_omit_edges_when_trace_was_not_queried() -> None:

@@ -7,6 +7,7 @@ from health_agent.models import (
     DuplicationCounts,
     HealthRead,
     RunMetrics,
+    RuntimeEdge,
     ScoreResult,
 )
 
@@ -84,7 +85,15 @@ def metrics_from_payload(payload: AnalysisPayload) -> RunMetrics:
             internalByService=internal_by_service,
         ),
         serviceCoupling=list(payload.dependencyCruiser.serviceMetrics),
+        runtimeEdges=_runtime_edges(payload),
     )
+
+
+def _runtime_edges(payload: AnalysisPayload) -> list[RuntimeEdge]:
+    graph = payload.runtime.callGraph
+    if graph is None or graph.queried is False or graph.edges is None:
+        return []
+    return list(graph.edges)
 
 
 def predecessors(prior_reads: list[HealthRead], current_sha: str) -> list[HealthRead]:

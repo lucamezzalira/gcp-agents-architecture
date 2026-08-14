@@ -8,15 +8,9 @@
   },
   "dependencies": {
     "@google-cloud/firestore": "^9.0.0",
-    "@google-cloud/opentelemetry-cloud-trace-exporter": "2.4.1",
     "@google-cloud/pubsub": "^6.0.1",
     "@google-cloud/storage": "^7.22.0",
-    "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/core": "1.30.1",
-    "@opentelemetry/instrumentation": "0.57.2",
-    "@opentelemetry/instrumentation-http": "0.57.2",
-    "@opentelemetry/resources": "1.30.1",
-    "@opentelemetry/sdk-trace-node": "1.30.1",
+    "@observability/runtime": "workspace:*",
     "fastify": "^5.4.0",
     "zod": "^4.4.3"
   },

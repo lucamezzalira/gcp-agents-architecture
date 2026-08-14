@@ -9,6 +9,8 @@ COPY health/scoring/package.json health/scoring/package.json
 COPY health/dashboard/package.json health/dashboard/package.json
 COPY health/mcp-server/package.json health/mcp-server/package.json
 COPY analysis/package.json analysis/package.json
+COPY services/audit/package.json services/audit/package.json
+COPY packages/observability/package.json packages/observability/package.json
 RUN pnpm install --frozen-lockfile
 COPY health/mcp-server ./health/mcp-server
 ENV PORT=8080

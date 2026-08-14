@@ -1,5 +1,5 @@
 import { alertLowStock, type LowStockMailer } from "./alert-low-stock.js";
-import type { Log } from "./ports/logger.js";
+import type { Logger } from "@observability/runtime";
 import type { OutcomePublisher } from "./ports/outcome-publisher.js";
 import type { ReservationStore } from "./ports/reservation-store.js";
 import type { StockStore } from "./ports/stock-store.js";
@@ -12,7 +12,7 @@ export type HandleReservationDeps = {
   stock: StockStore;
   reservations: ReservationStore;
   outcomes: OutcomePublisher;
-  logger: Log;
+  logger: Logger;
   now: () => Date;
   lowStock?: LowStockMailer;
 };
@@ -43,7 +43,7 @@ export async function handleReservation(
   command: ReservationCommand,
   deps: HandleReservationDeps,
 ): Promise<void> {
-  const log = deps.logger.bind(command.orderId);
+  const log = deps.logger.withCorrelation(command.orderId);
   const sku = requestedSku(command);
   const units = requestedUnits(command);
   if (command.order !== undefined) {

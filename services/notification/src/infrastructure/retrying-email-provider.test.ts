@@ -3,7 +3,7 @@ import { InMemoryBodyStore } from "./in-memory-body-store.js";
 import { InMemoryDeliveryStore } from "./in-memory-delivery-store.js";
 import type { EmailMessage, EmailProvider } from "../domain/ports/email-provider.js";
 import { deliver } from "../domain/deliver.js";
-import { silentLogger } from "../domain/ports/logger.js";
+import { silentLogger } from "@observability/runtime";
 import type { SendInstruction } from "../domain/ports/instruction-publisher.js";
 import { ProviderSendError } from "./provider-send-error.js";
 import { RetryingEmailProvider } from "./retrying-email-provider.js";

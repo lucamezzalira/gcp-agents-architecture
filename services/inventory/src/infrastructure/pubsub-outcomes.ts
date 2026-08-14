@@ -1,7 +1,7 @@
 import { PubSub } from "@google-cloud/pubsub";
 import type { OutcomePublisher } from "../domain/ports/outcome-publisher.js";
 import type { ReservationOutcome } from "../domain/ports/outcome-publisher.js";
-import { withProducerSpan } from "./tracing.js";
+import { withProducerSpan } from "@observability/runtime";
 
 type TopicHandle = {
   publishMessage(message: {

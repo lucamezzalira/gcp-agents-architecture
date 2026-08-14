@@ -5,7 +5,7 @@ import { InMemoryEmailProvider } from "../infrastructure/in-memory-email-provide
 import { BodyNotFoundError } from "./body-not-found.js";
 import { deliver } from "./deliver.js";
 import type { EmailMessage, EmailProvider } from "./ports/email-provider.js";
-import { silentLogger } from "./ports/logger.js";
+import { silentLogger } from "@observability/runtime";
 import type { SendInstruction } from "./send-instruction.js";
 
 const instruction: SendInstruction = {
