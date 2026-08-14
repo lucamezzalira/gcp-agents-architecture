@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDashboardModel,
+  commitUrl,
   easeOutCubic,
   hundredNote,
   improvementCopy,
@@ -9,9 +10,13 @@ import {
   ruleSetMarkers,
   scoreTone,
   selectRun,
+  shaTail,
   shortSha,
   toneColor,
+  trendCaption,
+  trendHeading,
   trendPoints,
+  trendScores,
 } from "./view.js";
 import type { HealthRun } from "./types.js";
 
@@ -77,6 +82,10 @@ describe("buildDashboardModel", () => {
 
   it("bands scores green, orange, then red", () => {
     expect(shortSha(restore.commitSha)).toBe("611fc24");
+    expect(shaTail(restore.commitSha)).toBe("2e3f49a691");
+    expect(commitUrl(restore.commitSha)).toBe(
+      "https://github.com/lucamezzalira/gcp-agents-architecture/commit/611fc24ee716690b4b0aae02eb5ea32e3f49a691",
+    );
     expect(scoreTone(100)).toBe("ok");
     expect(scoreTone(85)).toBe("ok");
     expect(scoreTone(84)).toBe("mid");
@@ -129,5 +138,41 @@ describe("buildDashboardModel", () => {
       hundredNote({ score: 100, suppressedBy: ["decision-dup"] }),
     ).toBe("At 100 because accepted decisions suppress findings.");
     expect(hundredNote({ score: 74, suppressedBy: ["decision-dup"] })).toBeUndefined();
+  });
+
+  it("plots the selected service overall on the trend, and the platform when none is selected", () => {
+    const scoped: HealthRun[] = [
+      {
+        ...baseline,
+        overall: 100,
+        services: [
+          { service: "checkout", overall: 100, characteristics: [] },
+          { service: "notification", overall: 100, characteristics: [] },
+        ],
+      },
+      {
+        ...regression,
+        overall: 61,
+        services: [
+          { service: "checkout", overall: 70, characteristics: [] },
+          { service: "notification", overall: 100, characteristics: [] },
+        ],
+      },
+      {
+        ...restore,
+        overall: 100,
+        services: [
+          { service: "checkout", overall: 100, characteristics: [] },
+          { service: "notification", overall: 100, characteristics: [] },
+        ],
+      },
+    ];
+    expect(trendScores(scoped)).toEqual([100, 61, 100]);
+    expect(trendScores(scoped, "checkout")).toEqual([100, 70, 100]);
+    expect(trendScores(scoped, "notification")).toEqual([100, 100, 100]);
+    expect(trendHeading("checkout")).toContain("checkout");
+    expect(trendHeading()).toBe("Trend across commits");
+    expect(trendCaption("checkout")).toMatch(/^checkout overall/);
+    expect(trendCaption()).toMatch(/^Platform overall/);
   });
 });

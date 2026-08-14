@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BodyNotFoundError } from "../domain/body-not-found.js";
-import { silentLogger } from "../domain/logger.js";
+import { silentLogger } from "../domain/ports/logger.js";
 import type { SendInstruction } from "../domain/send-instruction.js";
 import { processInstructionMessage } from "./instruction-subscriber.js";
 

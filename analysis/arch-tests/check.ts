@@ -100,16 +100,15 @@ export async function checkArchitecture(
       ".*src/infrastructure/.*(email-provider|firestore-|gcs-).*",
     );
 
-  // Ports are named for their role (store, provider, publisher, lookup,
-  // logger, stats, mailer, order.ts, send-instruction). Use cases
-  // (mark-paid, deliver, render-*, cancel-order) remain forbidden.
+  // Ports live in domain/ports, which is still under domain/, so
+  // inFolder("domain") would also forbid adapters depending on ports.
+  // The rule is the folder split: infrastructure may depend on
+  // domain/ports and on nothing else under domain.
   const rule2 = files
     .inFolder("infrastructure")
     .shouldNot()
     .dependOnFiles()
-    .matchingPattern(
-      ".*\\/domain\\/(?!(?:order\\.ts$)|.*(?:store|provider|publisher|lookup|logger|stats|mailer|send-instruction)).*",
-    );
+    .matchingPattern(".*/domain/(?!ports/).*");
 
   const rule3 = files
     .matchingPattern(".*services/(?!notification)[^/]+/.*")
@@ -156,6 +155,8 @@ export async function checkArchitecture(
     .dependOnFiles()
     .matchingPattern(".*services/checkout/.*/transport/.*");
 
+  // Mirror of rule 2 from the other side. domain/ports is still domain,
+  // so this folder check also keeps ports from depending on infrastructure.
   const rule8 = files
     .inFolder("domain")
     .shouldNot()

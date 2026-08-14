@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { InvalidTransitionError } from "../domain/invalid-transition.js";
-import type { Logger } from "../domain/logger.js";
+import type { Logger } from "../domain/ports/logger.js";
 import type { MarkPaidResult } from "../domain/mark-paid.js";
 import { OrderNotFoundError } from "../domain/order-not-found.js";
 import type { OrderView } from "../domain/get-order-view.js";

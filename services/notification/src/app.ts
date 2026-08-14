@@ -1,9 +1,9 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { deliver } from "./domain/deliver.js";
-import type { BodyStore } from "./domain/body-store.js";
-import type { DeliveryStore } from "./domain/delivery-store.js";
-import type { EmailMessage, EmailProvider } from "./domain/email-provider.js";
-import { silentLogger, type Logger } from "./domain/logger.js";
+import type { BodyStore } from "./domain/ports/body-store.js";
+import type { DeliveryStore } from "./domain/ports/delivery-store.js";
+import type { EmailMessage, EmailProvider } from "./domain/ports/email-provider.js";
+import { silentLogger, type Logger } from "./domain/ports/logger.js";
 import { CountingEmailProvider } from "./infrastructure/counting-email-provider.js";
 import { InMemoryBodyStore } from "./infrastructure/in-memory-body-store.js";
 import { InMemoryDeliveryStats } from "./infrastructure/in-memory-delivery-stats.js";

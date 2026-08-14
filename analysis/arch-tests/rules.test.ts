@@ -37,4 +37,13 @@ describe("architecture rules on fixtures", () => {
       true,
     );
   });
+
+  it("passes rule 2 when infrastructure imports a port whose name is not on any list", async () => {
+    const results = await checkArchitecture(
+      fixtureTsconfig("rule-2-unanticipated-port"),
+    );
+    const match = results.find((item) => item.ruleId === "rule-2");
+    expect(match?.passed).toBe(true);
+    expect(match?.violations).toEqual([]);
+  });
 });

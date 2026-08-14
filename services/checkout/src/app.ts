@@ -1,11 +1,11 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { getOrderView } from "./domain/get-order-view.js";
 import { markPaid } from "./domain/mark-paid.js";
-import type { BodyStore } from "./domain/body-store.js";
-import type { DeliveryStatusLookup } from "./domain/delivery-status-lookup.js";
-import type { InstructionPublisher } from "./domain/instruction-publisher.js";
-import { silentLogger, type Logger } from "./domain/logger.js";
-import type { OrderStore } from "./domain/order-store.js";
+import type { BodyStore } from "./domain/ports/body-store.js";
+import type { DeliveryStatusLookup } from "./domain/ports/delivery-status-lookup.js";
+import type { InstructionPublisher } from "./domain/ports/instruction-publisher.js";
+import { silentLogger, type Logger } from "./domain/ports/logger.js";
+import type { OrderStore } from "./domain/ports/order-store.js";
 import { FileBodyStore } from "./infrastructure/file-body-store.js";
 import { FirestoreOrderStore } from "./infrastructure/firestore-order-store.js";
 import { GcsBodyStore } from "./infrastructure/gcs-body-store.js";

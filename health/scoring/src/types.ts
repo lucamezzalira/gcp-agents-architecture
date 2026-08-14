@@ -5,9 +5,11 @@ import {
   archTestResultSchema,
   archViolationSchema,
   dependencyCruiserSchema,
+  duplicationCountsSchema,
   duplicationSchema,
   folderMetricSchema,
   runtimeSchema,
+  serviceMetricSchema,
 } from "./schemas.js";
 
 export type CharacteristicId =
@@ -23,6 +25,8 @@ export type PlatformCharacteristicId =
 export type ArchViolation = z.infer<typeof archViolationSchema>;
 export type ArchTestResult = z.infer<typeof archTestResultSchema>;
 export type FolderMetric = z.infer<typeof folderMetricSchema>;
+export type ServiceMetric = z.infer<typeof serviceMetricSchema>;
+export type DuplicationCounts = z.infer<typeof duplicationCountsSchema>;
 export type DependencyCruiserPayload = z.infer<typeof dependencyCruiserSchema>;
 export type DuplicationPayload = z.infer<typeof duplicationSchema>;
 export type RuntimePayload = z.infer<typeof runtimeSchema>;

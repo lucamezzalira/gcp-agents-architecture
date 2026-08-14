@@ -116,6 +116,11 @@ type AnalysisPayload = {
       instability: number;
       moduleCount?: number;
     }>;
+    serviceMetrics: Array<{
+      service: string;
+      afferentCoupling: number;
+      efferentCoupling: number;
+    }>;
   };
   duplication: {
     clones: Array<{
@@ -142,6 +147,17 @@ type AnalysisPayload = {
     orphanCount: number;
     cycleCount: number;
   }>;
+  priorServiceMetrics?: Array<{
+    service: string;
+    afferentCoupling: number;
+    efferentCoupling: number;
+  }>;
+  priorDuplicationCounts?: {
+    internal: number;
+    crossService: number;
+    shared: number;
+    internalByService?: Record<string, number>;
+  };
 };
 ```
 
@@ -255,7 +271,7 @@ The agent receives the computed scores and writes reasoning and recommendations 
 - Each rule has a fixture that passes and a fixture that fails. A rule whose pattern matches everything, or nothing, cannot pass the suite.
 - The guard (`analysis/arch-tests/guard.test.ts`) asserts every rule passes on the real services. It fails on the regression commit `124fa31` and passes on `main`.
 - The collector (`analysis/collect-payload.ts`) calls the same `checkArchitecture` and never fails, so a commit containing a deliberate regression can still publish a payload.
-- Rule 2 is a dependency-direction rule, not a filename list. A new domain use case imported by infrastructure fails without a rule change.
+- Rule 2: infrastructure may depend on `domain/ports` and on nothing else under `domain`. A new domain use case imported by infrastructure fails without a rule change. A new port under `domain/ports` does not.
 - The rule set is versioned. The version is on every payload and persisted run. The dashboard marks the trend where it changes.
 
 **Pipeline**

@@ -8,7 +8,7 @@ The score is deterministic. These weights are the specification; `health/scoring
 | --- | --- | --- |
 | `boundary-integrity` | Whether a service's own files respect declared boundaries | each service, rolled up to the platform |
 | `layering` | Whether transport, domain and infrastructure stay separated | each service, rolled up to the platform |
-| `coupling` | Cycles, orphans, and folder instability inside a service | each service, rolled up to the platform |
+| `coupling` | Cycles, orphans, dep-cruiser faults, and efferent coupling growth | each service, rolled up to the platform |
 | `duplication` | Internal clones inside one service | each service, rolled up to the platform |
 | `cross-service-integrity` | The relationship: rules 3-5 and 7, plus clones that span services | platform only |
 
@@ -43,7 +43,7 @@ Known services in this build: `checkout` and `notification`. A service listed in
 | ts-arch | rule 5 (cross-service internal import) | `boundary-integrity` | offending service | 25 |
 | ts-arch | rule 5 | `cross-service-integrity` | platform | 25 |
 | ts-arch | rule 1 (transport imports infrastructure or a provider/storage client) | `layering` | offending service | 20 |
-| ts-arch | rule 2 (infrastructure imports a domain use case) | `layering` | offending service | 20 |
+| ts-arch | rule 2 (infrastructure imports domain other than `domain/ports`) | `layering` | offending service | 20 |
 | ts-arch | rule 6 (domain imports transport) | `layering` | offending service | 20 |
 | ts-arch | rule 7 (transport imports another service's transport) | `boundary-integrity` | offending service | 25 |
 | ts-arch | rule 7 | `cross-service-integrity` | platform | 25 |
@@ -53,14 +53,32 @@ Known services in this build: `checkout` and `notification`. A service listed in
 | dependency-cruiser | each orphan | `coupling` | service owning the orphan | 5 |
 | dependency-cruiser | each `not-to-unresolvable` | `coupling` | service owning `from` | 10 |
 | dependency-cruiser | each `no-dep-on-test` | `coupling` | service owning `from` | 10 |
-| dependency-cruiser | mean folder instability `I` of `services/<name>/src/{domain,infrastructure,transport}` | `coupling` | that service | `round(I * 40)` |
-| jscpd | each internal clone | `duplication` | that service | 8 |
-| jscpd | each cross-service clone | `cross-service-integrity` | platform | 10 |
-| jscpd | each shared clone (service + non-service path) | `cross-service-integrity` | platform | 8 |
+| dependency-cruiser | efferent coupling growth vs the prior run | `coupling` | that service | `max(0, currentCe - priorCe) * 10` |
+| jscpd | internal clone count (first run) or growth vs prior | `duplication` | that service | 8 per extra clone |
+| jscpd | cross-service clone count (first run) or growth vs prior | `cross-service-integrity` | platform | 10 per extra clone |
+| jscpd | shared clone count (first run) or growth vs prior | `cross-service-integrity` | platform | 8 per extra clone |
 
 Duplication is not scored as a percentage. Config files are outside jscpd's TypeScript format filter and do not produce clones.
 
-Folder instability `I` is `Ce / (Ca + Ce)` from dependency-cruiser folder metrics. Use the mean `I` of `services/<name>/src/{domain,infrastructure,transport}` when those folders exist. Otherwise use the mean `I` of folders under that service whose `Ca + Ce > 0`. The service `src` folder itself often reports `I = 0` because internal edges do not leave it, so it is not used as the service score. Missing metrics apply no instability penalty, so a fixture with no graph still scores 100 on coupling.
+## Harmful direction
+
+A metric-based penalty fires only when the number moves the wrong way.
+
+| Signal | Harmful direction | First observation (no prior) |
+| --- | --- | --- |
+| Efferent coupling (`Ce`) | Increase vs the previous run | No growth penalty (neutral) |
+| Internal / cross-service / shared clones | Increase vs the previous run's count | Score the current count (baseline) |
+| Cycles, orphans, unresolvable, dep-on-test | Presence (a fault, not a bidirectional metric) | Same: each instance is a penalty |
+
+`Ce` is the count of unique resolved dependencies whose path is not under `services/<name>/`. `Ca` is the count of unique modules outside the service that depend on a module inside it. Both are stored on `dependencyCruiser.serviceMetrics`. Only `Ce` growth is scored. `Ca` is observation. A service that other code reached into (`Ca` up, `Ce` unchanged) is not penalised.
+
+Folder instability `I` (`Ce / (Ca + Ce)` per folder) stays on `folderMetrics` for the agent. It is not scored. Expected shapes, which the reasoner reads as facts rather than as scores:
+
+- `transport` should be highly unstable. Depends on domain; nothing should depend on it. Low `I` means something depends on transport. A transport folder at 0.78 is healthy.
+- `domain` should be stable. Things depend on it; it depends on little. Rising `I` is drift.
+- `infrastructure` should be unstable. Implements ports; depended upon only through them.
+
+Missing `serviceMetrics` or no prior for that service apply no efferent growth penalty, so a fixture with no graph still scores 100 on coupling.
 
 Intra-file clones (both locations the same path) are not scored.
 
@@ -137,3 +155,19 @@ Five rules. Rule 1 was transport must not depend on the `infrastructure` folder.
 - Rule 8: domain must not depend on infrastructure. Layering, 20.
 - Rule 9: infrastructure must not depend on transport. Layering, 20.
 - Every rule has a fixture that passes and a fixture that fails. A guard suite asserts every rule passes on the real services. The collector runs the same `checkArchitecture` and never fails.
+
+### Version 3
+
+Rule 2 no longer uses a name allow-list. Ports live in `domain/ports/`. Infrastructure may depend on that folder and on nothing else under `domain`. A port named `email-gateway.ts` is allowed because it sits in `ports/`, not because the name was anticipated. Use cases stay as files directly under `domain/`, so `cancel-order.ts` still fails with no rule change.
+
+Rule 8 is unchanged: `domain` (including `domain/ports`) must not depend on `infrastructure`. That is the same constraint from the other side. Rule 2 cannot be a plain `inFolder("domain")` check, because ports remain under `domain/` by design.
+
+### Version 4
+
+Instability is no longer scored. Folder `I` remains an observation for the reasoner, read against the layer profiles above rather than against zero.
+
+Coupling now penalises efferent coupling growth only: `max(0, currentCe - priorCe) * 10`. No prior means no growth penalty. Afferent coupling is never a penalty.
+
+Duplication penalties are increase-only once a prior clone count exists. The first observation still scores the current count as the baseline.
+
+The reasoner receives those layer profiles and the active rule ids. It must not recommend reducing transport instability, and must not recommend adding a rule that is already in force.

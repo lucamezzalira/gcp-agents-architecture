@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { InMemoryBodyStore } from "../infrastructure/in-memory-body-store.js";
 import { InMemoryInstructionPublisher } from "../infrastructure/in-memory-instruction-publisher.js";
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
-import { silentLogger } from "./logger.js";
+import { silentLogger } from "./ports/logger.js";
 import { markPaid } from "./mark-paid.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";

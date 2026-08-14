@@ -1,7 +1,7 @@
-import type { DeliveryStatusLookup } from "./delivery-status-lookup.js";
+import type { DeliveryStatusLookup } from "./ports/delivery-status-lookup.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order, OrderStatus, ShippingTier } from "./order.js";
-import type { OrderStore } from "./order-store.js";
+import type { OrderStore } from "./ports/order-store.js";
 
 export function confirmationMessageId(orderId: string): string {
   return `checkout:${orderId}:paid`;

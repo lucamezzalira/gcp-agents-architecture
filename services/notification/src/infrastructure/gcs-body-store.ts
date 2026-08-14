@@ -1,5 +1,5 @@
 import { Storage } from "@google-cloud/storage";
-import type { BodyStore } from "../domain/body-store.js";
+import type { BodyStore } from "../domain/ports/body-store.js";
 
 export type ReadableBucket = {
   file(name: string): {

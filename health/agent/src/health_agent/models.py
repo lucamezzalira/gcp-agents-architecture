@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -44,12 +46,19 @@ class FolderMetric(BaseModel):
     moduleCount: int | None = None
 
 
+class ServiceCouplingMetric(BaseModel):
+    service: str
+    afferentCoupling: float = 0
+    efferentCoupling: float = 0
+
+
 class DependencyCruiserPayload(BaseModel):
     cycles: list[dict[str, object]] = Field(default_factory=list)
     orphans: list[str] = Field(default_factory=list)
     violations: list[dict[str, object]] = Field(default_factory=list)
     metrics: DependencyMetrics = Field(default_factory=DependencyMetrics)
     folderMetrics: list[FolderMetric] = Field(default_factory=list)
+    serviceMetrics: list[ServiceCouplingMetric] = Field(default_factory=list)
 
 
 class RecentCommit(BaseModel):
@@ -73,6 +82,8 @@ class AnalysisPayload(BaseModel):
     duplication: DuplicationPayload = Field(default_factory=DuplicationPayload)
     recentCommits: list[RecentCommit] = Field(default_factory=list)
     changedFiles: list[str] = Field(default_factory=list)
+    priorServiceMetrics: list[ServiceCouplingMetric] = Field(default_factory=list)
+    priorDuplicationCounts: DuplicationCounts | None = None
     ruleSetVersion: int = 1
 
 
@@ -80,6 +91,7 @@ class DuplicationCounts(BaseModel):
     internal: int = 0
     crossService: int = 0
     shared: int = 0
+    internalByService: dict[str, int] = Field(default_factory=dict)
 
 
 class RunMetrics(BaseModel):
@@ -90,6 +102,7 @@ class RunMetrics(BaseModel):
     cycleCount: int = 0
     folderInstability: dict[str, float] = Field(default_factory=dict)
     duplicationCounts: DuplicationCounts = Field(default_factory=DuplicationCounts)
+    serviceCoupling: list[ServiceCouplingMetric] = Field(default_factory=list)
 
 
 class CharacteristicScore(BaseModel):

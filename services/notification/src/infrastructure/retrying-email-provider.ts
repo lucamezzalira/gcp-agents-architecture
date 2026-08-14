@@ -1,4 +1,4 @@
-import type { EmailMessage, EmailProvider } from "../domain/email-provider.js";
+import type { EmailMessage, EmailProvider } from "../domain/ports/email-provider.js";
 import { ProviderSendError } from "./provider-send-error.js";
 import {
   delayForAttempt,

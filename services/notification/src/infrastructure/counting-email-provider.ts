@@ -1,4 +1,4 @@
-import type { EmailMessage, EmailProvider } from "../domain/email-provider.js";
+import type { EmailMessage, EmailProvider } from "../domain/ports/email-provider.js";
 
 export class CountingEmailProvider implements EmailProvider {
   constructor(

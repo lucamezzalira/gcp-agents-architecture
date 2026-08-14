@@ -1,4 +1,4 @@
-export const RULE_SET_VERSION = 2;
+export const RULE_SET_VERSION = 4;
 
 export const RULE_IDS = [
   "rule-1",

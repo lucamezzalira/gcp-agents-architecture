@@ -1,4 +1,4 @@
-import type { DeliveryStatusLookup } from "../domain/delivery-status-lookup.js";
+import type { DeliveryStatusLookup } from "../domain/ports/delivery-status-lookup.js";
 
 export class InMemoryDeliveryStatusLookup implements DeliveryStatusLookup {
   private readonly delivered = new Set<string>();

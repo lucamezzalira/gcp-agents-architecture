@@ -1,8 +1,8 @@
-import type { BodyStore } from "./body-store.js";
+import type { BodyStore } from "./ports/body-store.js";
 import { BodyNotFoundError } from "./body-not-found.js";
-import type { DeliveryStore } from "./delivery-store.js";
-import type { EmailProvider } from "./email-provider.js";
-import type { Logger } from "./logger.js";
+import type { DeliveryStore } from "./ports/delivery-store.js";
+import type { EmailProvider } from "./ports/email-provider.js";
+import type { Logger } from "./ports/logger.js";
 import type { SendInstruction } from "./send-instruction.js";
 
 export type DeliverResult = {

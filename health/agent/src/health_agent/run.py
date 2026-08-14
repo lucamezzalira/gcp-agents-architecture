@@ -4,12 +4,17 @@ import argparse
 import json
 import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
 
 from health_agent.assemble import assemble, assert_scores_unchanged
 from health_agent.memory import MemoryBank, observation_from_read
 from health_agent.models import AnalysisPayload, HealthRead
-from health_agent.reasoner_facts import metrics_from_payload, prior_metrics_series
+from health_agent.reasoner_facts import (
+    enrich_payload_with_priors,
+    metrics_from_payload,
+    prior_metrics_series,
+)
 from health_agent.reasoner import Reasoner, StubReasoner
 from health_agent.score_bridge import repo_root, score_payload
 from health_agent.tracing import current_trace_id, tracer
@@ -87,8 +92,15 @@ def produce_health_read(
         root.set_attribute("run.id", payload.runId)
         root.set_attribute("commit.sha", payload.commitSha)
         root.set_attribute("reasoner", name)
-        with tracer().start_as_current_span("scoring"):
-            scores = score_payload(payload_path, decisions_path)
+        enriched = enrich_payload_with_priors(payload, priors)
+        with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            handle.write(enriched.model_dump_json(exclude_none=True))
+            scored_path = Path(handle.name)
+        try:
+            with tracer().start_as_current_span("scoring"):
+                scores = score_payload(scored_path, decisions_path)
+        finally:
+            scored_path.unlink(missing_ok=True)
         with tracer().start_as_current_span("memory_retrieve"):
             snippets = bank.retrieve(query)
         print(

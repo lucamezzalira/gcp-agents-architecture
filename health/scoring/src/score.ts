@@ -6,7 +6,7 @@ import type {
   AnalysisPayload,
   CharacteristicId,
   CharacteristicScore,
-  FolderMetric,
+  DuplicationCounts,
   PlatformCharacteristicId,
   ScoreResult,
   ServiceScore,
@@ -17,7 +17,7 @@ import {
   CROSS_SERVICE_RULES,
   CYCLE_PENALTY,
   DEP_ON_TEST_PENALTY,
-  INSTABILITY_SCALE,
+  EFFERENT_GROWTH_PENALTY,
   INTERNAL_CLONE_PENALTY,
   ORPHAN_PENALTY,
   PLATFORM_WEIGHTS,
@@ -158,25 +158,95 @@ function collectFindings(payload: AnalysisPayload): Finding[] {
     });
   }
 
+  findings.push(...duplicationFindings(payload));
+  findings.push(...efferentGrowthFindings(payload));
+
+  return findings;
+}
+
+type CountedClone = {
+  files: string[];
+  classification: "internal" | "cross-service" | "shared";
+  services: string[];
+};
+
+function scoredClones(payload: AnalysisPayload): CountedClone[] {
+  const clones: CountedClone[] = [];
   for (const clone of payload.duplication.clones) {
     const uniqueFiles = [...new Set(clone.files)];
     if (uniqueFiles.length < 2) {
       continue;
     }
     const classified = classifyClone(clone.files);
-    const classification = clone.classification ?? classified.classification;
-    const services = clone.services ?? classified.services;
+    clones.push({
+      files: clone.files,
+      classification: clone.classification ?? classified.classification,
+      services: clone.services ?? classified.services,
+    });
+  }
+  return clones;
+}
+
+function currentDuplicationCounts(payload: AnalysisPayload): DuplicationCounts {
+  const internalByService: Record<string, number> = {};
+  let internal = 0;
+  let crossService = 0;
+  let shared = 0;
+  for (const clone of scoredClones(payload)) {
+    if (clone.classification === "internal" && clone.services[0] !== undefined) {
+      internal += 1;
+      const service = clone.services[0];
+      internalByService[service] = (internalByService[service] ?? 0) + 1;
+    } else if (clone.classification === "cross-service") {
+      crossService += 1;
+    } else {
+      shared += 1;
+    }
+  }
+  return { internal, crossService, shared, internalByService };
+}
+
+function cloneFiles(
+  clones: CountedClone[],
+  classification: CountedClone["classification"],
+  service?: string,
+): string[] {
+  return clones
+    .filter((clone) => {
+      if (clone.classification !== classification) {
+        return false;
+      }
+      if (service === undefined) {
+        return true;
+      }
+      return clone.services[0] === service;
+    })
+    .flatMap((clone) => clone.files);
+}
+
+function duplicationFindings(payload: AnalysisPayload): Finding[] {
+  const clones = scoredClones(payload);
+  const prior = payload.priorDuplicationCounts;
+  if (prior === undefined) {
+    return baselineCloneFindings(clones);
+  }
+  return growthCloneFindings(clones, currentDuplicationCounts(payload), prior);
+}
+
+function baselineCloneFindings(clones: CountedClone[]): Finding[] {
+  const findings: Finding[] = [];
+  for (const clone of clones) {
     const key = clone.files.slice().sort().join("|");
-    if (classification === "internal" && services[0] !== undefined) {
+    if (clone.classification === "internal" && clone.services[0] !== undefined) {
       findings.push({
         ruleId: "duplication-internal",
         paths: clone.files,
         characteristic: "duplication",
         penalty: INTERNAL_CLONE_PENALTY,
         signal: `jscpd:internal:${key}`,
-        service: services[0],
+        service: clone.services[0],
       });
-    } else if (classification === "cross-service") {
+    } else if (clone.classification === "cross-service") {
       findings.push({
         ruleId: "duplication-cross-service",
         paths: clone.files,
@@ -194,7 +264,82 @@ function collectFindings(payload: AnalysisPayload): Finding[] {
       });
     }
   }
+  return findings;
+}
 
+function growthCloneFindings(
+  clones: CountedClone[],
+  current: DuplicationCounts,
+  prior: DuplicationCounts,
+): Finding[] {
+  const findings: Finding[] = [];
+  const services = new Set([
+    ...Object.keys(current.internalByService),
+    ...Object.keys(prior.internalByService ?? {}),
+  ]);
+  for (const service of services) {
+    const currentCount = current.internalByService[service] ?? 0;
+    const priorCount = prior.internalByService?.[service] ?? 0;
+    const growth = Math.max(0, currentCount - priorCount);
+    if (growth === 0) {
+      continue;
+    }
+    findings.push({
+      ruleId: "duplication-internal",
+      paths: cloneFiles(clones, "internal", service),
+      characteristic: "duplication",
+      penalty: growth * INTERNAL_CLONE_PENALTY,
+      signal: `jscpd:internal-growth:${service}:${priorCount}->${currentCount}`,
+      service,
+    });
+  }
+  const crossGrowth = Math.max(0, current.crossService - prior.crossService);
+  if (crossGrowth > 0) {
+    findings.push({
+      ruleId: "duplication-cross-service",
+      paths: cloneFiles(clones, "cross-service"),
+      characteristic: "cross-service-integrity",
+      penalty: crossGrowth * CROSS_SERVICE_CLONE_PENALTY,
+      signal: `jscpd:cross-service-growth:${prior.crossService}->${current.crossService}`,
+    });
+  }
+  const sharedGrowth = Math.max(0, current.shared - prior.shared);
+  if (sharedGrowth > 0) {
+    findings.push({
+      ruleId: "duplication-shared",
+      paths: cloneFiles(clones, "shared"),
+      characteristic: "cross-service-integrity",
+      penalty: sharedGrowth * SHARED_CLONE_PENALTY,
+      signal: `jscpd:shared-growth:${prior.shared}->${current.shared}`,
+    });
+  }
+  return findings;
+}
+
+function efferentGrowthFindings(payload: AnalysisPayload): Finding[] {
+  const findings: Finding[] = [];
+  const priors = payload.priorServiceMetrics ?? [];
+  if (priors.length === 0) {
+    return findings;
+  }
+  for (const current of payload.dependencyCruiser.serviceMetrics ?? []) {
+    const prior = priors.find((item) => item.service === current.service);
+    if (prior === undefined) {
+      continue;
+    }
+    const growth = Math.max(0, current.efferentCoupling - prior.efferentCoupling);
+    if (growth === 0) {
+      continue;
+    }
+    findings.push({
+      ruleId: "efferent-growth",
+      paths: [`services/${current.service}/`],
+      characteristic: "coupling",
+      penalty: growth * EFFERENT_GROWTH_PENALTY,
+      signal: `dependency-cruiser:efferent-growth:${current.service}:${prior.efferentCoupling}->${current.efferentCoupling}`,
+      service: current.service,
+    });
+  }
   return findings;
 }
 
@@ -251,65 +396,6 @@ function weightedOverall(
   );
 }
 
-function serviceSrcFolder(service: string): string {
-  return `services/${service}/src`;
-}
-
-const LAYER_FOLDERS = ["domain", "infrastructure", "transport"] as const;
-
-export function folderInstabilityForService(
-  metrics: FolderMetric[],
-  service: string,
-): number | undefined {
-  const normalised = metrics.map((item) => ({
-    ...item,
-    folder: item.folder.replace(/\\/g, "/").replace(/\/$/, ""),
-  }));
-  const layers = LAYER_FOLDERS.map((layer) =>
-    normalised.find(
-      (item) => item.folder === `${serviceSrcFolder(service)}/${layer}`,
-    ),
-  ).filter((item): item is FolderMetric => item !== undefined);
-  if (layers.length > 0) {
-    return (
-      layers.reduce((sum, item) => sum + item.instability, 0) / layers.length
-    );
-  }
-  const prefix = `services/${service}/`;
-  const coupled = normalised.filter(
-    (item) =>
-      item.folder.startsWith(prefix) &&
-      item.afferentCoupling + item.efferentCoupling > 0,
-  );
-  if (coupled.length === 0) {
-    return undefined;
-  }
-  return (
-    coupled.reduce((sum, item) => sum + item.instability, 0) / coupled.length
-  );
-}
-
-function instabilityPenalty(
-  payload: AnalysisPayload,
-  service: string,
-): { penalty: number; signal: string } | undefined {
-  const instability = folderInstabilityForService(
-    payload.dependencyCruiser.folderMetrics,
-    service,
-  );
-  if (instability === undefined) {
-    return undefined;
-  }
-  const penalty = Math.round(instability * INSTABILITY_SCALE);
-  if (penalty <= 0) {
-    return undefined;
-  }
-  return {
-    penalty,
-    signal: `dependency-cruiser:instability:${service}:${instability}`,
-  };
-}
-
 function meanScore(scores: number[]): number {
   if (scores.length === 0) {
     return 100;
@@ -338,23 +424,6 @@ export function score(
           ? finding.characteristic
           : undefined,
     );
-    const instability = instabilityPenalty(payload, service);
-    if (instability !== undefined) {
-      const decision = matchingDecision(
-        {
-          ruleId: "instability",
-          paths: [serviceSrcFolder(service)],
-          service,
-        },
-        decisions,
-      );
-      if (decision !== undefined) {
-        buckets.coupling.suppressedBy.push(decision.id);
-      } else {
-        buckets.coupling.penalty += instability.penalty;
-        buckets.coupling.signalsUsed.push(instability.signal);
-      }
-    }
     const characteristics = SERVICE_CHARACTERISTIC_ORDER.map((id) =>
       toCharacteristic(id, buckets[id]),
     );

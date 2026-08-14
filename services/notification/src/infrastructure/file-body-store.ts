@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, normalize, sep } from "node:path";
-import type { BodyStore } from "../domain/body-store.js";
+import type { BodyStore } from "../domain/ports/body-store.js";
 
 function resolveRef(root: string, bodyRef: string): string {
   const relative = bodyRef.split("/").filter((part) => part.length > 0 && part !== "..");

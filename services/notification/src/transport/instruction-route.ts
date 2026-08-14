@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { BodyNotFoundError } from "../domain/body-not-found.js";
 import type { DeliverResult } from "../domain/deliver.js";
-import type { Logger } from "../domain/logger.js";
+import type { Logger } from "../domain/ports/logger.js";
 import {
   parseSendInstruction,
   type SendInstruction,

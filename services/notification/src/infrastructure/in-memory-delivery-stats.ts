@@ -1,7 +1,7 @@
 import type {
   DeliveryStats,
   DeliveryStatsSource,
-} from "../domain/delivery-stats.js";
+} from "../domain/ports/delivery-stats.js";
 
 export class InMemoryDeliveryStats implements DeliveryStatsSource {
   private delivered = 0;

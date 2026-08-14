@@ -10,11 +10,45 @@ from health_agent.models import (
     ScoreResult,
 )
 
+KNOWN_RULE_IDS = [f"rule-{n}" for n in range(1, 10)]
+
+LAYER_PROFILES = {
+    "transport": {
+        "expected": "highly-unstable",
+        "meaning": (
+            "Depends on domain; nothing should depend on it. "
+            "Low I means something depends on transport. "
+            "A transport folder at 0.78 is healthy. Never recommend reducing it."
+        ),
+    },
+    "domain": {
+        "expected": "stable",
+        "meaning": (
+            "Things depend on it; it depends on little. Rising I is drift."
+        ),
+    },
+    "infrastructure": {
+        "expected": "unstable",
+        "meaning": (
+            "Implements ports; depended upon only through them."
+        ),
+    },
+}
+
 
 def metrics_from_payload(payload: AnalysisPayload) -> RunMetrics:
     counts = Counter(
         clone.classification or "internal" for clone in payload.duplication.clones
     )
+    internal_by_service: dict[str, int] = {}
+    for clone in payload.duplication.clones:
+        classification = clone.classification or "internal"
+        if classification != "internal":
+            continue
+        service = clone.services[0] if clone.services else None
+        if service is None:
+            continue
+        internal_by_service[service] = internal_by_service.get(service, 0) + 1
     layers: dict[str, list[float]] = {}
     for metric in payload.dependencyCruiser.folderMetrics:
         folder = metric.folder.replace("\\", "/")
@@ -38,7 +72,9 @@ def metrics_from_payload(payload: AnalysisPayload) -> RunMetrics:
             internal=counts.get("internal", 0),
             crossService=counts.get("cross-service", 0),
             shared=counts.get("shared", 0),
+            internalByService=internal_by_service,
         ),
+        serviceCoupling=list(payload.dependencyCruiser.serviceMetrics),
     )
 
 
@@ -49,6 +85,30 @@ def predecessors(prior_reads: list[HealthRead], current_sha: str) -> list[Health
             break
         found.append(read)
     return found
+
+
+def last_predecessor_metrics(
+    prior_reads: list[HealthRead], current_sha: str
+) -> RunMetrics | None:
+    for read in reversed(predecessors(prior_reads, current_sha)):
+        if read.metrics is not None:
+            return read.metrics
+    return None
+
+
+def enrich_payload_with_priors(
+    payload: AnalysisPayload,
+    prior_reads: list[HealthRead],
+) -> AnalysisPayload:
+    metrics = last_predecessor_metrics(prior_reads, payload.commitSha)
+    if metrics is None:
+        return payload
+    updates: dict[str, object] = {
+        "priorDuplicationCounts": metrics.duplicationCounts,
+    }
+    if metrics.serviceCoupling:
+        updates["priorServiceMetrics"] = metrics.serviceCoupling
+    return payload.model_copy(update=updates)
 
 
 def prior_metrics_series(
@@ -69,9 +129,17 @@ def prior_metrics_series(
                 "duplicationCounts": read.metrics.duplicationCounts.model_dump(),
                 "orphanCount": read.metrics.orphanCount,
                 "cycleCount": read.metrics.cycleCount,
+                "serviceCoupling": [
+                    item.model_dump() for item in read.metrics.serviceCoupling
+                ],
             }
         )
     return series[-limit:]
+
+
+def active_rule_ids(payload: AnalysisPayload) -> list[str]:
+    found = [item.ruleId for item in payload.archTests]
+    return found if found else list(KNOWN_RULE_IDS)
 
 
 def build_facts(
@@ -117,6 +185,8 @@ def build_facts(
             for item in payload.archTests
             if not item.passed
         ],
+        "activeRules": active_rule_ids(payload),
+        "layerProfiles": LAYER_PROFILES,
         "commitMessage": payload.commitMessage,
         "ruleSetVersion": payload.ruleSetVersion,
         "changedFiles": list(payload.changedFiles),
@@ -137,6 +207,9 @@ def build_facts(
             "dependencies": payload.dependencyCruiser.metrics.dependencies,
             "folderMetrics": [
                 item.model_dump() for item in payload.dependencyCruiser.folderMetrics
+            ],
+            "serviceMetrics": [
+                item.model_dump() for item in payload.dependencyCruiser.serviceMetrics
             ],
         },
         "priorMetrics": prior_metrics_series(priors, payload.commitSha),

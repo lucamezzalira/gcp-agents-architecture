@@ -1,4 +1,4 @@
-import type { BodyStore } from "../domain/body-store.js";
+import type { BodyStore } from "../domain/ports/body-store.js";
 
 export class InMemoryBodyStore implements BodyStore {
   private readonly objects = new Map<string, string>();

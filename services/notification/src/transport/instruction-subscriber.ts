@@ -1,6 +1,6 @@
 import { PubSub, type Message } from "@google-cloud/pubsub";
 import { BodyNotFoundError } from "../domain/body-not-found.js";
-import type { Logger } from "../domain/logger.js";
+import type { Logger } from "../domain/ports/logger.js";
 import { parseSendInstruction } from "../domain/send-instruction.js";
 import type { InstructionHandler } from "./instruction-route.js";
 

@@ -1,12 +1,9 @@
-export type DeliveryStats = {
-  delivered: number;
-  failed: number;
-  averageAttempts: number;
-};
+import type {
+  DeliveryStats,
+  DeliveryStatsSource,
+} from "./ports/delivery-stats.js";
 
-export type DeliveryStatsSource = {
-  readStats(): Promise<DeliveryStats>;
-};
+export type { DeliveryStats, DeliveryStatsSource };
 
 export async function getDeliveryStats(
   source: DeliveryStatsSource,

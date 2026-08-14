@@ -1,5 +1,17 @@
-from health_agent.models import AnalysisPayload, HealthRead, RunMetrics, ScoreResult
-from health_agent.reasoner_facts import build_facts, metrics_from_payload
+from health_agent.adk_agent import INSTRUCTION
+from health_agent.models import (
+    AnalysisPayload,
+    HealthRead,
+    RunMetrics,
+    ScoreResult,
+    ServiceCouplingMetric,
+)
+from health_agent.reasoner_facts import (
+    LAYER_PROFILES,
+    build_facts,
+    enrich_payload_with_priors,
+    metrics_from_payload,
+)
 
 
 def _payload(**overrides: object) -> AnalysisPayload:
@@ -10,7 +22,7 @@ def _payload(**overrides: object) -> AnalysisPayload:
         "timestamp": "2026-01-01T00:00:00.000Z",
         "archTests": [
             {"ruleId": f"rule-{n}", "passed": True, "violations": []}
-            for n in range(1, 6)
+            for n in range(1, 10)
         ],
         "dependencyCruiser": {
             "cycles": [],
@@ -138,3 +150,85 @@ def test_changed_files_are_in_the_facts() -> None:
         "services/notification/src/domain/get-delivery-stats.ts",
         "services/notification/src/transport/metrics-route.ts",
     ]
+
+
+def test_facts_include_layer_profiles_and_active_rules() -> None:
+    payload = _payload()
+    scores = ScoreResult.model_validate(
+        {
+            "overall": 100,
+            "characteristics": [
+                {"id": "coupling", "score": 100, "signalsUsed": []}
+            ],
+        }
+    )
+    facts = build_facts(payload, scores, [])
+    profiles = facts["layerProfiles"]
+    assert profiles == LAYER_PROFILES
+    assert profiles["transport"]["expected"] == "highly-unstable"
+    assert profiles["domain"]["expected"] == "stable"
+    assert profiles["infrastructure"]["expected"] == "unstable"
+    assert "0.78" in profiles["transport"]["meaning"]
+    active = facts["activeRules"]
+    assert isinstance(active, list)
+    assert "rule-5" in active
+    assert "rule-9" in active
+
+
+def test_metrics_from_payload_stores_service_coupling() -> None:
+    payload = _payload(
+        dependencyCruiser={
+            "cycles": [],
+            "orphans": [],
+            "violations": [],
+            "metrics": {"modules": 40, "dependencies": 90},
+            "serviceMetrics": [
+                {
+                    "service": "checkout",
+                    "afferentCoupling": 1,
+                    "efferentCoupling": 4,
+                },
+                {
+                    "service": "notification",
+                    "afferentCoupling": 6,
+                    "efferentCoupling": 2,
+                },
+            ],
+        }
+    )
+    metrics = metrics_from_payload(payload)
+    assert [item.service for item in metrics.serviceCoupling] == [
+        "checkout",
+        "notification",
+    ]
+    assert metrics.serviceCoupling[1].afferentCoupling == 6
+    assert metrics.serviceCoupling[1].efferentCoupling == 2
+
+
+def test_enrich_payload_copies_predecessor_coupling() -> None:
+    payload = _payload(commitSha="current-sha")
+    prior = _read("sha-0", modules=30, dependencies=50)
+    assert prior.metrics is not None
+    prior.metrics.serviceCoupling = [
+        ServiceCouplingMetric(
+            service="notification", afferentCoupling=4, efferentCoupling=3
+        )
+    ]
+    enriched = enrich_payload_with_priors(payload, [prior])
+    assert len(enriched.priorServiceMetrics) == 1
+    assert enriched.priorServiceMetrics[0].service == "notification"
+    assert enriched.priorServiceMetrics[0].efferentCoupling == 3
+    assert enriched.priorDuplicationCounts is not None
+
+
+def test_instruction_covers_efferent_growth_and_existing_rules() -> None:
+    text = INSTRUCTION.lower()
+    assert "efferent" in text
+    assert "instability" in text
+    assert "transport" in text
+    assert "0.78" in INSTRUCTION
+    assert "highly unstable" in text
+    assert "already present" in text
+    assert "activeRules" in INSTRUCTION or "activerules" in text
+    assert "never recommend reducing" in text
+

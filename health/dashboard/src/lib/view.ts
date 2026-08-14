@@ -66,6 +66,46 @@ export function displayedOverall(
   );
 }
 
+export function trendScores(
+  runs: HealthRun[],
+  service?: string,
+): number[] {
+  return runs.map((run) => displayedOverall(run, service));
+}
+
+export const TREND_CHART = {
+  width: 640,
+  height: 180,
+  baselineY: 168,
+} as const;
+
+export function trendArea(
+  points: ChartPoint[],
+  baselineY = TREND_CHART.baselineY,
+): string {
+  if (points.length === 0) {
+    return "";
+  }
+  const line = polyline(points);
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (first === undefined || last === undefined) {
+    return "";
+  }
+  return `${first.x},${baselineY} ${line} ${last.x},${baselineY}`;
+}
+
+export function trendHeading(service?: string): string {
+  return service === undefined
+    ? "Trend across commits"
+    : `Trend across commits · ${service}`;
+}
+
+export function trendCaption(service?: string): string {
+  const scope = service === undefined ? "Platform overall" : `${service} overall`;
+  return `${scope}. Vertical marks are rule-set version changes. Scores on either side are not directly comparable. Default list is current runs only.`;
+}
+
 export function displayedCharacteristics(
   run: HealthRun,
   service?: string,
@@ -94,6 +134,17 @@ export function hundredNote(item: {
 
 export function shortSha(sha: string): string {
   return sha.slice(0, 7);
+}
+
+export function shaTail(sha: string, length = 10): string {
+  if (sha.length <= length) {
+    return sha;
+  }
+  return sha.slice(-length);
+}
+
+export function commitUrl(sha: string): string {
+  return `https://github.com/lucamezzalira/gcp-agents-architecture/commit/${sha}`;
 }
 
 export type ScoreTone = "ok" | "mid" | "drop";
@@ -193,6 +244,12 @@ export function trendPoints(
 
 export function polyline(points: ChartPoint[]): string {
   return points.map((point) => `${point.x},${point.y}`).join(" ");
+}
+
+export function legendScoreLine(run: HealthRun, service?: string): string {
+  const score = displayedOverall(run, service);
+  const superseded = run.state === "superseded" ? " · superseded" : "";
+  return `${shortSha(run.commitSha)} · ${score}${superseded} · v${ruleSetVersionOf(run)}`;
 }
 
 export function ringOffset(score: number, radius: number): number {

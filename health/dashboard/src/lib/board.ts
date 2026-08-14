@@ -1,18 +1,28 @@
 import type { CharacteristicRead, HealthRun } from "./types.js";
 import {
+  commitUrl,
   displayName,
   displayedCharacteristics,
   displayedOverall,
   easeOutCubic,
   hundredNote,
   improvementCopy,
+  legendScoreLine,
   lerp,
+  polyline,
   ringOffset,
   ruleSetVersionOf,
   scoreTone,
   selectRun,
+  shaTail,
   shortSha,
   toneColor,
+  TREND_CHART,
+  trendArea,
+  trendCaption,
+  trendHeading,
+  trendPoints,
+  trendScores,
 } from "./view.js";
 
 const RADIUS = 58;
@@ -89,17 +99,99 @@ function serviceOverall(run: HealthRun, name: string): string {
   return found === undefined ? "n/a" : String(found.overall);
 }
 
-export function paintCopy(run: HealthRun, service?: string): void {
+function paintTrend(runs: HealthRun[], service?: string): void {
+  const heading = document.querySelector("[data-trend-heading]");
+  if (heading) {
+    heading.textContent = trendHeading(service);
+  }
+  const caption = document.querySelector("[data-trend-caption]");
+  if (caption) {
+    caption.textContent = trendCaption(service);
+  }
+  const title = document.querySelector("[data-trend-title]");
+  if (title) {
+    title.textContent =
+      service === undefined
+        ? "Platform overall across commits. Click a point to inspect that run."
+        : `${service} overall across commits. Click a point to inspect that run.`;
+  }
+  const scores = trendScores(runs, service);
+  const points = trendPoints(scores, TREND_CHART.width, TREND_CHART.height);
+  const line = polyline(points);
+  const area = trendArea(points);
+  const lineNode = document.querySelector("[data-trend-line]");
+  if (lineNode instanceof SVGPolylineElement) {
+    lineNode.setAttribute("points", line);
+  }
+  const areaNode = document.querySelector("[data-trend-area]");
+  if (areaNode instanceof SVGPolygonElement) {
+    areaNode.setAttribute("points", area);
+  }
+  runs.forEach((run, index) => {
+    const point = points[index];
+    const score = scores[index];
+    if (point === undefined || score === undefined) {
+      return;
+    }
+    const tone = scoreTone(score);
+    const scope = service ?? "platform";
+    document.querySelectorAll(`[data-run="${run.runId}"]`).forEach((node) => {
+      const hit = node.querySelector(".hit");
+      const dot = node.querySelector(".dot");
+      if (hit instanceof SVGCircleElement) {
+        hit.setAttribute("cx", String(point.x));
+        hit.setAttribute("cy", String(point.y));
+      }
+      if (dot instanceof SVGCircleElement) {
+        dot.setAttribute("cx", String(point.x));
+        dot.setAttribute("cy", String(point.y));
+        dot.setAttribute("class", `dot ${tone}`);
+      }
+      if (node.getAttribute("role") === "button") {
+        node.setAttribute(
+          "aria-label",
+          `Inspect ${shortSha(run.commitSha)}, ${scope} ${score}`,
+        );
+      }
+      if (node instanceof HTMLButtonElement) {
+        node.classList.remove("ok-label", "mid-label", "drop-label");
+        node.classList.add(`${tone}-label`);
+        const legend = node.querySelector("[data-legend-score]");
+        if (legend) {
+          legend.textContent = legendScoreLine(run, service);
+        }
+      }
+    });
+  });
+}
+
+export function paintCopy(
+  run: HealthRun,
+  service?: string,
+  runs: HealthRun[] = [],
+): void {
   const commit = document.querySelector("[data-commit]");
-  if (commit) commit.textContent = shortSha(run.commitSha);
+  if (commit instanceof HTMLAnchorElement) {
+    commit.textContent = shaTail(run.commitSha);
+    commit.href = commitUrl(run.commitSha);
+  } else if (commit) {
+    commit.textContent = shaTail(run.commitSha);
+  }
   const message = document.querySelector("[data-message]");
   if (message) message.textContent = run.commitMessage;
   const runId = document.querySelector("[data-run-id]");
-  if (runId) runId.textContent = run.runId;
+  if (runId instanceof HTMLElement) {
+    runId.textContent = run.runId;
+    runId.title = run.runId;
+  }
   const reasoner = document.querySelector("[data-reasoner]");
   if (reasoner) reasoner.textContent = run.reasoner ?? "unknown";
   const traceId = document.querySelector("[data-trace-id]");
-  if (traceId) traceId.textContent = run.traceId ?? "none";
+  if (traceId instanceof HTMLElement) {
+    const value = run.traceId ?? "none";
+    traceId.textContent = value;
+    traceId.title = value;
+  }
   const ruleSet = document.querySelector("[data-rule-set]");
   if (ruleSet) ruleSet.textContent = `v${ruleSetVersionOf(run)}`;
   const state = document.querySelector("[data-state]");
@@ -109,7 +201,17 @@ export function paintCopy(run: HealthRun, service?: string): void {
     caption.textContent =
       service === undefined
         ? "Platform overall · click a commit on the trend to compare"
-        : `${service} overall · click platform to return`;
+        : `${service} overall · click Overall to return`;
+  }
+  document.querySelectorAll("[data-platform-overall]").forEach((node) => {
+    node.textContent = String(run.overall);
+  });
+  const platformChip = document.querySelector("[data-platform]");
+  if (platformChip instanceof HTMLElement) {
+    const onPlatform = service === undefined;
+    platformChip.classList.toggle("is-selected", onPlatform);
+    platformChip.classList.toggle("is-return", !onPlatform);
+    platformChip.setAttribute("aria-pressed", onPlatform ? "true" : "false");
   }
   const checkoutOverall = document.querySelector("[data-checkout-overall]");
   if (checkoutOverall) checkoutOverall.textContent = serviceOverall(run, "checkout");
@@ -144,6 +246,10 @@ export function paintCopy(run: HealthRun, service?: string): void {
       dot.setAttribute("r", selected ? "7" : "5");
     }
   });
+
+  if (runs.length > 0) {
+    paintTrend(runs, service);
+  }
 }
 
 export function mountBoard(runs: HealthRun[]): void {
@@ -208,7 +314,7 @@ export function mountBoard(runs: HealthRun[]): void {
   };
 
   if (initial !== undefined) {
-    paintCopy(initial, service);
+    paintCopy(initial, service, runs);
     applyOverall(displayedOverall(initial, service));
   }
 
@@ -218,7 +324,7 @@ export function mountBoard(runs: HealthRun[]): void {
       return;
     }
     currentRunId = run.runId;
-    paintCopy(run, service);
+    paintCopy(run, service, runs);
     tweenOverall(displayedOverall(run, service));
     writeUrl(run, service);
   };
@@ -229,7 +335,7 @@ export function mountBoard(runs: HealthRun[]): void {
       return;
     }
     service = nextService;
-    paintCopy(run, service);
+    paintCopy(run, service, runs);
     tweenOverall(displayedOverall(run, service));
     writeUrl(run, service);
   };
@@ -263,4 +369,24 @@ export function mountBoard(runs: HealthRun[]): void {
       activateService(name.length === 0 ? undefined : name);
     });
   });
+
+  const rulesModal = document.querySelector("[data-rules-modal]");
+  const rulesOpen = document.querySelector("[data-rules-open]");
+  const rulesClose = document.querySelector("[data-rules-close]");
+  if (
+    rulesModal instanceof HTMLDialogElement &&
+    rulesOpen instanceof HTMLElement
+  ) {
+    rulesOpen.addEventListener("click", () => {
+      rulesModal.showModal();
+    });
+    rulesClose?.addEventListener("click", () => {
+      rulesModal.close();
+    });
+    rulesModal.addEventListener("click", (event) => {
+      if (event.target === rulesModal) {
+        rulesModal.close();
+      }
+    });
+  }
 }

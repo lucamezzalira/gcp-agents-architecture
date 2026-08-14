@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import { createPostgresStore } from "../lib/postgres";
 import {
   buildDashboardModel,
+  commitUrl,
   displayName,
   displayedCharacteristics,
   displayedOverall,
@@ -13,10 +14,21 @@ import {
   ruleSetMarkers,
   ruleSetVersionOf,
   scoreTone,
+  shaTail,
   shortSha,
   toneColor,
+  trendArea,
+  trendCaption,
+  trendHeading,
   trendPoints,
+  trendScores,
 } from "../lib/view";
+import {
+  ARCH_RULES,
+  METRIC_SIGNALS,
+  RULE_COUNT,
+  scoringLine,
+} from "../lib/rules";
 
 const store = createPostgresStore();
 const includeSuperseded = Astro.url.searchParams.get("history") === "all";
@@ -35,17 +47,10 @@ const characteristics =
     : displayedCharacteristics(selected, selectedService);
 const chartW = 640;
 const chartH = 180;
-const plotted = trendPoints(
-  model.runs.map((run) => run.overall),
-  chartW,
-  chartH,
-);
+const plotted = trendPoints(trendScores(model.runs, selectedService), chartW, chartH);
 const versionMarks = ruleSetMarkers(model.runs, plotted);
 const line = polyline(plotted);
-const area =
-  plotted.length === 0
-    ? ""
-    : `${plotted[0]?.x},168 ${line} ${plotted[plotted.length - 1]?.x},168`;
+const area = trendArea(plotted);
 const radius = 58;
 const circumference = 2 * Math.PI * radius;
 const payload = JSON.stringify(model.runs);
@@ -70,6 +75,29 @@ const historyHref = includeSuperseded
         <span>Health system</span>
         <h1>Architecture score</h1>
       </div>
+      {
+        selected !== undefined && (
+          <div class="top-actions">
+            <button
+              type="button"
+              class:list={[
+                "scope-chip",
+                selectedService === undefined ? "is-selected" : "is-return",
+              ]}
+              data-service=""
+              data-platform
+              aria-pressed={selectedService === undefined}
+            >
+              <span>Overall</span>
+              <strong data-platform-overall>{selected.overall}</strong>
+            </button>
+            <button type="button" class="scope-chip" data-rules-open>
+              <span>Rules</span>
+              <strong>{RULE_COUNT}</strong>
+            </button>
+          </div>
+        )
+      }
     </header>
 
     {
@@ -112,15 +140,21 @@ const historyHref = includeSuperseded
               {
                 selectedService === undefined
                   ? "Platform overall · click a commit on the trend to compare"
-                  : `${selectedService} overall · click platform to return`
+                  : `${selectedService} overall · click Overall to return`
               }
             </p>
           </div>
-          <div class="panel">
+          <div class="panel meta-panel">
             <div class="meta-grid">
               <div>
                 <span>Commit</span>
-                <p class="sha" data-commit>{shortSha(selected.commitSha)}</p>
+                <a
+                  class="sha"
+                  data-commit
+                  href={commitUrl(selected.commitSha)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >{shaTail(selected.commitSha)}</a>
               </div>
               <div>
                 <span>Overall</span>
@@ -132,7 +166,7 @@ const historyHref = includeSuperseded
               </div>
               <div>
                 <span>Run</span>
-                <p class="sha" data-run-id>{selected.runId}</p>
+                <p class="sha truncate" data-run-id title={selected.runId}>{selected.runId}</p>
               </div>
               <div>
                 <span>Reasoner</span>
@@ -140,7 +174,11 @@ const historyHref = includeSuperseded
               </div>
               <div>
                 <span>Trace</span>
-                <p class="sha" data-trace-id>{selected.traceId ?? "none"}</p>
+                <p
+                  class="sha truncate"
+                  data-trace-id
+                  title={selected.traceId ?? "none"}
+                >{selected.traceId ?? "none"}</p>
               </div>
               <div>
                 <span>Rule set</span>
@@ -165,6 +203,17 @@ const historyHref = includeSuperseded
             subscriber allowed to talk to the email provider.
           </p>
           <div class="service-map" data-service-map>
+            <a
+              class:list={[
+                "svc",
+                selectedService === undefined ? "is-selected" : "",
+              ]}
+              href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}${includeSuperseded ? "&history=all" : ""}`}
+              data-service=""
+            >
+              platform
+              <strong data-platform-overall>{selected.overall}</strong>
+            </a>
             <a
               class:list={[
                 "svc",
@@ -193,30 +242,19 @@ const historyHref = includeSuperseded
               </strong>
             </a>
           </div>
-          <a
-            class:list={[
-              "platform-link",
-              selectedService === undefined ? "is-selected" : "",
-            ]}
-            href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}${includeSuperseded ? "&history=all" : ""}`}
-            data-service=""
-          >
-            Platform view
-          </a>
         </section>
       )
     }
 
     <section class="panel trend">
-      <h2>Trend across commits</h2>
+      <h2 data-trend-heading>{trendHeading(selectedService)}</h2>
       {
         model.runs.length === 0 ? (
           <p>No history yet.</p>
         ) : (
           <>
-            <p class="signals">
-              Vertical marks are rule-set version changes. Scores on either side
-              are not directly comparable. Default list is current runs only.
+            <p class="signals" data-trend-caption>
+              {trendCaption(selectedService)}
             </p>
             <p class="history-toggle">
               <a href={historyHref}>
@@ -226,7 +264,13 @@ const historyHref = includeSuperseded
               </a>
             </p>
             <svg class="chart" viewBox={`0 0 ${chartW} ${chartH}`} role="img">
-              <title>Overall score across replayed commits. Click a point to inspect that run.</title>
+              <title data-trend-title>
+                {
+                  selectedService === undefined
+                    ? "Platform overall across commits. Click a point to inspect that run."
+                    : `${selectedService} overall across commits. Click a point to inspect that run.`
+                }
+              </title>
               <defs>
                 <linearGradient id="trendFill" x1="0" x2="0" y1="0" y2="1">
                   <stop offset="0%" stop-color="#4ade80" stop-opacity="0.28" />
@@ -246,8 +290,8 @@ const historyHref = includeSuperseded
                   </g>
                 ))
               }
-              <polygon class="area" points={area} />
-              <polyline class="line" points={line} />
+              <polygon class="area" data-trend-area points={area} />
+              <polyline class="line" data-trend-line points={line} />
               {plotted.map((point, index) => {
                 const run = model.runs[index];
                 if (run === undefined) {
@@ -260,7 +304,7 @@ const historyHref = includeSuperseded
                     class={selectedDot ? "is-selected" : ""}
                     role="button"
                     tabindex="0"
-                    aria-label={`Inspect ${shortSha(run.commitSha)}, overall ${run.overall}`}
+                    aria-label={`Inspect ${shortSha(run.commitSha)}, ${selectedService ?? "platform"} ${point.score}`}
                     aria-pressed={selectedDot ? "true" : "false"}
                   >
                     <circle class="hit" cx={point.x} cy={point.y} r="18" />
@@ -275,24 +319,27 @@ const historyHref = includeSuperseded
               })}
             </svg>
             <div class="legend">
-              {model.runs.map((run) => (
+              {model.runs.map((run) => {
+                const score = displayedOverall(run, selectedService);
+                return (
                 <button
                   type="button"
                   data-run={run.runId}
                   class:list={[
-                    `${scoreTone(run.overall)}-label`,
+                    `${scoreTone(score)}-label`,
                     run.runId === selected?.runId ? "is-selected" : "",
                   ]}
                   aria-pressed={run.runId === selected?.runId}
                 >
-                  <div class="sha">
-                    {shortSha(run.commitSha)} · {run.overall}
+                  <div class="sha" data-legend-score>
+                    {shortSha(run.commitSha)} · {score}
                     {run.state === "superseded" ? " · superseded" : ""}
                     {` · v${ruleSetVersionOf(run)}`}
                   </div>
                   <p>{run.commitMessage}</p>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </>
         )
@@ -347,6 +394,44 @@ const historyHref = includeSuperseded
       )
     }
   </main>
+
+  <dialog class="rules-modal" data-rules-modal aria-labelledby="rules-modal-title">
+    <div class="rules-modal-inner">
+      <header>
+        <h2 id="rules-modal-title">Architecture rules</h2>
+        <button type="button" class="rules-close" data-rules-close>
+          Close
+        </button>
+      </header>
+      <p class="rules-lead">
+        Each characteristic starts at 100. A finding subtracts its penalty,
+        floored at 0. The service that committed the import takes the hit.
+        Rules 3, 4, 5 and 7 also move platform cross-service-integrity.
+      </p>
+      <ol class="rule-list">
+        {ARCH_RULES.map((rule) => (
+          <li>
+            <div class="rule-head">
+              <span class="rule-id">{rule.id}</span>
+              <strong>{rule.title}</strong>
+            </div>
+            <p>{rule.description}</p>
+            <p class="rule-score">{scoringLine(rule)}</p>
+          </li>
+        ))}
+      </ol>
+      <h3>Other signals</h3>
+      <ul class="metric-list">
+        {METRIC_SIGNALS.map((item) => (
+          <li>
+            <strong>{item.description}.</strong>
+            {" "}
+            Scores on {item.characteristic}. Penalty {item.penalty}.
+          </li>
+        ))}
+      </ul>
+    </div>
+  </dialog>
 
   <script id="runs-data" type="application/json" set:html={payload} />
   <script>

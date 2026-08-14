@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from health_agent.persist import connect, insert_health_read, migrate
+from health_agent.persist import connect, insert_health_read, load_recent_reads, migrate
 from health_agent.run import produce_health_read
 from health_agent.score_bridge import repo_root
 
@@ -54,7 +54,10 @@ def replay() -> None:
                 payload_path = tmp_path / f"{sha}.json"
                 collect_payload(root, worktree, payload_path)
                 payload = json.loads(payload_path.read_text())
-                read = produce_health_read(payload_path)
+                prior_reads = load_recent_reads(conn)
+                read = produce_health_read(
+                    payload_path, prior_reads=prior_reads
+                )
                 insert_health_read(conn, read, str(payload.get("commitMessage", "")))
             finally:
                 subprocess.run(

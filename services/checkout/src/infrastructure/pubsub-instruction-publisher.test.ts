@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SendInstruction } from "../domain/send-instruction.js";
+import type { SendInstruction } from "../domain/ports/instruction-publisher.js";
 import { PubSubInstructionPublisher } from "./pubsub-instruction-publisher.js";
 
 const instruction: SendInstruction = {

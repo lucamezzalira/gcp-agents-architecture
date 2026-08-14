@@ -64,7 +64,8 @@ export const CYCLE_PENALTY = 15;
 export const ORPHAN_PENALTY = 5;
 export const UNRESOLVABLE_PENALTY = 10;
 export const DEP_ON_TEST_PENALTY = 10;
-export const INSTABILITY_SCALE = 40;
+/** Penalty per extra outgoing edge vs the prior run. Decrease is not scored. */
+export const EFFERENT_GROWTH_PENALTY = 10;
 export const INTERNAL_CLONE_PENALTY = 8;
 export const CROSS_SERVICE_CLONE_PENALTY = 10;
 export const SHARED_CLONE_PENALTY = 8;

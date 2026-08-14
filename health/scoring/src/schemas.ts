@@ -20,6 +20,12 @@ export const folderMetricSchema = z.object({
   moduleCount: z.number().optional(),
 });
 
+export const serviceMetricSchema = z.object({
+  service: z.string(),
+  afferentCoupling: z.number(),
+  efferentCoupling: z.number(),
+});
+
 export const dependencyCruiserSchema = z.object({
   cycles: z.array(z.object({ path: z.array(z.string()) })),
   orphans: z.array(z.string()),
@@ -35,6 +41,7 @@ export const dependencyCruiserSchema = z.object({
     dependencies: z.number(),
   }),
   folderMetrics: z.array(folderMetricSchema).default([]),
+  serviceMetrics: z.array(serviceMetricSchema).default([]),
 });
 
 export const cloneClassificationSchema = z.enum([
@@ -67,18 +74,24 @@ export const runtimeSchema = z.object({
   ),
 });
 
+export const duplicationCountsSchema = z.object({
+  internal: z.number(),
+  crossService: z.number(),
+  shared: z.number(),
+  internalByService: z.record(z.string(), z.number()).default({}),
+});
+
 export const priorMetricsEntrySchema = z.object({
   commitSha: z.string(),
   modules: z.number(),
   dependencies: z.number(),
   folderInstability: z.record(z.string(), z.number()).default({}),
-  duplicationCounts: z
-    .object({
-      internal: z.number(),
-      crossService: z.number(),
-      shared: z.number(),
-    })
-    .default({ internal: 0, crossService: 0, shared: 0 }),
+  duplicationCounts: duplicationCountsSchema.default({
+    internal: 0,
+    crossService: 0,
+    shared: 0,
+    internalByService: {},
+  }),
   orphanCount: z.number(),
   cycleCount: z.number(),
 });
@@ -98,6 +111,8 @@ export const analysisPayloadSchema = z.object({
     .default([]),
   changedFiles: z.array(z.string()).default([]),
   priorMetrics: z.array(priorMetricsEntrySchema).default([]),
+  priorServiceMetrics: z.array(serviceMetricSchema).default([]),
+  priorDuplicationCounts: duplicationCountsSchema.optional(),
   ruleSetVersion: z.number().int().default(1),
 });
 

@@ -2,7 +2,7 @@ import type {
   CorrelatedLogger,
   LogFields,
   Logger,
-} from "../domain/logger.js";
+} from "../domain/ports/logger.js";
 
 export type LogWriter = (line: string) => void;
 

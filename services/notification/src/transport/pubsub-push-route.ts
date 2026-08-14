@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { Logger } from "../domain/logger.js";
+import type { Logger } from "../domain/ports/logger.js";
 import { processInstructionMessage } from "./instruction-subscriber.js";
 import type { InstructionHandler } from "./instruction-route.js";
 

@@ -4,8 +4,8 @@ import { InMemoryDeliveryStore } from "../infrastructure/in-memory-delivery-stor
 import { InMemoryEmailProvider } from "../infrastructure/in-memory-email-provider.js";
 import { BodyNotFoundError } from "./body-not-found.js";
 import { deliver } from "./deliver.js";
-import type { EmailMessage, EmailProvider } from "./email-provider.js";
-import { silentLogger } from "./logger.js";
+import type { EmailMessage, EmailProvider } from "./ports/email-provider.js";
+import { silentLogger } from "./ports/logger.js";
 import type { SendInstruction } from "./send-instruction.js";
 
 const instruction: SendInstruction = {

@@ -165,15 +165,167 @@ describe("score", () => {
     ).toBeUndefined();
   });
 
-  it("moves coupling when folder instability changes without a cycle", () => {
+  it("does not move coupling when folder instability changes", () => {
     const quieter = score(withGraph(zeroFindings, { checkout: 0.2, notification: 0.2 }), []);
     const noisier = score(withGraph(zeroFindings, { checkout: 0.6, notification: 0.2 }), []);
-    expect(quieter.services.find((item) => item.service === "checkout")?.characteristics.find((item) => item.id === "coupling")?.score).toBe(92);
-    expect(noisier.services.find((item) => item.service === "checkout")?.characteristics.find((item) => item.id === "coupling")?.score).toBe(76);
-    expect(characteristic(noisier, "coupling").score).not.toBe(
+    expect(serviceChar(quieter, "checkout", "coupling").score).toBe(100);
+    expect(serviceChar(noisier, "checkout", "coupling").score).toBe(100);
+    expect(characteristic(noisier, "coupling").score).toBe(
       characteristic(quieter, "coupling").score,
     );
-    expect(noisier.overall).not.toBe(quieter.overall);
+    expect(noisier.overall).toBe(quieter.overall);
+  });
+
+  it("penalises checkout coupling for Ce growth and ignores a Ca rise on notification", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      archTests: [
+        {
+          ruleId: "rule-5",
+          passed: false,
+          violations: [
+            {
+              file: "services/checkout/src/domain/mark-paid.ts",
+              detail: "imports notification internals",
+              service: "checkout",
+            },
+          ],
+        },
+      ],
+      dependencyCruiser: {
+        ...zeroFindings.dependencyCruiser,
+        serviceMetrics: [
+          { service: "checkout", afferentCoupling: 0, efferentCoupling: 2 },
+          { service: "notification", afferentCoupling: 5, efferentCoupling: 3 },
+        ],
+      },
+      priorServiceMetrics: [
+        { service: "checkout", afferentCoupling: 0, efferentCoupling: 1 },
+        { service: "notification", afferentCoupling: 4, efferentCoupling: 3 },
+      ],
+    };
+    const result = score(payload, []);
+    expect(serviceChar(result, "checkout", "boundary-integrity").score).toBe(75);
+    expect(serviceChar(result, "notification", "boundary-integrity").score).toBe(
+      100,
+    );
+    expect(serviceChar(result, "notification", "coupling").score).toBe(100);
+    expect(serviceChar(result, "checkout", "coupling").score).toBe(90);
+    expect(characteristic(result, "cross-service-integrity").score).toBe(75);
+  });
+
+  it("does not penalise a drop in efferent coupling", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      dependencyCruiser: {
+        ...zeroFindings.dependencyCruiser,
+        serviceMetrics: [
+          { service: "checkout", afferentCoupling: 1, efferentCoupling: 2 },
+          { service: "notification", afferentCoupling: 4, efferentCoupling: 3 },
+        ],
+      },
+      priorServiceMetrics: [
+        { service: "checkout", afferentCoupling: 1, efferentCoupling: 5 },
+        { service: "notification", afferentCoupling: 2, efferentCoupling: 3 },
+      ],
+    };
+    const result = score(payload, []);
+    expect(serviceChar(result, "checkout", "coupling").score).toBe(100);
+    expect(serviceChar(result, "notification", "coupling").score).toBe(100);
+  });
+
+  it("scores an improved-metrics run no lower than its predecessor", () => {
+    const worse: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      dependencyCruiser: {
+        ...zeroFindings.dependencyCruiser,
+        cycles: [
+          { path: ["services/checkout/src/a.ts", "services/checkout/src/b.ts"] },
+          { path: ["services/checkout/src/c.ts", "services/checkout/src/d.ts"] },
+        ],
+        orphans: [
+          "services/checkout/src/orphan-a.ts",
+          "services/checkout/src/orphan-b.ts",
+        ],
+        serviceMetrics: [
+          { service: "checkout", afferentCoupling: 1, efferentCoupling: 6 },
+          { service: "notification", afferentCoupling: 2, efferentCoupling: 4 },
+        ],
+      },
+      duplication: {
+        percentage: 3,
+        clones: [
+          {
+            files: [
+              "services/checkout/src/domain/order.ts",
+              "services/checkout/src/domain/order-copy.ts",
+            ],
+            lines: 12,
+            tokens: 80,
+            classification: "internal",
+            services: ["checkout"],
+          },
+          {
+            files: [
+              "services/checkout/src/domain/send-instruction.ts",
+              "services/notification/src/domain/send-instruction.ts",
+            ],
+            lines: 20,
+            tokens: 90,
+            classification: "cross-service",
+            services: ["checkout", "notification"],
+          },
+        ],
+      },
+    };
+    const better: AnalysisPayload = {
+      ...worse,
+      dependencyCruiser: {
+        ...worse.dependencyCruiser,
+        cycles: [
+          { path: ["services/checkout/src/a.ts", "services/checkout/src/b.ts"] },
+        ],
+        orphans: ["services/checkout/src/orphan-a.ts"],
+        serviceMetrics: [
+          { service: "checkout", afferentCoupling: 1, efferentCoupling: 5 },
+          { service: "notification", afferentCoupling: 2, efferentCoupling: 4 },
+        ],
+      },
+      duplication: {
+        percentage: 1,
+        clones: [
+          {
+            files: [
+              "services/checkout/src/domain/send-instruction.ts",
+              "services/notification/src/domain/send-instruction.ts",
+            ],
+            lines: 20,
+            tokens: 90,
+            classification: "cross-service",
+            services: ["checkout", "notification"],
+          },
+        ],
+      },
+      priorServiceMetrics: worse.dependencyCruiser.serviceMetrics,
+      priorDuplicationCounts: {
+        internal: 1,
+        crossService: 1,
+        shared: 0,
+        internalByService: { checkout: 1 },
+      },
+    };
+    const first = score(worse, []);
+    const second = score(better, []);
+    expect(second.overall).toBeGreaterThanOrEqual(first.overall);
+    expect(serviceChar(second, "checkout", "coupling").score).toBeGreaterThanOrEqual(
+      serviceChar(first, "checkout", "coupling").score,
+    );
+    expect(serviceChar(second, "checkout", "duplication").score).toBeGreaterThanOrEqual(
+      serviceChar(first, "checkout", "duplication").score,
+    );
   });
 
   it("scores internal clones on the service and cross-service clones on the platform", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
-import type { CorrelatedLogger, LogFields, Logger } from "../domain/logger.js";
+import type { CorrelatedLogger, LogFields, Logger } from "../domain/ports/logger.js";
 
 type RecordedLine = {
   level: "info" | "warn" | "error";

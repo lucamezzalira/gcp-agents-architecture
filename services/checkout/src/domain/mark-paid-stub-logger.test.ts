@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { BodyStore } from "./body-store.js";
-import type { InstructionPublisher } from "./instruction-publisher.js";
-import type { CorrelatedLogger, Logger } from "./logger.js";
+import type { BodyStore } from "./ports/body-store.js";
+import type { InstructionPublisher } from "./ports/instruction-publisher.js";
+import type { CorrelatedLogger, Logger } from "./ports/logger.js";
 import { markPaid } from "./mark-paid.js";
 import type { Order } from "./order.js";
 import { OrderNotFoundError } from "./order-not-found.js";
-import type { OrderStore } from "./order-store.js";
+import type { OrderStore } from "./ports/order-store.js";
 import type { SendInstruction } from "./send-instruction.js";
 
 const order: Order = {
@@ -30,6 +30,10 @@ class MemoryOrderStore implements OrderStore {
 
   async get(): Promise<Order | undefined> {
     return this.stored;
+  }
+
+  async list(): Promise<Order[]> {
+    return this.stored === undefined ? [] : [this.stored];
   }
 
   async save(): Promise<void> {}

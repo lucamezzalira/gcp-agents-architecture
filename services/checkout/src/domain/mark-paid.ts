@@ -1,11 +1,11 @@
-import type { BodyStore } from "./body-store.js";
+import type { BodyStore } from "./ports/body-store.js";
 import { confirmationMessageId } from "./get-order-view.js";
-import type { InstructionPublisher } from "./instruction-publisher.js";
-import type { Logger } from "./logger.js";
+import type { InstructionPublisher } from "./ports/instruction-publisher.js";
+import type { Logger } from "./ports/logger.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
-import type { OrderStore } from "./order-store.js";
+import type { OrderStore } from "./ports/order-store.js";
 import { applyTransition } from "./order-transition.js";
 import {
   confirmationBodyRef,

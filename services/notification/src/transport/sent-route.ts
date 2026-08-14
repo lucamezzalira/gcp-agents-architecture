@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import type { EmailMessage } from "../domain/email-provider.js";
-import type { Logger } from "../domain/logger.js";
+import type { EmailMessage } from "../domain/ports/email-provider.js";
+import type { Logger } from "../domain/ports/logger.js";
 
 export type SentReader = () => EmailMessage[];
 

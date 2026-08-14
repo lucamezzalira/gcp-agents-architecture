@@ -1,7 +1,7 @@
 import { Firestore } from "@google-cloud/firestore";
-import type { Order } from "../domain/order.js";
-import { orderSchema } from "../domain/order.js";
-import type { OrderStore } from "../domain/order-store.js";
+import type { Order } from "../domain/ports/order-store.js";
+import { orderSchema } from "../domain/ports/order-store.js";
+import type { OrderStore } from "../domain/ports/order-store.js";
 
 export class FirestoreOrderStore implements OrderStore {
   constructor(private readonly db: Firestore) {}
@@ -20,6 +20,18 @@ export class FirestoreOrderStore implements OrderStore {
       return undefined;
     }
     return parsed.data;
+  }
+
+  async list(): Promise<Order[]> {
+    const snap = await this.db.collection("orders").get();
+    const orders: Order[] = [];
+    for (const doc of snap.docs) {
+      const parsed = orderSchema.safeParse(doc.data());
+      if (parsed.success) {
+        orders.push(parsed.data);
+      }
+    }
+    return orders;
   }
 
   async save(order: Order): Promise<void> {

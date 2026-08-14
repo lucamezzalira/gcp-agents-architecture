@@ -1,4 +1,4 @@
-import type { DeliveryStore } from "../domain/delivery-store.js";
+import type { DeliveryStore } from "../domain/ports/delivery-store.js";
 
 export class InMemoryDeliveryStore implements DeliveryStore {
   private readonly claimed = new Set<string>();

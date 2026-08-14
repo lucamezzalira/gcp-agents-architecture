@@ -1,5 +1,5 @@
 import { Firestore } from "@google-cloud/firestore";
-import type { DeliveryStore } from "../domain/delivery-store.js";
+import type { DeliveryStore } from "../domain/ports/delivery-store.js";
 
 export class FirestoreDeliveryStore implements DeliveryStore {
   constructor(private readonly db: Firestore) {}

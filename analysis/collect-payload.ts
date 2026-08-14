@@ -179,6 +179,44 @@ function folderMetrics(
     }));
 }
 
+function serviceMetricsFromModules(
+  modules: Array<{
+    source: string;
+    dependencies?: Array<{ resolved?: string }>;
+  }>,
+  services: string[],
+): Array<{
+  service: string;
+  afferentCoupling: number;
+  efferentCoupling: number;
+}> {
+  return services.map((service) => {
+    const prefix = `services/${service}/`;
+    const ce = new Set<string>();
+    const ca = new Set<string>();
+    for (const module of modules) {
+      const source = relativize(module.source);
+      const inside = source.startsWith(prefix);
+      for (const dep of module.dependencies ?? []) {
+        if (dep.resolved === undefined || dep.resolved.length === 0) {
+          continue;
+        }
+        const resolved = relativize(dep.resolved);
+        if (inside && !resolved.startsWith(prefix)) {
+          ce.add(resolved);
+        } else if (!inside && resolved.startsWith(prefix)) {
+          ca.add(source);
+        }
+      }
+    }
+    return {
+      service,
+      afferentCoupling: ca.size,
+      efferentCoupling: ce.size,
+    };
+  });
+}
+
 function cyclesFrom(depcruise: DepcruiseJson): Array<{ path: string[] }> {
   const cycles: Array<{ path: string[] }> = [];
   const seen = new Set<string>();
@@ -260,6 +298,7 @@ async function main(): Promise<void> {
         dependencies: dependencyCount,
       },
       folderMetrics: folderMetrics(depcruise),
+      serviceMetrics: serviceMetricsFromModules(modules, listedServices()),
     },
     duplication: {
       clones,
