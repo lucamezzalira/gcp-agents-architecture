@@ -595,17 +595,25 @@ a.sha:hover {
   background: rgba(74, 222, 128, 0.08);
 }
 
+.runtime-heading {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--mute);
+  margin: 1rem 0 0.35rem;
+  letter-spacing: 0.02em;
+}
+
 .runtime-graph {
   display: block;
   width: 100%;
-  max-width: 700px;
+  max-width: 720px;
   height: auto;
-  margin: 0.4rem 0 0;
+  margin: 0;
   color: rgba(226, 232, 240, 0.85);
 }
 
 .runtime-node rect {
-  fill: rgba(255, 255, 255, 0.04);
+  fill: var(--bg-elev);
   stroke: var(--line);
 }
 
@@ -618,8 +626,8 @@ a.sha:hover {
 
 .runtime-link path {
   fill: none;
-  stroke: rgba(148, 163, 184, 0.75);
-  stroke-width: 1.4;
+  stroke: rgba(148, 163, 184, 0.8);
+  stroke-width: 1.5;
 }
 
 .runtime-link.is-http path {
@@ -628,8 +636,13 @@ a.sha:hover {
 
 .runtime-link text {
   fill: var(--mute);
-  font-size: 10px;
+  font-size: 11px;
   text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke fill;
+  stroke: var(--bg-elev);
+  stroke-width: 5px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 .history-toggle {

@@ -16,7 +16,8 @@
     "dashboard": "pnpm --filter @health/dashboard dev",
     "notification": "pnpm --filter @services/notification start",
     "checkout": "pnpm --filter @services/checkout start",
-    "inventory": "pnpm --filter @services/inventory start"
+    "inventory": "pnpm --filter @services/inventory start",
+    "audit": "pnpm --filter @services/audit start"
   },
   "devDependencies": {
     "turbo": "^2.5.4",

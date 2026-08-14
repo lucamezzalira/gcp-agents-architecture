@@ -31,13 +31,13 @@ export const DESIGNED_RUNTIME_EDGES: RuntimeEdgeView[] = [
     from: "checkout",
     to: "notification",
     protocol: "pubsub",
-    purpose: "send-instruction (paid)",
+    purpose: "paid confirmation",
   },
   {
     from: "inventory",
     to: "notification",
     protocol: "pubsub",
-    purpose: "send-instruction (low stock)",
+    purpose: "low-stock alert",
   },
 ];
 
@@ -84,7 +84,11 @@ export function mergeRuntimeEdges(
       continue;
     }
     const key = edgeKey(edge.from, edge.to, protocol);
-    if (DESIGNED_RUNTIME_EDGES.some((item) => edgeKey(item.from, item.to, item.protocol) === key)) {
+    if (
+      DESIGNED_RUNTIME_EDGES.some(
+        (item) => edgeKey(item.from, item.to, item.protocol) === key,
+      )
+    ) {
       continue;
     }
     merged.push({
@@ -115,6 +119,7 @@ export type GraphLink = {
   d: string;
   labelX: number;
   labelY: number;
+  label: string;
 };
 
 export type RuntimeGraphLayout = {
@@ -125,20 +130,105 @@ export type RuntimeGraphLayout = {
 };
 
 const NODE_W = 148;
-const NODE_H = 46;
+const NODE_H = 44;
+const WIDTH = 720;
+const HEIGHT = 280;
 
 const NODE_POSITIONS: Record<string, { x: number; y: number }> = {
-  checkout: { x: 28, y: 88 },
-  inventory: { x: 276, y: 88 },
-  notification: { x: 524, y: 88 },
+  checkout: { x: 36, y: 132 },
+  inventory: { x: 286, y: 132 },
+  notification: { x: 536, y: 132 },
 };
 
-function nodeCenter(id: string): { x: number; y: number } | undefined {
+type Lane = "skip-top" | "upper-far" | "upper-near" | "lower";
+
+const EDGE_LANES: Record<string, Lane> = {
+  "checkout->notification:pubsub": "skip-top",
+  "checkout->inventory:pubsub": "upper-far",
+  "inventory->notification:pubsub": "upper-near",
+  "checkout->inventory:http": "upper-near",
+  "inventory->checkout:pubsub": "lower",
+};
+
+function box(id: string):
+  | {
+      left: number;
+      right: number;
+      top: number;
+      bottom: number;
+      cx: number;
+      cy: number;
+    }
+  | undefined {
   const pos = NODE_POSITIONS[id];
   if (pos === undefined) {
     return undefined;
   }
-  return { x: pos.x + NODE_W / 2, y: pos.y + NODE_H / 2 };
+  return {
+    left: pos.x,
+    right: pos.x + NODE_W,
+    top: pos.y,
+    bottom: pos.y + NODE_H,
+    cx: pos.x + NODE_W / 2,
+    cy: pos.y + NODE_H / 2,
+  };
+}
+
+function curve(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  controlY: number,
+): { d: string; labelX: number; labelY: number } {
+  const labelX = (x1 + x2) / 2;
+  return {
+    d: `M ${x1} ${y1} Q ${labelX} ${controlY} ${x2} ${y2}`,
+    labelX,
+    labelY: controlY,
+  };
+}
+
+function route(
+  from: string,
+  to: string,
+  lane: Lane,
+): { d: string; labelX: number; labelY: number } | undefined {
+  const start = box(from);
+  const end = box(to);
+  if (start === undefined || end === undefined) {
+    return undefined;
+  }
+  if (lane === "skip-top") {
+    return curve(start.cx, start.top, end.cx, end.top, 28);
+  }
+  if (lane === "lower") {
+    const goingRight = start.cx < end.cx;
+    return curve(
+      goingRight ? start.right : start.left,
+      start.bottom,
+      goingRight ? end.left : end.right,
+      end.bottom,
+      232,
+    );
+  }
+  const goingRight = start.cx < end.cx;
+  const controlY = lane === "upper-far" ? 58 : 96;
+  return curve(
+    goingRight ? start.right : start.left,
+    start.top + 8,
+    goingRight ? end.left : end.right,
+    end.top + 8,
+    controlY,
+  );
+}
+
+function linkLabel(edge: RuntimeEdgeView): string {
+  const count = edge.count !== undefined ? ` · ${edge.count}` : "";
+  if (edge.protocol === "http") {
+    return `HTTP ${edge.purpose}${count}`;
+  }
+  return edge.purpose + count;
 }
 
 export function layoutRuntimeGraph(edges: RuntimeEdgeView[]): RuntimeGraphLayout {
@@ -149,32 +239,27 @@ export function layoutRuntimeGraph(edges: RuntimeEdgeView[]): RuntimeGraphLayout
     width: NODE_W,
     height: NODE_H,
   }));
-  const pairIndex = new Map<string, number>();
+  const used = new Set<string>();
   const links: GraphLink[] = [];
   for (const edge of edges) {
-    const start = nodeCenter(edge.from);
-    const end = nodeCenter(edge.to);
-    if (start === undefined || end === undefined) {
+    const key = edgeKey(edge.from, edge.to, edge.protocol);
+    const lane = EDGE_LANES[key] ?? (edge.from === edge.to ? "lower" : "upper-near");
+    const placed = route(edge.from, edge.to, lane);
+    if (placed === undefined) {
       continue;
     }
-    const pair = `${edge.from}->${edge.to}`;
-    const index = pairIndex.get(pair) ?? 0;
-    pairIndex.set(pair, index + 1);
-    const goingRight = end.x >= start.x;
-    const lift = goingRight ? -(48 + index * 28) : 48 + index * 28;
-    const midX = (start.x + end.x) / 2;
-    const midY = start.y + lift;
-    const d = `M ${start.x} ${start.y} Q ${midX} ${midY} ${end.x} ${end.y}`;
+    used.add(key);
     links.push({
       from: edge.from,
       to: edge.to,
       protocol: edge.protocol,
       purpose: edge.purpose,
       count: edge.count,
-      d,
-      labelX: midX,
-      labelY: midY + (goingRight ? -6 : 14),
+      d: placed.d,
+      labelX: placed.labelX,
+      labelY: placed.labelY,
+      label: linkLabel(edge),
     });
   }
-  return { width: 700, height: 220, nodes, links };
+  return { width: WIDTH, height: HEIGHT, nodes, links };
 }
