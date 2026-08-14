@@ -145,10 +145,16 @@ describe("score", () => {
     const withExtraSignal: AnalysisPayload = {
       ...zeroFindings,
       runtime: {
-        illustrative: true,
+        ...zeroFindings.runtime,
+        vsImports: {
+          runtimeOnly: [
+            { from: "checkout", to: "inventory", protocol: "http" },
+          ],
+          importOnly: [{ from: "checkout", to: "notification" }],
+        },
         signals: [
           ...zeroFindings.runtime.signals,
-          { name: "error-rate", value: 0.02, unit: "ratio" },
+          { name: "error-rate", value: 0.02, unit: "ratio", illustrative: true },
         ],
       },
     };

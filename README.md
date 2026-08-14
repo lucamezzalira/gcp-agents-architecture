@@ -8,7 +8,7 @@ Read `docs/PRD.md` for what and why, `docs/BUILD-SPEC.md` for the tree, contract
 
 Real: notification and checkout, their layering, Pub/Sub, Firestore, Postgres, the health agent, Memory Bank, the MCP server, the dashboard, ts-arch, dependency-cruiser, jscpd, Cloud Trace, the commit history, the scoring model, Terraform.
 
-Illustrative: runtime and security signals. They arrive with `illustrative: true` and carry no weight.
+Illustrative: p95-latency, error-rate, and security signals. They arrive with `illustrative: true` and carry no weight. The runtime call graph is observed from synthetic smoke traffic and is also not scored.
 
 ## Deployed on GCP
 
@@ -31,6 +31,7 @@ flowchart LR
     fsC[("Firestore checkout")]
     notif["notification (internal)"]
     fsN[("Firestore notification")]
+    trace[Cloud Trace]
   end
 
   subgraph hlth["ga-health-mezzalab"]
@@ -55,12 +56,13 @@ flowchart LR
   notif --> email
   dash --> sql
   mcp --> sql
+  gha -->|WIF services-ci| trace
   gha -->|WIF health-ci| analysis
   analysis -->|push| agent
   agent --> sql
 ```
 
-GitHub Actions on `main` collects an `AnalysisPayload` and publishes it to `analysis-payloads` as `health-ci` via Workload Identity. The health agent writes the scored run to Postgres. MCP and the dashboard read that table. Images are in Artifact Registry (`health`, `services`). Health Cloud Run services read `health-database-url` and connect to Cloud SQL over a unix socket.
+GitHub Actions authenticates as `services-ci` in `ga-services-mezzalab` via the health project's Workload Identity pool, runs synthetic smoke against the live services, then collects. On `main` it publishes the payload to `analysis-payloads` as `health-ci`. The health agent writes the scored run to Postgres. MCP and the dashboard read that table. Images are in Artifact Registry (`health`, `services`). Health Cloud Run services read `health-database-url` and connect to Cloud SQL over a unix socket.
 
 ## Commands
 

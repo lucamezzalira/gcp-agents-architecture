@@ -8,11 +8,11 @@ The score is deterministic. These weights are the specification; `health/scoring
 | --- | --- | --- |
 | `boundary-integrity` | Whether a service's own files respect declared boundaries | each service, rolled up to the platform |
 | `layering` | Whether transport, domain and infrastructure stay separated | each service, rolled up to the platform |
-| `coupling` | Cycles, orphans, dep-cruiser faults, and efferent coupling growth | each service, rolled up to the platform |
+| `coupling` | Cycles, orphans, dep-cruiser faults, and current efferent coupling | each service, rolled up to the platform |
 | `duplication` | Internal clones inside one service | each service, rolled up to the platform |
 | `cross-service-integrity` | The relationship: rules 3-5 and 7, plus clones that span services | platform only |
 
-Runtime signals carry no weight. They are illustrative and are reported, not scored.
+The runtime call graph is observed from synthetic smoke traffic and carries no weight. CI generates that traffic for the commit being scored, then queries Cloud Trace. `queried: false` is not an empty graph. `p95-latency` and `error-rate` remain illustrative. None of these move a score.
 
 ## Method
 
@@ -53,24 +53,26 @@ Known services in this build: `checkout`, `notification`, and `inventory`. A ser
 | dependency-cruiser | each orphan | `coupling` | service owning the orphan | 5 |
 | dependency-cruiser | each `not-to-unresolvable` | `coupling` | service owning `from` | 10 |
 | dependency-cruiser | each `no-dep-on-test` | `coupling` | service owning `from` | 10 |
-| dependency-cruiser | efferent coupling growth vs the prior run | `coupling` | that service | `max(0, currentCe - priorCe) * 10` |
-| jscpd | internal clone count (first run) or growth vs prior | `duplication` | that service | 8 per extra clone |
-| jscpd | cross-service clone count (first run) or growth vs prior | `cross-service-integrity` | platform | 10 per extra clone |
-| jscpd | shared clone count (first run) or growth vs prior | `cross-service-integrity` | platform | 8 per extra clone |
+| dependency-cruiser | each outgoing edge that leaves the service (`Ce`) | `coupling` | that service | 10 per current edge |
+| jscpd | each internal clone currently present | `duplication` | that service | 8 per clone |
+| jscpd | each cross-service clone currently present | `cross-service-integrity` | platform | 10 per clone |
+| jscpd | each shared clone currently present | `cross-service-integrity` | platform | 8 per clone |
 
 Duplication is not scored as a percentage. Config files are outside jscpd's TypeScript format filter and do not produce clones.
 
-## Harmful direction
+## State, not change
 
-A metric-based penalty fires only when the number moves the wrong way.
+Every finding derived from a metric is penalised on the current count, every run. Four cross-service clones cost 40 on the commit that created them and 40 on every later commit until they are removed. The same applies to internal clones, shared clones, and efferent coupling.
 
-| Signal | Harmful direction | First observation (no prior) |
+The delta vs the previous run is kept on the payload (`priorDuplicationCounts`, `priorServiceMetrics`) so the reasoner can say whether something is growing, holding, or being cleaned up. Nothing about the delta touches a score. A run identical to its predecessor therefore scores identically. A score cannot rise merely because deterioration paused. Removing a clone or an outgoing edge raises the score because the current count fell.
+
+| Signal | What is scored | First observation |
 | --- | --- | --- |
-| Efferent coupling (`Ce`) | Increase vs the previous run | No growth penalty (neutral) |
-| Internal / cross-service / shared clones | Increase vs the previous run's count | Score the current count (baseline) |
-| Cycles, orphans, unresolvable, dep-on-test | Presence (a fault, not a bidirectional metric) | Same: each instance is a penalty |
+| Efferent coupling (`Ce`) | `currentCe * 10` | Same as later runs. Ce 0 is skipped. |
+| Internal / cross-service / shared clones | Current clone count | Same as later runs |
+| Cycles, orphans, unresolvable, dep-on-test | Presence (a fault, not a bidirectional metric) | Each instance is a penalty |
 
-`Ce` is the count of unique resolved dependencies whose path is not under `services/<name>/`. `Ca` is the count of unique modules outside the service that depend on a module inside it. Both are stored on `dependencyCruiser.serviceMetrics`. Only `Ce` growth is scored. `Ca` is observation. A service that other code reached into (`Ca` up, `Ce` unchanged) is not penalised.
+`Ce` is the count of unique resolved dependencies whose path is not under `services/<name>/`. `Ca` is the count of unique modules outside the service that depend on a module inside it. Both are stored on `dependencyCruiser.serviceMetrics`. Only `Ce` is scored. `Ca` is observation. A service that other code reached into (`Ca` up, `Ce` unchanged) is not penalised for the Ca change. It is still penalised for its current `Ce`.
 
 Folder instability `I` (`Ce / (Ca + Ce)` per folder) stays on `folderMetrics` for the agent. It is not scored. Expected shapes, which the reasoner reads as facts rather than as scores:
 
@@ -78,7 +80,7 @@ Folder instability `I` (`Ce / (Ca + Ce)` per folder) stays on `folderMetrics` fo
 - `domain` should be stable. Things depend on it; it depends on little. Rising `I` is drift.
 - `infrastructure` should be unstable. Implements ports; depended upon only through them.
 
-Missing `serviceMetrics` or no prior for that service apply no efferent growth penalty, so a fixture with no graph still scores 100 on coupling.
+Missing `serviceMetrics` or Ce 0 apply no efferent coupling penalty, so a fixture with no graph still scores 100 on coupling.
 
 Intra-file clones (both locations the same path) are not scored.
 
@@ -179,3 +181,7 @@ The reasoner receives those layer profiles and the active rule ids. It must not 
 Platform `boundary-integrity` is a mean across services, matching layering, coupling and duplication. Worst-of is gone. `cross-service-integrity` remains the sole platform-level boundary channel. Per-service scoring and the weights are unchanged.
 
 The dashboard reports the worst service and the count of services below 80 on the platform view. Those figures are presentation. They do not enter the score.
+
+### Version 6
+
+Penalties apply to architectural state, not to recent change. Clone findings always use the current count. Efferent coupling is `currentCe * 10` every run, including the first observation. Prior counts stay on the payload for the reasoner and do not move a score.

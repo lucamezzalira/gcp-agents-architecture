@@ -24,6 +24,7 @@ import {
 import { registerMetricsRoute } from "./transport/metrics-route.js";
 import { registerPubSubPushRoute } from "./transport/pubsub-push-route.js";
 import { registerSentRoute } from "./transport/sent-route.js";
+import { registerTraceHook } from "./transport/trace-context.js";
 
 export type RecordedEmailProvider = EmailProvider & {
   readonly calls: EmailMessage[];
@@ -54,6 +55,7 @@ function buildApp(
   const handleInstruction: InstructionHandler = (instruction) =>
     deliver(instruction, { bodyStore, deliveryStore, emailProvider, logger });
   const server = Fastify();
+  registerTraceHook(server);
   registerHealthRoute(server);
   registerInstructionRoute(server, handleInstruction, logger);
   registerPubSubPushRoute(server, handleInstruction, logger);

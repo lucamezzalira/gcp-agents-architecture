@@ -1,4 +1,7 @@
-import { createRuntimeApp } from "./app.js";
+import { startTracing } from "./infrastructure/tracing.js";
+
+await startTracing("checkout");
+const { createRuntimeApp } = await import("./app.js");
 
 const port = Number(process.env.PORT ?? "3000");
 const server = createRuntimeApp();

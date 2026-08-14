@@ -25,6 +25,7 @@ import { MemoryStock } from "./infrastructure/memory-stock.js";
 import { PubSubOutcomes } from "./infrastructure/pubsub-outcomes.js";
 import { PubSubInstructionPublisher } from "./infrastructure/pubsub-instruction-publisher.js";
 import { registerHealthRoute } from "./transport/health-route.js";
+import { registerTraceHook } from "./transport/trace-context.js";
 import {
   registerReservationPushRoute,
   type ReservationHandler,
@@ -64,6 +65,7 @@ function buildServer(
     });
   };
   const server = Fastify();
+  registerTraceHook(server);
   registerHealthRoute(server);
   registerStockRoutes(server, stock, logger);
   registerReservationPushRoute(server, handle, logger);

@@ -40,6 +40,10 @@ resource "google_cloud_run_v2_service" "checkout" {
         name  = "INVENTORY_URL"
         value = try(google_cloud_run_v2_service.inventory[0].uri, "")
       }
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "checkout"
+      }
     }
   }
 
@@ -75,6 +79,10 @@ resource "google_cloud_run_v2_service" "notification" {
       env {
         name  = "FIRESTORE_DATABASE"
         value = google_firestore_database.notification.name
+      }
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "notification"
       }
     }
   }
@@ -135,6 +143,10 @@ resource "google_cloud_run_v2_service" "inventory" {
       env {
         name  = "SEND_INSTRUCTIONS_TOPIC"
         value = google_pubsub_topic.send_instructions.id
+      }
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "inventory"
       }
     }
   }

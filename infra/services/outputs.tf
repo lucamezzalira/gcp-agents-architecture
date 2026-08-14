@@ -14,3 +14,8 @@ output "notification_uri" {
 output "inventory_uri" {
   value = try(google_cloud_run_v2_service.inventory[0].uri, "")
 }
+
+output "services_ci_sa" {
+  value       = google_service_account.ci.email
+  description = "Impersonated from GitHub Actions via the health-project WIF pool to read Cloud Trace."
+}

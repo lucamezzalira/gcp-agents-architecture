@@ -4,6 +4,7 @@ import {
   parseReservationCommand,
   type ReservationCommand,
 } from "../domain/reservation-command.js";
+import { withPubSubConsume } from "./trace-context.js";
 
 export type ReservationHandler = (command: ReservationCommand) => Promise<void>;
 
@@ -54,15 +55,17 @@ export function registerReservationPushRoute(
   log: Log,
 ): void {
   app.post("/pubsub", async (request, reply) => {
-    const bytes = decodePushBody(request.body);
-    if (bytes === undefined) {
-      log.bind("unparsed").warn("pubsub.invalid");
-      return reply.code(400).send({ error: "invalid pubsub envelope" });
-    }
-    const decision = await processReservationBytes(bytes, handle, log);
-    if (decision === "nack") {
-      return reply.code(500).send({ error: "nack" });
-    }
-    return reply.code(204).send();
+    return withPubSubConsume(request, async () => {
+      const bytes = decodePushBody(request.body);
+      if (bytes === undefined) {
+        log.bind("unparsed").warn("pubsub.invalid");
+        return reply.code(400).send({ error: "invalid pubsub envelope" });
+      }
+      const decision = await processReservationBytes(bytes, handle, log);
+      if (decision === "nack") {
+        return reply.code(500).send({ error: "nack" });
+      }
+      return reply.code(204).send();
+    });
   });
 }

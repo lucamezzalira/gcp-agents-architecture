@@ -3,10 +3,12 @@ import { z } from "zod";
 import type { Logger } from "../domain/ports/logger.js";
 import type { StockOutcomeSink } from "../domain/ports/stock-outcome-sink.js";
 import { parseStockOutcome } from "../domain/stock-outcome.js";
+import { withPubSubConsume } from "./trace-context.js";
 
 const envelopeSchema = z.object({
   message: z.object({
     data: z.string().min(1),
+    attributes: z.record(z.string(), z.string()).optional(),
   }),
 });
 
@@ -16,6 +18,7 @@ export function registerOutcomePushRoute(
   logger: Logger,
 ): void {
   app.post("/reservation-outcomes", async (request, reply) => {
+    return withPubSubConsume(request, async () => {
     const parsed = envelopeSchema.safeParse(request.body);
     if (!parsed.success) {
       logger.withCorrelation("unparsed").warn("outcome.invalid");
@@ -40,5 +43,6 @@ export function registerOutcomePushRoute(
       result: outcome.result,
     });
     return reply.code(204).send();
+    });
   });
 }

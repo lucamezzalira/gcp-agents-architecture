@@ -29,7 +29,7 @@ terraform apply
 
 Then pass `services_ci_sa_email` into the health root so CI can publish payloads.
 
-After WIF exists, set GitHub Actions variables `WIF_PROVIDER`, `HEALTH_CI_SA`, and `ANALYSIS_TOPIC` from `terraform output` on `infra/health` so the `publish-health` job can post `AnalysisPayload` JSON.
+After WIF exists, set GitHub Actions variables `WIF_PROVIDER`, `HEALTH_CI_SA`, `SERVICES_CI_SA`, `TRACE_PROJECT`, and `ANALYSIS_TOPIC`. `WIF_PROVIDER` is the health-project pool. Collect impersonates `services-ci` (Cloud Trace reader in the services project) through that same pool. `publish-health` still impersonates `health-ci` to post `AnalysisPayload` JSON.
 
 Lint (no apply):
 

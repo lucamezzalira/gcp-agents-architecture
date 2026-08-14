@@ -3,6 +3,7 @@ import { BodyNotFoundError } from "../domain/body-not-found.js";
 import type { Logger } from "../domain/ports/logger.js";
 import { parseSendInstruction } from "../domain/send-instruction.js";
 import type { InstructionHandler } from "./instruction-route.js";
+import { withPubSubConsumeFromAttributes } from "./trace-context.js";
 
 export async function processInstructionMessage(
   data: Buffer,
@@ -44,15 +45,15 @@ export function listenForInstructions(
 ): { close: () => Promise<void> } {
   const subscription = new PubSub().subscription(subscriptionName);
   const onMessage = (message: Message): void => {
-    void processInstructionMessage(message.data, handle, logger).then(
-      (decision) => {
-        if (decision === "ack") {
-          message.ack();
-          return;
-        }
-        message.nack();
-      },
-    );
+    void withPubSubConsumeFromAttributes(message.attributes, () =>
+      processInstructionMessage(message.data, handle, logger),
+    ).then((decision) => {
+      if (decision === "ack") {
+        message.ack();
+        return;
+      }
+      message.nack();
+    });
   };
   subscription.on("message", onMessage);
   return {

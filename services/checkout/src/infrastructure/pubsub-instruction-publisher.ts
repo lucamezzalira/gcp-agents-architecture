@@ -1,9 +1,13 @@
 import { PubSub } from "@google-cloud/pubsub";
 import type { InstructionPublisher } from "../domain/ports/instruction-publisher.js";
 import type { SendInstruction } from "../domain/ports/instruction-publisher.js";
+import { withProducerSpan } from "./tracing.js";
 
 export type PublishableTopic = {
-  publishMessage(message: { json: SendInstruction }): Promise<string>;
+  publishMessage(message: {
+    json: SendInstruction;
+    attributes?: Record<string, string>;
+  }): Promise<string>;
 };
 
 export class PubSubInstructionPublisher implements InstructionPublisher {
@@ -14,6 +18,8 @@ export class PubSubInstructionPublisher implements InstructionPublisher {
   }
 
   async publish(instruction: SendInstruction): Promise<void> {
-    await this.topic.publishMessage({ json: instruction });
+    await withProducerSpan("pubsub.publish notification", "notification", (attributes) =>
+      this.topic.publishMessage({ json: instruction, attributes }),
+    );
   }
 }

@@ -30,7 +30,28 @@
     "percentage": 0
   },
   "runtime": {
-    "illustrative": true,
-    "signals": []
+    "callGraph": {
+      "illustrative": false,
+      "synthetic": true,
+      "description": "Service-to-service edges observed from synthetic smoke traffic in Cloud Trace. Not scored.",
+      "window": {
+        "start": "2026-01-02T00:00:00.000Z",
+        "end": "2026-01-02T00:00:00.000Z"
+      },
+      "traffic": "none",
+      "queried": false
+    },
+    "vsImports": {
+      "runtimeOnly": [],
+      "importOnly": []
+    },
+    "signals": [
+      {
+        "name": "p95-latency",
+        "value": 120,
+        "unit": "ms",
+        "illustrative": true
+      }
+    ]
   }
 }

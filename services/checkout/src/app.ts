@@ -29,6 +29,7 @@ import { PubSubStockReservations } from "./infrastructure/pubsub-stock-reservati
 import { registerHealthRoute } from "./transport/health-route.js";
 import { registerOrderRoutes } from "./transport/order-routes.js";
 import { registerOutcomePushRoute } from "./transport/outcome-push.js";
+import { registerTraceHook } from "./transport/trace-context.js";
 
 export type CheckoutApp = {
   server: FastifyInstance;
@@ -52,6 +53,7 @@ function buildServer(
   logger: Logger,
 ): FastifyInstance {
   const server = Fastify();
+  registerTraceHook(server);
   registerHealthRoute(server);
   registerOrderRoutes(
     server,

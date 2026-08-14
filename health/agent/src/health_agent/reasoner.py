@@ -20,9 +20,44 @@ class Reasoner:
 
 
 def _runtime_note(payload: AnalysisPayload) -> str:
-    if payload.runtime.illustrative:
-        return " Runtime signals are illustrative and were not scored."
-    return ""
+    parts: list[str] = []
+    graph = payload.runtime.callGraph
+    vs_imports = payload.runtime.vsImports
+    if graph is not None and graph.illustrative is False:
+        if not graph.queried:
+            parts.append(
+                " Runtime call graph was not queried; Cloud Trace was not "
+                "reached. That is not an empty graph."
+            )
+        else:
+            parts.append(
+                " Runtime call graph is observed from synthetic smoke traffic "
+                f"({graph.traffic}) and is not scored."
+            )
+            window = graph.window
+            start = window.get("start")
+            end = window.get("end")
+            if start and end:
+                parts.append(f" Trace window {start} to {end}.")
+            if vs_imports is not None:
+                for edge in vs_imports.runtimeOnly:
+                    parts.append(
+                        f" Runtime-only {edge.protocol} edge {edge.from_service} -> "
+                        f"{edge.to} has no corresponding import."
+                    )
+                for edge in vs_imports.importOnly:
+                    parts.append(
+                        f" Import {edge.from_service} -> {edge.to} has no observed "
+                        "runtime edge (dead coupling)."
+                    )
+    leftover = [item.name for item in payload.runtime.signals if item.illustrative]
+    if leftover:
+        parts.append(
+            " " + ", ".join(leftover) + " remain illustrative and were not scored."
+        )
+    elif payload.runtime.illustrative:
+        parts.append(" Runtime signals are illustrative and were not scored.")
+    return "".join(parts)
 
 
 def _all_rules_passed(payload: AnalysisPayload) -> bool:

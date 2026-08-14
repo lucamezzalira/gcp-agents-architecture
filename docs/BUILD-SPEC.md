@@ -139,9 +139,31 @@ type AnalysisPayload = {
     }>;
     percentage: number;
   };
-  runtime: {                       // ILLUSTRATIVE
-    illustrative: true;
-    signals: Array<{ name: string; value: number; unit: string }>;
+  runtime: {
+    callGraph: {
+      illustrative: false;
+      synthetic: true;
+      description: string;
+      window: { start: string; end: string };
+      traffic: "this-run" | "inherited" | "none";
+      queried: boolean;
+      edges?: Array<{
+        from: string;
+        to: string;
+        protocol: "http" | "pubsub";
+        count: number;
+      }>;
+    };
+    vsImports: {
+      runtimeOnly: Array<{ from: string; to: string; protocol: "http" | "pubsub" }>;
+      importOnly: Array<{ from: string; to: string }>;
+    };
+    signals: Array<{
+      name: string;
+      value: number;
+      unit: string;
+      illustrative?: true;
+    }>;
   };
   recentCommits?: Array<{ sha: string; message: string }>;
   changedFiles?: string[];
@@ -168,7 +190,7 @@ type AnalysisPayload = {
 };
 ```
 
-`runtime.illustrative` is always `true` in this build. Runtime signals do not move a score and are omitted from the dashboard.
+The runtime call graph is observed from synthetic smoke traffic in Cloud Trace. CI authenticates as `services-ci` via Workload Identity Federation, runs `scripts/smoke-runtime.sh` against the live services, then queries Cloud Trace. `traffic: "this-run"` means that smoke produced the traces in `window`. `queried` is true only when the Trace API call succeeded. A failed query omits `edges`; an empty `edges` array means the query ran and found no calls. The graph is not scored. `p95-latency` and `error-rate` remain illustrative. Runtime signals are omitted from the dashboard.
 
 ### Health read (agent output)
 
@@ -283,6 +305,7 @@ The agent receives the computed scores and writes reasoning and recommendations 
 
 **Pipeline**
 - A push produces an `AnalysisPayload` on the health topic within 90 seconds. Collection does not fail when a rule fails.
+- Collect authenticates to Cloud Trace as `services-ci` via WIF, runs `scripts/smoke-runtime.sh` against the live services, then queries. The payload records `traffic: "this-run"`, the trace window, and `queried: true` only when the query succeeded. A failed query omits `edges`.
 - The guard is a separate CI step that blocks when a rule is violated.
 - The agent produces a `HealthRead` persisted to Postgres.
 - Replay across N commits produces N current rows in `health_run`. A rescore supersedes the previous current row for that SHA.
@@ -299,7 +322,7 @@ The agent receives the computed scores and writes reasoning and recommendations 
 - A 100 with `suppressedBy` is visually distinct from a 100 with no findings.
 - Superseded runs are hidden by default, with a toggle to compare.
 - The trend marks the point where `ruleSetVersion` changes.
-- Runtime signals stay in the payload with `illustrative: true`. They do not appear on the dashboard and they do not move a score.
+- Runtime signals stay in the payload. The call graph is observed (synthetic smoke) and is not scored. `p95-latency` and `error-rate` remain `illustrative: true`. They do not appear on the dashboard and they do not move a score.
 
 ## Build order
 

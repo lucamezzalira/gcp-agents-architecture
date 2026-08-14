@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { StockLookup } from "../domain/ports/stock-lookup.js";
+import { tracedFetch } from "./tracing.js";
 
 const levelSchema = z.object({
   sku: z.string().min(1),
@@ -11,7 +12,7 @@ export class HttpStockLookup implements StockLookup {
 
   async available(sku: string): Promise<number> {
     const url = `${this.inventoryBaseUrl.replace(/\/$/, "")}/stock/${encodeURIComponent(sku)}`;
-    const response = await fetch(url);
+    const response = await tracedFetch(url, { method: "GET" }, "inventory");
     if (response.status === 404) {
       return 0;
     }

@@ -48,6 +48,12 @@ variable "health_analysis_topic" {
   description = "Full resource name of project A's analysis-payloads topic."
 }
 
+variable "github_wif_principal" {
+  type        = string
+  default     = ""
+  description = "GitHub Actions principalSet from the health-project WIF pool. Empty skips impersonation of services-ci."
+}
+
 locals {
   apis = [
     "run.googleapis.com",
@@ -56,5 +62,7 @@ locals {
     "storage.googleapis.com",
     "artifactregistry.googleapis.com",
     "iam.googleapis.com",
+    "iamcredentials.googleapis.com",
+    "cloudtrace.googleapis.com",
   ]
 }

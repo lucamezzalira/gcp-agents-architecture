@@ -14,8 +14,10 @@ def test_agent_does_not_change_scores() -> None:
     read = produce_health_read(payload_path)
     assert_scores_unchanged(scores, read)
     boundary = next(item for item in read.characteristics if item.id == "boundary-integrity")
-    assert boundary.score == 60
+    assert boundary.score == 80
     assert boundary.recommendations
     payload = AnalysisPayload.model_validate_json(Path(payload_path).read_text())
-    assert payload.runtime.illustrative is True
+    assert payload.runtime.callGraph is not None
+    assert payload.runtime.callGraph.illustrative is False
+    assert any(item.illustrative for item in payload.runtime.signals)
     assert "illustrative" in boundary.reasoning

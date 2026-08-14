@@ -20,5 +20,5 @@ If a number in the output differs from what the scoring model produced, that is 
 
 - NEVER run analysis tools. The agent consumes CI output; it does not invoke ts-arch, dependency-cruiser or jscpd.
 - Deterministic findings are authoritative. A failed architecture test is a fact and the agent does not argue with it.
-- Runtime signals arrive with `illustrative: true`. Treat them as demonstrative of the pattern and say so in reasoning.
+- The runtime call graph is observed from synthetic smoke traffic. Name a runtime-only edge with its protocol when it appears. queried false is not an empty graph. p95-latency and error-rate arrive with `illustrative: true`; treat those as demonstrative of the pattern and say so in reasoning.
 - Every run must be traceable end to end. Do not swallow errors.

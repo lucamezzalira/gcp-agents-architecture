@@ -12,6 +12,15 @@ from health_agent.models import (
 
 KNOWN_RULE_IDS = [f"rule-{n}" for n in range(1, 10)]
 
+
+def leftover_runtime_illustrative(payload: AnalysisPayload) -> bool:
+    if any(item.illustrative for item in payload.runtime.signals):
+        return True
+    if payload.runtime.illustrative:
+        return True
+    return False
+
+
 LAYER_PROFILES = {
     "transport": {
         "expected": "highly-unstable",
@@ -94,6 +103,73 @@ def last_predecessor_metrics(
         if read.metrics is not None:
             return read.metrics
     return None
+
+
+def _direction(current: int, prior: int | None) -> str:
+    if prior is None:
+        return "first"
+    if current > prior:
+        return "grew"
+    if current < prior:
+        return "cleaned"
+    return "held"
+
+
+def _delta_side(current: int, prior: int | None) -> dict[str, object]:
+    return {
+        "current": current,
+        "prior": prior,
+        "delta": None if prior is None else current - prior,
+        "direction": _direction(current, prior),
+    }
+
+
+def metric_deltas(
+    payload: AnalysisPayload,
+    prior_reads: list[HealthRead] | None = None,
+) -> dict[str, object]:
+    current = metrics_from_payload(payload)
+    prior = last_predecessor_metrics(prior_reads or [], payload.commitSha)
+    if prior is None and payload.priorDuplicationCounts is not None:
+        prior_dup = payload.priorDuplicationCounts
+        prior_ce = {item.service: item for item in payload.priorServiceMetrics}
+    elif prior is None:
+        prior_dup = None
+        prior_ce = {}
+    else:
+        prior_dup = prior.duplicationCounts
+        prior_ce = {item.service: item for item in prior.serviceCoupling}
+    clones = {
+        "internal": _delta_side(
+            current.duplicationCounts.internal,
+            None if prior_dup is None else prior_dup.internal,
+        ),
+        "crossService": _delta_side(
+            current.duplicationCounts.crossService,
+            None if prior_dup is None else prior_dup.crossService,
+        ),
+        "shared": _delta_side(
+            current.duplicationCounts.shared,
+            None if prior_dup is None else prior_dup.shared,
+        ),
+    }
+    seen: set[str] = set()
+    efferent: list[dict[str, object]] = []
+    for item in current.serviceCoupling:
+        seen.add(item.service)
+        previous = prior_ce.get(item.service)
+        prior_val = None if previous is None else int(previous.efferentCoupling)
+        current_val = int(item.efferentCoupling)
+        side = _delta_side(current_val, prior_val)
+        side["service"] = item.service
+        efferent.append(side)
+    for service, previous in prior_ce.items():
+        if service in seen:
+            continue
+        side = _delta_side(0, int(previous.efferentCoupling))
+        side["service"] = service
+        efferent.append(side)
+    return {"clones": clones, "efferentCoupling": efferent}
 
 
 def enrich_payload_with_priors(
@@ -213,11 +289,25 @@ def build_facts(
             ],
         },
         "priorMetrics": prior_metrics_series(priors, payload.commitSha),
+        "metricDeltas": metric_deltas(payload, priors),
         "priorOverall": [
             item.overall for item in predecessors(priors, payload.commitSha)
         ][-6:],
         "memoryBank": memory_snippets or [],
-        "runtimeIllustrative": payload.runtime.illustrative,
+        "runtimeCallGraph": (
+            payload.runtime.callGraph.model_dump(by_alias=True, exclude_none=True)
+            if payload.runtime.callGraph is not None
+            else None
+        ),
+        "runtimeVsImports": (
+            payload.runtime.vsImports.model_dump(by_alias=True)
+            if payload.runtime.vsImports is not None
+            else None
+        ),
+        "runtimeIllustrativeSignals": [
+            item.name for item in payload.runtime.signals if item.illustrative
+        ],
+        "runtimeIllustrative": leftover_runtime_illustrative(payload),
         "narrativeIds": [item.id for item in scores.characteristics]
         + [
             f"{service.service}:{item.id}"

@@ -1,5 +1,10 @@
-import { createRuntimeApp } from "./app.js";
-import { listenForInstructions } from "./transport/instruction-subscriber.js";
+import { startTracing } from "./infrastructure/tracing.js";
+
+await startTracing("notification");
+const { createRuntimeApp } = await import("./app.js");
+const { listenForInstructions } = await import(
+  "./transport/instruction-subscriber.js"
+);
 
 const port = Number(process.env.PORT ?? "3001");
 const runtime = createRuntimeApp();

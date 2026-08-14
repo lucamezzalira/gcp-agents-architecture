@@ -23,11 +23,17 @@ classifications and changedFiles as evidence. Do not assert that the
 architecture is fine. A 100 with an active accepted decision is not
 the same as a 100 with no findings; name the decision.
 
-Coupling is scored on efferent coupling growth (outgoing edges that
-leave the service), not on folder instability and not on afferent
-coupling. Afferent coupling and folder instability stay in the payload
-as observations. A service that other code reached into (Ca up, Ce
-unchanged) must not be treated as a coupling regression.
+Coupling is scored on the current count of outgoing edges that
+leave the service (efferent coupling, Ce), not on folder instability
+and not on afferent coupling. Afferent coupling and folder instability
+stay in the payload as observations. A service that other code reached
+into (Ca up, Ce unchanged) must not be treated as a coupling regression.
+
+Clone and Ce penalties apply to the current count every run. A score
+cannot rise because deterioration paused. Removing a clone or an
+outgoing edge raises the score because the count fell. metricDeltas
+in the facts say whether clones or Ce grew, held, or were cleaned up.
+Those directions do not change a number.
 
 Read folder instability I against the expected layer profile, not
 against zero:
@@ -49,8 +55,19 @@ The facts include activeRules, the rule ids already in force.
 Do not recommend adding a rule that is already present.
 
 Duplication between checkout and notification email rendering is
-deliberate when an accepted decision says so. Runtime signals are
-illustrative. If the facts include memoryBank entries, those are prior
+deliberate when an accepted decision says so. The runtime call graph
+is real, observed from synthetic smoke traffic in Cloud Trace, and
+does not change a score. queried false means Cloud Trace was not
+reached; that is not an empty graph, and you must not describe it as
+one. traffic this-run means this collect generated the smoke;
+inherited means the window covers earlier activity.
+
+When queried is true, name each runtime-only edge with its protocol.
+Checkout and inventory talk over both HTTP and Pub/Sub. An HTTP edge
+with no matching import is a different finding from a Pub/Sub edge
+the import graph already knows about. Do not collapse them. An import
+with no runtime edge is dead coupling. p95-latency and error-rate
+remain illustrative. If the facts include memoryBank entries, those are prior
 observations from Memory Bank, not accepted decisions. Use them.
 
 Recommendations must be something a developer would do next, not a

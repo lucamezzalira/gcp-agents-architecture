@@ -1,9 +1,13 @@
 import { PubSub } from "@google-cloud/pubsub";
 import type { StockReservationPublisher } from "../domain/ports/stock-reservation-publisher.js";
 import type { StockCommand } from "../domain/ports/stock-reservation-publisher.js";
+import { withProducerSpan } from "./tracing.js";
 
 type TopicHandle = {
-  publishMessage(message: { json: StockCommand }): Promise<string>;
+  publishMessage(message: {
+    json: StockCommand;
+    attributes?: Record<string, string>;
+  }): Promise<string>;
 };
 
 export class PubSubStockReservations implements StockReservationPublisher {
@@ -14,6 +18,8 @@ export class PubSubStockReservations implements StockReservationPublisher {
   }
 
   async publish(command: StockCommand): Promise<void> {
-    await this.topic.publishMessage({ json: command });
+    await withProducerSpan("pubsub.publish inventory", "inventory", (attributes) =>
+      this.topic.publishMessage({ json: command, attributes }),
+    );
   }
 }

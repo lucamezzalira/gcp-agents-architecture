@@ -103,3 +103,114 @@ def test_rule_3_and_rule_4_are_named_separately() -> None:
     assert "delivery records" in boundary.reasoning
     assert any("SendInstruction" in item or "send instruction" in item.lower() for item in boundary.recommendations)
     assert any("Firestore" in item for item in boundary.recommendations)
+
+
+def test_runtime_only_checkout_inventory_edge_is_named() -> None:
+    payload = AnalysisPayload.model_validate(
+        {
+            "runId": "r",
+            "commitSha": "a" * 40,
+            "commitMessage": "ok",
+            "timestamp": "2026-01-01T00:00:00.000Z",
+            "archTests": [
+                {"ruleId": f"rule-{n}", "passed": True, "violations": []}
+                for n in range(1, 10)
+            ],
+            "runtime": {
+                "callGraph": {
+                    "illustrative": False,
+                    "synthetic": True,
+                    "description": "synthetic smoke",
+                    "window": {
+                        "start": "2026-01-01T00:00:00.000Z",
+                        "end": "2026-01-01T00:30:00.000Z",
+                    },
+                    "traffic": "this-run",
+                    "edges": [
+                        {
+                            "from": "checkout",
+                            "to": "inventory",
+                            "protocol": "http",
+                            "count": 1,
+                        }
+                    ],
+                    "queried": True,
+                },
+                "vsImports": {
+                    "runtimeOnly": [
+                        {
+                            "from": "checkout",
+                            "to": "inventory",
+                            "protocol": "http",
+                        }
+                    ],
+                    "importOnly": [],
+                },
+                "signals": [
+                    {
+                        "name": "error-rate",
+                        "value": 0.01,
+                        "unit": "ratio",
+                        "illustrative": True,
+                    }
+                ],
+            },
+        }
+    )
+    boundary = next(
+        item
+        for item in StubReasoner().reason(payload, _scores(100, []))
+        if item.id == "boundary-integrity"
+    )
+    assert "checkout -> inventory" in boundary.reasoning
+    assert "http" in boundary.reasoning
+    assert "synthetic smoke" in boundary.reasoning
+    assert "this-run" in boundary.reasoning
+    assert "error-rate" in boundary.reasoning
+    assert "illustrative" in boundary.reasoning
+
+
+def test_unqueried_runtime_graph_is_not_an_empty_result() -> None:
+    payload = AnalysisPayload.model_validate(
+        {
+            "runId": "r",
+            "commitSha": "a" * 40,
+            "commitMessage": "ok",
+            "timestamp": "2026-01-01T00:00:00.000Z",
+            "archTests": [
+                {"ruleId": f"rule-{n}", "passed": True, "violations": []}
+                for n in range(1, 10)
+            ],
+            "runtime": {
+                "callGraph": {
+                    "illustrative": False,
+                    "synthetic": True,
+                    "description": "synthetic smoke",
+                    "window": {
+                        "start": "2026-01-01T00:00:00.000Z",
+                        "end": "2026-01-01T00:30:00.000Z",
+                    },
+                    "traffic": "none",
+                    "queried": False,
+                },
+                "vsImports": {"runtimeOnly": [], "importOnly": []},
+                "signals": [
+                    {
+                        "name": "p95-latency",
+                        "value": 120,
+                        "unit": "ms",
+                        "illustrative": True,
+                    }
+                ],
+            },
+        }
+    )
+    boundary = next(
+        item
+        for item in StubReasoner().reason(payload, _scores(100, []))
+        if item.id == "boundary-integrity"
+    )
+    assert "not queried" in boundary.reasoning
+    assert "not an empty graph" in boundary.reasoning
+    assert "Runtime-only" not in boundary.reasoning
+

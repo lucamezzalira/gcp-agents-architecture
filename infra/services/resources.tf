@@ -131,6 +131,37 @@ resource "google_project_iam_member" "inventory_firestore" {
   }
 }
 
+resource "google_project_iam_member" "checkout_trace" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.checkout.email}"
+}
+
+resource "google_project_iam_member" "notification_trace" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.notification.email}"
+}
+
+resource "google_project_iam_member" "inventory_trace" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.inventory.email}"
+}
+
+resource "google_project_iam_member" "ci_trace" {
+  project = var.project_id
+  role    = "roles/cloudtrace.user"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+}
+
+resource "google_service_account_iam_member" "ci_wif" {
+  count              = var.github_wif_principal == "" ? 0 : 1
+  service_account_id = google_service_account.ci.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = var.github_wif_principal
+}
+
 resource "google_storage_bucket_iam_member" "checkout_write" {
   bucket = google_storage_bucket.bodies.name
   role   = "roles/storage.objectUser"

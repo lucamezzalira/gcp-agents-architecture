@@ -1,3 +1,4 @@
 project_id = "REPLACE_SERVICES_PROJECT"
 region     = "europe-west1"
 # checkout_image / notification_image / inventory_image leave empty until the first build
+# github_wif_principal = "principalSet://iam.googleapis.com/projects/REPLACE_HEALTH_PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/REPLACE_GITHUB_OWNER/REPLACE_GITHUB_REPO"

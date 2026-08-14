@@ -43,12 +43,13 @@ Dependencies point inward. Transport depends on domain. Domain defines the inter
 
 ### Signals
 
-Three real, one illustrative.
+Three real, two leftover illustrative.
 
 - **Architecture tests** (real) — ts-arch, encoding declared rules as executable tests.
 - **Static analysis** (real) — dependency-cruiser: dependency graphs, coupling, cycles, orphans.
 - **Duplication** (real) — jscpd. Present because the no-shared-rendering decision creates duplication the system should surface without condemning.
-- **Runtime signals** (illustrative) — representative data published to the health topic. Labelled as such in the repo and the article.
+- **Runtime call graph** (real, synthetic traffic) — Cloud Trace edges from a smoke script. Compared with the import graph. Not scored.
+- **p95-latency and error-rate** (illustrative) — representative numbers. Labelled as such in the repo and the article.
 
 ### Architecture rules
 
@@ -133,7 +134,7 @@ Cross-project IAM allows CI to publish to the health project's signal topic. Reg
 
 Real: both services and their infrastructure, Pub/Sub, Firestore, Postgres, the health agent, Memory Bank, the MCP server, the dashboard, ts-arch, dependency-cruiser, jscpd, Cloud Trace, the commit history, the scoring model, all Terraform.
 
-Illustrative: runtime and security signals, supplied as representative data published to the health topic.
+Illustrative: p95-latency, error-rate, and security signals, supplied as representative data. The runtime call graph is observed from synthetic smoke traffic generated in CI for the scored commit, and is not scored.
 
 Stated plainly in the repository README and in the article.
 

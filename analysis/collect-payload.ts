@@ -6,6 +6,7 @@ import { classifyClone } from "@health/scoring/classify";
 import { analysisPayloadSchema } from "@health/scoring/schemas";
 import { serviceFromPath } from "@health/scoring/types";
 import { checkArchitecture, RULE_SET_VERSION } from "./arch-tests/check.js";
+import { buildRuntimePayload } from "./runtime-graph.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const defaultRoot = join(here, "..");
@@ -304,13 +305,10 @@ async function main(): Promise<void> {
       clones,
       percentage: jscpd.statistics?.total?.percentage ?? 0,
     },
-    runtime: {
-      illustrative: true as const,
-      signals: [
-        { name: "p95-latency", value: 120, unit: "ms" },
-        { name: "error-rate", value: 0.01, unit: "ratio" },
-      ],
-    },
+    runtime: await buildRuntimePayload({
+      modules,
+      relativize,
+    }),
     recentCommits: recentCommits(),
     changedFiles: changedFiles(),
     ruleSetVersion: RULE_SET_VERSION,

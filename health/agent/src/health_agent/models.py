@@ -15,9 +15,49 @@ class ArchTestResult(BaseModel):
     violations: list[ArchViolation]
 
 
+class RuntimeEdge(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_service: str = Field(alias="from")
+    to: str
+    protocol: str = "http"
+    count: int = 1
+
+
+class RuntimeCallGraph(BaseModel):
+    illustrative: bool = False
+    synthetic: bool = True
+    description: str = ""
+    window: dict[str, str] = Field(default_factory=dict)
+    traffic: str = "none"
+    queried: bool = False
+    edges: list[RuntimeEdge] | None = None
+
+
+class RuntimeVsImports(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    runtimeOnly: list[RuntimeEdge] = Field(default_factory=list)
+    importOnly: list[RuntimeEdge] = Field(default_factory=list)
+
+
+class RuntimeSignal(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: str
+    value: float
+    unit: str
+    illustrative: bool | None = None
+
+
 class RuntimePayload(BaseModel):
-    illustrative: bool
-    signals: list[dict[str, str | float | int]]
+    model_config = ConfigDict(extra="allow")
+
+    illustrative: bool | None = None
+    callGraph: RuntimeCallGraph | None = None
+    vsImports: RuntimeVsImports | None = None
+    signals: list[RuntimeSignal] = Field(default_factory=list)
+
 
 
 class Clone(BaseModel):
