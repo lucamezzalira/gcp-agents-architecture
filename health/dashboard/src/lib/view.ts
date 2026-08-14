@@ -26,6 +26,37 @@ export function buildDashboardModel(
   };
 }
 
+export function slimRunForClient(run: HealthRun, keepDetail: boolean): HealthRun {
+  if (keepDetail) {
+    return run;
+  }
+  const strip = (item: HealthRun["characteristics"][number]) => ({
+    id: item.id,
+    score: item.score,
+    reasoning: "",
+    recommendations: [] as string[],
+    signalsUsed: [] as string[],
+    ...(item.suppressedBy !== undefined
+      ? { suppressedBy: item.suppressedBy }
+      : {}),
+  });
+  return {
+    ...run,
+    characteristics: run.characteristics.map(strip),
+    services: run.services.map((service) => ({
+      ...service,
+      characteristics: service.characteristics.map(strip),
+    })),
+  };
+}
+
+export function clientRunsPayload(
+  runs: HealthRun[],
+  selectedId?: string,
+): HealthRun[] {
+  return runs.map((run) => slimRunForClient(run, run.runId === selectedId));
+}
+
 export function selectRun(
   runs: HealthRun[],
   sha?: string,

@@ -23,6 +23,7 @@ import {
   platformGapLine,
   platformSpreadLine,
   SERVICE_SPREAD_THRESHOLD,
+  clientRunsPayload,
 } from "./view.js";
 import type { HealthRun } from "./types.js";
 
@@ -251,5 +252,14 @@ describe("buildDashboardModel", () => {
         ],
       }),
     ).toBe("boundary integrity 80 · cross service integrity 90");
+  });
+});
+
+describe("clientRunsPayload", () => {
+  it("keeps reasoning only on the selected run", () => {
+    const payload = clientRunsPayload(runs, restore.runId);
+    expect(payload[2]?.characteristics[0]?.reasoning).toBe("boundaries hold");
+    expect(payload[1]?.characteristics[0]?.reasoning).toBe("");
+    expect(payload[1]?.characteristics[0]?.recommendations).toEqual([]);
   });
 });

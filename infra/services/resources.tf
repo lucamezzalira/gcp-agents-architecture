@@ -34,6 +34,13 @@ resource "google_firestore_database" "inventory" {
   depends_on  = [google_project_service.apis]
 }
 
+resource "google_firestore_database" "audit" {
+  name        = "audit"
+  location_id = var.region
+  type        = "FIRESTORE_NATIVE"
+  depends_on  = [google_project_service.apis]
+}
+
 resource "google_storage_bucket" "bodies_logs" { #tfsec:ignore:google-storage-bucket-encryption-customer-key
   #checkov:skip=CKV_GCP_62:This bucket is the access log destination
   name                        = "${var.project_id}-email-bodies-logs"
@@ -78,6 +85,18 @@ resource "google_pubsub_topic" "reservation_outcomes" {
   depends_on = [google_project_service.apis]
 }
 
+resource "google_pubsub_topic" "dead_letters" {
+  #checkov:skip=CKV_GCP_83:Google-managed encryption is enough for this demo
+  name       = "push-dead-letters"
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_pubsub_topic_iam_member" "dead_letters_publisher" {
+  topic  = google_pubsub_topic.dead_letters.name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
 resource "google_service_account" "checkout" {
   account_id   = "checkout"
   display_name = "Checkout service"
@@ -91,6 +110,11 @@ resource "google_service_account" "notification" {
 resource "google_service_account" "inventory" {
   account_id   = "inventory"
   display_name = "Inventory service"
+}
+
+resource "google_service_account" "audit" {
+  account_id   = "audit-log"
+  display_name = "Audit service"
 }
 
 resource "google_service_account" "ci" {
@@ -131,6 +155,17 @@ resource "google_project_iam_member" "inventory_firestore" {
   }
 }
 
+resource "google_project_iam_member" "audit_firestore" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.audit.email}"
+  condition {
+    title       = "audit-database-only"
+    description = "Audit may only use the audit Firestore database"
+    expression  = "resource.name.startsWith(\"projects/${var.project_id}/databases/${google_firestore_database.audit.name}\")"
+  }
+}
+
 resource "google_project_iam_member" "checkout_trace" {
   project = var.project_id
   role    = "roles/cloudtrace.agent"
@@ -147,6 +182,12 @@ resource "google_project_iam_member" "inventory_trace" {
   project = var.project_id
   role    = "roles/cloudtrace.agent"
   member  = "serviceAccount:${google_service_account.inventory.email}"
+}
+
+resource "google_project_iam_member" "audit_trace" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.audit.email}"
 }
 
 resource "google_project_iam_member" "ci_trace" {
@@ -217,6 +258,14 @@ resource "google_pubsub_subscription" "notification" {
       }
     }
   }
+  ack_deadline_seconds = 120
+  expiration_policy {
+    ttl = ""
+  }
+  dead_letter_policy {
+    dead_letter_topic     = google_pubsub_topic.dead_letters.id
+    max_delivery_attempts = 5
+  }
   retry_policy {
     minimum_backoff = "10s"
     maximum_backoff = "600s"
@@ -247,6 +296,14 @@ resource "google_pubsub_subscription" "inventory_reservations" {
         audience              = google_cloud_run_v2_service.inventory[0].uri
       }
     }
+  }
+  ack_deadline_seconds = 120
+  expiration_policy {
+    ttl = ""
+  }
+  dead_letter_policy {
+    dead_letter_topic     = google_pubsub_topic.dead_letters.id
+    max_delivery_attempts = 5
   }
   retry_policy {
     minimum_backoff = "10s"
@@ -279,6 +336,14 @@ resource "google_pubsub_subscription" "checkout_outcomes" {
       }
     }
   }
+  ack_deadline_seconds = 120
+  expiration_policy {
+    ttl = ""
+  }
+  dead_letter_policy {
+    dead_letter_topic     = google_pubsub_topic.dead_letters.id
+    max_delivery_attempts = 5
+  }
   retry_policy {
     minimum_backoff = "10s"
     maximum_backoff = "600s"
@@ -295,6 +360,69 @@ resource "google_pubsub_subscription_iam_member" "checkout_outcomes_subscribe" {
   subscription = google_pubsub_subscription.checkout_outcomes.name
   role         = "roles/pubsub.subscriber"
   member       = "serviceAccount:${google_service_account.checkout.email}"
+}
+
+resource "google_pubsub_subscription" "audit_instructions" {
+  name  = "send-instructions-audit"
+  topic = google_pubsub_topic.send_instructions.id
+  dynamic "push_config" {
+    for_each = var.audit_image == "" ? [] : [1]
+    content {
+      push_endpoint = "${google_cloud_run_v2_service.audit[0].uri}/intake"
+      oidc_token {
+        service_account_email = google_service_account.audit.email
+        audience              = google_cloud_run_v2_service.audit[0].uri
+      }
+    }
+  }
+  ack_deadline_seconds = 120
+  expiration_policy {
+    ttl = ""
+  }
+  dead_letter_policy {
+    dead_letter_topic     = google_pubsub_topic.dead_letters.id
+    max_delivery_attempts = 5
+  }
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+}
+
+resource "google_service_account_iam_member" "audit_pubsub_token" {
+  service_account_id = google_service_account.audit.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "audit_subscribe" {
+  subscription = google_pubsub_subscription.audit_instructions.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:${google_service_account.audit.email}"
+}
+
+resource "google_pubsub_subscription_iam_member" "notification_dlq" {
+  subscription = google_pubsub_subscription.notification.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "inventory_dlq" {
+  subscription = google_pubsub_subscription.inventory_reservations.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "checkout_dlq" {
+  subscription = google_pubsub_subscription.checkout_outcomes.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "audit_dlq" {
+  subscription = google_pubsub_subscription.audit_instructions.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 output "ci_sa_email" {
@@ -323,4 +451,8 @@ output "firestore_notification" {
 
 output "firestore_inventory" {
   value = google_firestore_database.inventory.name
+}
+
+output "firestore_audit" {
+  value = google_firestore_database.audit.name
 }

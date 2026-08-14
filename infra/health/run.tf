@@ -41,7 +41,7 @@ resource "google_cloud_run_v2_service" "dashboard" {
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.database_url.secret_id
-            version = "latest"
+            version = google_secret_manager_secret_version.database_url.version
           }
         }
       }
@@ -71,9 +71,11 @@ resource "google_cloud_run_v2_service" "mcp" {
   ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.mcp.email
+    timeout                          = "60s"
+    max_instance_request_concurrency = 8
+    service_account                  = google_service_account.mcp.email
     scaling {
-      min_instance_count = 0
+      min_instance_count = 1
       max_instance_count = 1
     }
     volumes {
@@ -89,7 +91,8 @@ resource "google_cloud_run_v2_service" "mcp" {
           cpu    = "1"
           memory = "512Mi"
         }
-        cpu_idle = true
+        cpu_idle          = false
+        startup_cpu_boost = true
       }
       ports {
         container_port = 8080
@@ -99,7 +102,7 @@ resource "google_cloud_run_v2_service" "mcp" {
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.database_url.secret_id
-            version = "latest"
+            version = google_secret_manager_secret_version.database_url.version
           }
         }
       }
@@ -129,7 +132,9 @@ resource "google_cloud_run_v2_service" "agent" {
   ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.agent.email
+    timeout                          = "300s"
+    max_instance_request_concurrency = 1
+    service_account                  = google_service_account.agent.email
     scaling {
       min_instance_count = 0
       max_instance_count = 1
@@ -178,7 +183,7 @@ resource "google_cloud_run_v2_service" "agent" {
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.database_url.secret_id
-            version = "latest"
+            version = google_secret_manager_secret_version.database_url.version
           }
         }
       }
@@ -217,11 +222,25 @@ resource "google_pubsub_subscription" "analysis_push" {
       audience              = google_cloud_run_v2_service.agent[0].uri
     }
   }
-  ack_deadline_seconds = 120
+  ack_deadline_seconds = 240
+  expiration_policy {
+    ttl = ""
+  }
+  dead_letter_policy {
+    dead_letter_topic     = google_pubsub_topic.dead_letters.id
+    max_delivery_attempts = 5
+  }
   retry_policy {
     minimum_backoff = "10s"
     maximum_backoff = "600s"
   }
+}
+
+resource "google_pubsub_subscription_iam_member" "analysis_dlq" {
+  count        = var.agent_image == "" ? 0 : 1
+  subscription = google_pubsub_subscription.analysis_push[0].name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 # Agent Runtime, Agent Identity and Memory Bank are attached in the console

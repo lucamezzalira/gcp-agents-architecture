@@ -11,18 +11,28 @@ SKU="${SKU:-standard-item}"
 
 echo "synthetic smoke: place an order, reserve stock, pay, send a confirmation, trigger a low-stock alert"
 
+identity_token() {
+  local audience="$1"
+  gcloud auth print-identity-token --audiences="$audience"
+}
+
 request() {
   local method="$1"
   local url="$2"
   local payload="${3:-}"
+  local origin token
+  origin="$(python3 -c 'from urllib.parse import urlparse; import sys; u=urlparse(sys.argv[1]); print(f"{u.scheme}://{u.netloc}")' "$url")"
+  token="$(identity_token "$origin")"
   local body http
   body="$(mktemp)"
   if [[ -n "$payload" ]]; then
     http="$(curl -sS -o "$body" -w '%{http_code}' -X "$method" "$url" \
       -H 'content-type: application/json' \
+      -H "Authorization: Bearer ${token}" \
       -d "$payload")"
   else
-    http="$(curl -sS -o "$body" -w '%{http_code}' -X "$method" "$url")"
+    http="$(curl -sS -o "$body" -w '%{http_code}' -X "$method" "$url" \
+      -H "Authorization: Bearer ${token}")"
   fi
   if [[ "$http" != 2* ]]; then
     echo "${method} ${url} failed (${http}): $(cat "$body")" >&2

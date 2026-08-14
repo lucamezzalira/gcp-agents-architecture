@@ -118,7 +118,11 @@ async function loadRun(
   const matches = runs.filter(
     (run) => run.commitSha.startsWith(commitSha) || run.runId.startsWith(commitSha),
   );
-  return matches.at(-1);
+  const found = matches.at(-1);
+  if (found === undefined) {
+    return undefined;
+  }
+  return (await store.loadDetailed(found.runId)) ?? found;
 }
 
 function toResult(

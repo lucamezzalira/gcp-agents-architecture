@@ -3,15 +3,13 @@
 Two roots:
 
 - `infra/health` — project A: Pub/Sub analysis topic, Cloud SQL Postgres, Cloud Run dashboard/agent/MCP, Artifact Registry, GitHub WIF.
-- `infra/services` — project B: two Firestore databases (`checkout`, `notification`), bodies bucket, send-instructions topic, Cloud Run for the two services.
+- `infra/services` — project B: Firestore databases (`checkout`, `notification`, `inventory`, `audit`), bodies bucket, send-instructions / stock topics, Cloud Run for the four services.
 
 Cloud Run services are skipped while `*_image` variables are empty. Apply the data plane first, build images, then set the image variables and apply again.
 
-Budget for this demo: stay inside the free-trial credits (about £226). The meter is Cloud SQL `db-f1-micro` plus its public IPv4, roughly £12–18 per month if left running. Firestore, GCS, Pub/Sub, and scale-to-zero Cloud Run are small next to that. The agent runs `HEALTH_REASONER=adk` against Vertex. That costs tokens. Destroy the stacks when the demo is done.
+Live meter (talk shape, 2026-08): Cloud SQL `db-custom-1-3840` ALWAYS on (~$90–110/month with public IPv4 and 10 GB), dashboard Cloud Run min 1 with CPU allocated (~$50–70/month in `europe-west1`), MCP min 1 during a talk, Vertex tokens for the agent. Scale-to-zero checkout/inventory/notification/audit are small next to that. Set billing budgets at the current number, not £40. Destroy the stacks when the demo is done.
 
-Set a budget alert in the billing console at £40 and £80 before apply.
-
-Checkout and notification pick cloud adapters when `BODY_BUCKET` is set (GCS, named Firestore, Pub/Sub). Local `./scripts/dev-services.sh` leaves that unset and uses the file store plus HTTP.
+Checkout, inventory, notification, and audit pick cloud adapters when `BODY_BUCKET` is set (GCS, named Firestore, Pub/Sub). Local `./scripts/dev-services.sh` leaves that unset and uses the file store plus HTTP. Smoke against Cloud Run uses `gcloud auth print-identity-token`; inventory and checkout are not `allUsers`.
 
 ```
 gcloud auth application-default login
@@ -27,9 +25,9 @@ terraform init
 terraform apply
 ```
 
-Then pass `services_ci_sa_email` into the health root so CI can publish payloads.
+Then pass `services_ci_sa_email` into the health root so CI can read Cloud Trace. `publish-health` impersonates `health-ci` to post `AnalysisPayload` JSON. `services-ci` is not a publisher on `analysis-payloads`.
 
-After WIF exists, set GitHub Actions variables `WIF_PROVIDER`, `HEALTH_CI_SA`, `SERVICES_CI_SA`, `TRACE_PROJECT`, and `ANALYSIS_TOPIC`. `WIF_PROVIDER` is the health-project pool. Collect impersonates `services-ci` (Cloud Trace reader in the services project) through that same pool. `publish-health` still impersonates `health-ci` to post `AnalysisPayload` JSON.
+After WIF exists, set GitHub Actions variables `WIF_PROVIDER`, `HEALTH_CI_SA`, `SERVICES_CI_SA`, `TRACE_PROJECT`, and `ANALYSIS_TOPIC`. `WIF_PROVIDER` is the health-project pool. Collect impersonates `services-ci` (Cloud Trace reader in the services project) through that same pool.
 
 Lint (no apply):
 

@@ -1,5 +1,9 @@
 terraform {
   required_version = ">= 1.8.0"
+  backend "gcs" {
+    bucket = "ga-health-mezzalab-tfstate"
+    prefix = "health"
+  }
   required_providers {
     google = {
       source  = "hashicorp/google"

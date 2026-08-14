@@ -21,6 +21,11 @@ export class InMemoryHealthStore implements HealthStore {
     return this.latest === undefined ? [] : [this.latest];
   }
 
+  async loadDetailed(runId: string): Promise<LatestHealth | undefined> {
+    const runs = await this.loadRuns();
+    return runs.find((run) => run.runId === runId);
+  }
+
   async loadActiveDecisions(): Promise<AcceptedDecision[]> {
     return this.decisions.filter((item) => item.active);
   }

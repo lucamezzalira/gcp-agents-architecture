@@ -1,5 +1,9 @@
 terraform {
   required_version = ">= 1.8.0"
+  backend "gcs" {
+    bucket = "ga-services-mezzalab-tfstate"
+    prefix = "services"
+  }
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -19,7 +23,7 @@ data "google_project" "this" {
 
 variable "project_id" {
   type        = string
-  description = "GCP project B: checkout, notification, inventory"
+  description = "GCP project B: checkout, notification, inventory, audit"
 }
 
 variable "region" {
@@ -38,6 +42,11 @@ variable "notification_image" {
 }
 
 variable "inventory_image" {
+  type    = string
+  default = ""
+}
+
+variable "audit_image" {
   type    = string
   default = ""
 }

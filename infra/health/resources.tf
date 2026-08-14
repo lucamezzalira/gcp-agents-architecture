@@ -23,6 +23,18 @@ resource "google_pubsub_topic" "analysis" {
   depends_on = [google_project_service.apis]
 }
 
+resource "google_pubsub_topic" "dead_letters" {
+  #checkov:skip=CKV_GCP_83:Google-managed encryption is enough for this demo
+  name       = "analysis-dead-letters"
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_pubsub_topic_iam_member" "dead_letters_publisher" {
+  topic  = google_pubsub_topic.dead_letters.name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
 resource "google_service_account" "dashboard" {
   account_id   = "health-dashboard"
   display_name = "Health dashboard"
@@ -55,22 +67,32 @@ resource "google_sql_database_instance" "health" { #tfsec:ignore:google-sql-no-p
   database_version = "POSTGRES_16"
   region           = var.region
   settings {
-    tier              = "db-custom-1-3840"
-    edition           = "ENTERPRISE"
-    availability_type = "ZONAL"
-    disk_type         = "PD_SSD"
-    disk_size         = 10
-    disk_autoresize   = false
+    tier                        = "db-custom-1-3840"
+    deletion_protection_enabled = true
+    edition                     = "ENTERPRISE"
+    availability_type           = "ZONAL"
+    disk_type                   = "PD_SSD"
+    disk_size                   = 10
+    disk_autoresize             = false
     ip_configuration {
       ipv4_enabled = true
       ssl_mode     = "ENCRYPTED_ONLY"
     }
     backup_configuration {
       enabled                        = true
-      point_in_time_recovery_enabled = false
+      point_in_time_recovery_enabled = true
       backup_retention_settings {
         retained_backups = 3
       }
+    }
+    insights_config {
+      query_insights_enabled  = true
+      record_application_tags = false
+    }
+    maintenance_window {
+      day          = 7
+      hour         = 3
+      update_track = "stable"
     }
     database_flags {
       name  = "log_checkpoints"
@@ -109,7 +131,7 @@ resource "google_sql_database_instance" "health" { #tfsec:ignore:google-sql-no-p
       value = "ddl"
     }
   }
-  deletion_protection = false
+  deletion_protection = true
   depends_on          = [google_project_service.apis]
 }
 
@@ -188,11 +210,4 @@ resource "google_project_iam_member" "agent_vertex" {
   project = var.project_id
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.agent.email}"
-}
-
-resource "google_pubsub_topic_iam_member" "ci_publish" {
-  count  = var.services_ci_sa_email == "" ? 0 : 1
-  topic  = google_pubsub_topic.analysis.name
-  role   = "roles/pubsub.publisher"
-  member = "serviceAccount:${var.services_ci_sa_email}"
 }

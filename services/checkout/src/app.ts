@@ -17,7 +17,9 @@ import type { StockLookup } from "./domain/ports/stock-lookup.js";
 import type { StockOutcomeSink } from "./domain/ports/stock-outcome-sink.js";
 import type { StockReservationPublisher } from "./domain/ports/stock-reservation-publisher.js";
 import { FileBodyStore } from "./infrastructure/file-body-store.js";
+import { FirestoreDeliveryStatusLookup } from "./infrastructure/firestore-delivery-status-lookup.js";
 import { FirestoreOrderStore } from "./infrastructure/firestore-order-store.js";
+import { FirestoreStockOutcomes } from "./infrastructure/firestore-stock-outcomes.js";
 import { GcsBodyStore } from "./infrastructure/gcs-body-store.js";
 import { HttpInstructionPublisher } from "./infrastructure/http-instruction-publisher.js";
 import { HttpStockLookup } from "./infrastructure/http-stock-lookup.js";
@@ -132,7 +134,8 @@ export function createLocalApp(): FastifyInstance {
 }
 
 export function createCloudApp(): FastifyInstance {
-  const orderStore = FirestoreOrderStore.connect(requireEnv("FIRESTORE_DATABASE"));
+  const database = requireEnv("FIRESTORE_DATABASE");
+  const orderStore = FirestoreOrderStore.connect(database);
   const bodyStore = GcsBodyStore.fromBucketName(requireEnv("BODY_BUCKET"));
   const publisher = PubSubInstructionPublisher.fromTopicName(
     requireEnv("SEND_INSTRUCTIONS_TOPIC"),
@@ -145,13 +148,13 @@ export function createCloudApp(): FastifyInstance {
     bodyStore,
     publisher,
     stockReservations,
-    new MemoryStockOutcomes(),
+    FirestoreStockOutcomes.connect(database),
     new HttpStockLookup(
       process.env.INVENTORY_URL && process.env.INVENTORY_URL.length > 0
         ? process.env.INVENTORY_URL
         : "http://127.0.0.1:3002",
     ),
-    new InMemoryDeliveryStatusLookup(),
+    FirestoreDeliveryStatusLookup.connect(database),
     createJsonLogger("checkout"),
   );
 }

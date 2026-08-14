@@ -19,6 +19,7 @@ import {
   scoreTone,
   shaTail,
   shortSha,
+  clientRunsPayload,
   toneColor,
   trendArea,
   trendCaption,
@@ -68,7 +69,7 @@ const circumference = 2 * Math.PI * radius;
 const runtimeGraph = layoutRuntimeGraph(
   mergeRuntimeEdges(selected?.runtimeEdges ?? []),
 );
-const payload = JSON.stringify(model.runs);
+const payload = JSON.stringify(clientRunsPayload(model.runs, selected?.runId));
 const historyHref = includeSuperseded
   ? `?${new URLSearchParams({
       ...(requested ? { commit: requested } : {}),

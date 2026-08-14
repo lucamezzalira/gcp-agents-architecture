@@ -55,6 +55,7 @@ export type HealthRunSummary = {
 export type HealthStore = {
   loadLatest(): Promise<LatestHealth | undefined>;
   loadRuns(): Promise<LatestHealth[]>;
+  loadDetailed(runId: string): Promise<LatestHealth | undefined>;
   loadActiveDecisions(): Promise<AcceptedDecision[]>;
 };
 

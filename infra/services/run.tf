@@ -90,12 +90,36 @@ resource "google_cloud_run_v2_service" "notification" {
   depends_on = [google_project_service.apis]
 }
 
-resource "google_cloud_run_v2_service_iam_member" "checkout_public" {
+resource "google_cloud_run_v2_service_iam_member" "inventory_checkout" {
+  count    = var.inventory_image == "" || var.checkout_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.inventory[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.checkout.email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "checkout_pubsub" {
   count    = var.checkout_image == "" ? 0 : 1
   name     = google_cloud_run_v2_service.checkout[0].name
   location = var.region
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = "serviceAccount:${google_service_account.checkout.email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "checkout_ci" {
+  count    = var.checkout_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.checkout[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.ci.email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "inventory_ci" {
+  count    = var.inventory_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.inventory[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.ci.email}"
 }
 
 resource "google_cloud_run_v2_service_iam_member" "notification_pubsub" {
@@ -154,18 +178,54 @@ resource "google_cloud_run_v2_service" "inventory" {
   depends_on = [google_project_service.apis]
 }
 
-resource "google_cloud_run_v2_service_iam_member" "inventory_public" {
-  count    = var.inventory_image == "" ? 0 : 1
-  name     = google_cloud_run_v2_service.inventory[0].name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
-
 resource "google_cloud_run_v2_service_iam_member" "inventory_pubsub" {
   count    = var.inventory_image == "" ? 0 : 1
   name     = google_cloud_run_v2_service.inventory[0].name
   location = var.region
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.inventory.email}"
+}
+
+resource "google_cloud_run_v2_service" "audit" {
+  count               = var.audit_image == "" ? 0 : 1
+  name                = "audit"
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.audit.email
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 1
+    }
+    containers {
+      image = var.audit_image
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle = true
+      }
+      env {
+        name  = "FIRESTORE_DATABASE"
+        value = google_firestore_database.audit.name
+      }
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "audit"
+      }
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "audit_pubsub" {
+  count    = var.audit_image == "" ? 0 : 1
+  name     = google_cloud_run_v2_service.audit[0].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.audit.email}"
 }
