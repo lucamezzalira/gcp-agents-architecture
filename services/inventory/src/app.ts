@@ -20,7 +20,6 @@ import {
   FirestoreInventory,
 } from "./infrastructure/firestore-inventory.js";
 import { GcsHtml } from "./infrastructure/gcs-html.js";
-import { HttpInstructionPublisher } from "./infrastructure/http-instruction-publisher.js";
 import { MemoryHtml } from "./infrastructure/memory-html.js";
 import { MemoryMail } from "./infrastructure/memory-mail.js";
 import { MemoryOutcomes } from "./infrastructure/memory-outcomes.js";
@@ -110,11 +109,7 @@ export function createLocalApp(): FastifyInstance {
   const stock = new MemoryStock();
   void stock.save({ sku: DEFAULT_SKU, available: 100 });
   const html = new MemoryHtml();
-  const mailer =
-    process.env.NOTIFICATION_URL !== undefined &&
-    process.env.NOTIFICATION_URL.length > 0
-      ? new HttpInstructionPublisher(process.env.NOTIFICATION_URL)
-      : new MemoryMail();
+  const mailer = new MemoryMail();
   return buildServer(
     stock,
     new MemoryReservations(),
