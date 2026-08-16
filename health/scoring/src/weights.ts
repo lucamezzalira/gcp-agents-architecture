@@ -65,8 +65,8 @@ export const CYCLE_PENALTY = 15;
 export const ORPHAN_PENALTY = 5;
 export const UNRESOLVABLE_PENALTY = 10;
 export const DEP_ON_TEST_PENALTY = 10;
-/** Penalty per extra outgoing edge vs the prior run. Decrease is not scored. */
-export const EFFERENT_GROWTH_PENALTY = 10;
+/** Penalty per current outgoing edge that leaves the service. Ce 0 is skipped. */
+export const EFFERENT_COUPLING_PENALTY = 10;
 export const INTERNAL_CLONE_PENALTY = 8;
 export const CROSS_SERVICE_CLONE_PENALTY = 10;
 export const SHARED_CLONE_PENALTY = 8;

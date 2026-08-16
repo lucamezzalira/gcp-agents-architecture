@@ -182,7 +182,7 @@ describe("score", () => {
     expect(noisier.overall).toBe(quieter.overall);
   });
 
-  it("penalises checkout coupling for Ce growth and ignores a Ca rise on notification", () => {
+  it("penalises current Ce every run and ignores a Ca rise", () => {
     const payload: AnalysisPayload = {
       ...zeroFindings,
       services: ["checkout", "notification"],
@@ -203,12 +203,12 @@ describe("score", () => {
         ...zeroFindings.dependencyCruiser,
         serviceMetrics: [
           { service: "checkout", afferentCoupling: 0, efferentCoupling: 2 },
-          { service: "notification", afferentCoupling: 5, efferentCoupling: 3 },
+          { service: "notification", afferentCoupling: 5, efferentCoupling: 0 },
         ],
       },
       priorServiceMetrics: [
-        { service: "checkout", afferentCoupling: 0, efferentCoupling: 1 },
-        { service: "notification", afferentCoupling: 4, efferentCoupling: 3 },
+        { service: "checkout", afferentCoupling: 0, efferentCoupling: 2 },
+        { service: "notification", afferentCoupling: 4, efferentCoupling: 0 },
       ],
     };
     const result = score(payload, []);
@@ -217,11 +217,11 @@ describe("score", () => {
       100,
     );
     expect(serviceChar(result, "notification", "coupling").score).toBe(100);
-    expect(serviceChar(result, "checkout", "coupling").score).toBe(90);
+    expect(serviceChar(result, "checkout", "coupling").score).toBe(80);
     expect(characteristic(result, "cross-service-integrity").score).toBe(75);
   });
 
-  it("does not penalise a drop in efferent coupling", () => {
+  it("scores remaining Ce after a drop, not zero", () => {
     const payload: AnalysisPayload = {
       ...zeroFindings,
       services: ["checkout", "notification"],
@@ -229,17 +229,42 @@ describe("score", () => {
         ...zeroFindings.dependencyCruiser,
         serviceMetrics: [
           { service: "checkout", afferentCoupling: 1, efferentCoupling: 2 },
-          { service: "notification", afferentCoupling: 4, efferentCoupling: 3 },
+          { service: "notification", afferentCoupling: 4, efferentCoupling: 0 },
         ],
       },
       priorServiceMetrics: [
         { service: "checkout", afferentCoupling: 1, efferentCoupling: 5 },
-        { service: "notification", afferentCoupling: 2, efferentCoupling: 3 },
+        { service: "notification", afferentCoupling: 2, efferentCoupling: 0 },
       ],
     };
     const result = score(payload, []);
-    expect(serviceChar(result, "checkout", "coupling").score).toBe(100);
+    expect(serviceChar(result, "checkout", "coupling").score).toBe(80);
     expect(serviceChar(result, "notification", "coupling").score).toBe(100);
+  });
+
+  it("penalises Ce on the first observation the same as later runs", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "notification"],
+      dependencyCruiser: {
+        ...zeroFindings.dependencyCruiser,
+        serviceMetrics: [
+          { service: "checkout", afferentCoupling: 0, efferentCoupling: 2 },
+          { service: "notification", afferentCoupling: 1, efferentCoupling: 0 },
+        ],
+      },
+    };
+    const first = score(payload, []);
+    const later = score(
+      {
+        ...payload,
+        priorServiceMetrics: payload.dependencyCruiser.serviceMetrics,
+      },
+      [],
+    );
+    expect(serviceChar(first, "checkout", "coupling").score).toBe(80);
+    expect(serviceChar(later, "checkout", "coupling").score).toBe(80);
+    expect(later.overall).toBe(first.overall);
   });
 
   it("scores an improved-metrics run no lower than its predecessor", () => {
@@ -332,6 +357,10 @@ describe("score", () => {
     expect(serviceChar(second, "checkout", "duplication").score).toBeGreaterThanOrEqual(
       serviceChar(first, "checkout", "duplication").score,
     );
+    expect(characteristic(second, "cross-service-integrity").score).toBe(
+      characteristic(first, "cross-service-integrity").score,
+    );
+    expect(characteristic(first, "cross-service-integrity").score).toBe(90);
   });
 
   it("scores internal clones on the service and cross-service clones on the platform", () => {
@@ -368,6 +397,117 @@ describe("score", () => {
     expect(serviceChar(result, "checkout", "duplication").score).toBe(92);
     expect(serviceChar(result, "notification", "duplication").score).toBe(100);
     expect(characteristic(result, "cross-service-integrity").score).toBe(90);
+  });
+
+  it("penalises current cross-service clones even when the prior count is unchanged", () => {
+    const clones: AnalysisPayload["duplication"]["clones"] = [
+      {
+        files: [
+          "services/checkout/src/infrastructure/http-instruction-publisher.ts",
+          "services/inventory/src/infrastructure/http-instruction-publisher.ts",
+        ],
+        lines: 24,
+        tokens: 113,
+        classification: "cross-service",
+        services: ["checkout", "inventory"],
+      },
+      {
+        files: [
+          "services/checkout/src/infrastructure/pubsub-instruction-publisher.ts",
+          "services/inventory/src/infrastructure/pubsub-instruction-publisher.ts",
+        ],
+        lines: 25,
+        tokens: 149,
+        classification: "cross-service",
+        services: ["checkout", "inventory"],
+      },
+      {
+        files: [
+          "services/checkout/src/infrastructure/file-body-store.ts",
+          "services/notification/src/infrastructure/file-body-store.ts",
+        ],
+        lines: 17,
+        tokens: 129,
+        classification: "cross-service",
+        services: ["checkout", "notification"],
+      },
+    ];
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "inventory", "notification"],
+      duplication: { percentage: 3, clones },
+    };
+    const first = score(payload, []);
+    const held: AnalysisPayload = {
+      ...payload,
+      priorDuplicationCounts: {
+        internal: 0,
+        crossService: 3,
+        shared: 0,
+        internalByService: {},
+      },
+    };
+    const second = score(held, []);
+    expect(characteristic(first, "cross-service-integrity").score).toBe(70);
+    expect(characteristic(second, "cross-service-integrity").score).toBe(70);
+    expect(second.overall).toBe(first.overall);
+    expect(JSON.stringify(second.characteristics)).toBe(
+      JSON.stringify(first.characteristics),
+    );
+  });
+
+  it("raises CSI by one clone penalty when a cross-service clone is removed", () => {
+    const three: AnalysisPayload["duplication"]["clones"] = [
+      {
+        files: [
+          "services/checkout/src/a.ts",
+          "services/notification/src/a.ts",
+        ],
+        lines: 10,
+        tokens: 40,
+        classification: "cross-service",
+        services: ["checkout", "notification"],
+      },
+      {
+        files: [
+          "services/checkout/src/b.ts",
+          "services/inventory/src/b.ts",
+        ],
+        lines: 10,
+        tokens: 40,
+        classification: "cross-service",
+        services: ["checkout", "inventory"],
+      },
+      {
+        files: [
+          "services/checkout/src/c.ts",
+          "services/inventory/src/c.ts",
+        ],
+        lines: 10,
+        tokens: 40,
+        classification: "cross-service",
+        services: ["checkout", "inventory"],
+      },
+    ];
+    const withThree: AnalysisPayload = {
+      ...zeroFindings,
+      services: ["checkout", "inventory", "notification"],
+      duplication: { percentage: 3, clones: three },
+    };
+    const withTwo: AnalysisPayload = {
+      ...withThree,
+      duplication: { percentage: 2, clones: three.slice(0, 2) },
+      priorDuplicationCounts: {
+        internal: 0,
+        crossService: 3,
+        shared: 0,
+        internalByService: {},
+      },
+    };
+    const before = score(withThree, []);
+    const after = score(withTwo, []);
+    expect(characteristic(before, "cross-service-integrity").score).toBe(70);
+    expect(characteristic(after, "cross-service-integrity").score).toBe(80);
   });
 
   it("suppresses a platform-scoped cross-service clone decision", () => {
@@ -591,5 +731,19 @@ describe("classifyClone", () => {
         "health/scoring/src/cli.ts",
       ]),
     ).toEqual({ classification: "shared", services: ["checkout"] });
+  });
+});
+
+describe("analysisPayloadSchema committedAt", () => {
+  it("keeps payloads without committedAt valid", () => {
+    expect(zeroFindings.committedAt).toBeUndefined();
+  });
+
+  it("accepts git committer time when collect supplies it", () => {
+    const parsed = analysisPayloadSchema.parse({
+      ...zeroFindings,
+      committedAt: "2026-08-14T17:55:39+01:00",
+    });
+    expect(parsed.committedAt).toBe("2026-08-14T17:55:39+01:00");
   });
 });

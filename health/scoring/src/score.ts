@@ -6,7 +6,6 @@ import type {
   AnalysisPayload,
   CharacteristicId,
   CharacteristicScore,
-  DuplicationCounts,
   PlatformCharacteristicId,
   ScoreResult,
   ServiceScore,
@@ -17,7 +16,7 @@ import {
   CROSS_SERVICE_RULES,
   CYCLE_PENALTY,
   DEP_ON_TEST_PENALTY,
-  EFFERENT_GROWTH_PENALTY,
+  EFFERENT_COUPLING_PENALTY,
   INTERNAL_CLONE_PENALTY,
   ORPHAN_PENALTY,
   PLATFORM_WEIGHTS,
@@ -159,7 +158,7 @@ function collectFindings(payload: AnalysisPayload): Finding[] {
   }
 
   findings.push(...duplicationFindings(payload));
-  findings.push(...efferentGrowthFindings(payload));
+  findings.push(...efferentCouplingFindings(payload));
 
   return findings;
 }
@@ -187,50 +186,8 @@ function scoredClones(payload: AnalysisPayload): CountedClone[] {
   return clones;
 }
 
-function currentDuplicationCounts(payload: AnalysisPayload): DuplicationCounts {
-  const internalByService: Record<string, number> = {};
-  let internal = 0;
-  let crossService = 0;
-  let shared = 0;
-  for (const clone of scoredClones(payload)) {
-    if (clone.classification === "internal" && clone.services[0] !== undefined) {
-      internal += 1;
-      const service = clone.services[0];
-      internalByService[service] = (internalByService[service] ?? 0) + 1;
-    } else if (clone.classification === "cross-service") {
-      crossService += 1;
-    } else {
-      shared += 1;
-    }
-  }
-  return { internal, crossService, shared, internalByService };
-}
-
-function cloneFiles(
-  clones: CountedClone[],
-  classification: CountedClone["classification"],
-  service?: string,
-): string[] {
-  return clones
-    .filter((clone) => {
-      if (clone.classification !== classification) {
-        return false;
-      }
-      if (service === undefined) {
-        return true;
-      }
-      return clone.services[0] === service;
-    })
-    .flatMap((clone) => clone.files);
-}
-
 function duplicationFindings(payload: AnalysisPayload): Finding[] {
-  const clones = scoredClones(payload);
-  const prior = payload.priorDuplicationCounts;
-  if (prior === undefined) {
-    return baselineCloneFindings(clones);
-  }
-  return growthCloneFindings(clones, currentDuplicationCounts(payload), prior);
+  return baselineCloneFindings(scoredClones(payload));
 }
 
 function baselineCloneFindings(clones: CountedClone[]): Finding[] {
@@ -267,76 +224,18 @@ function baselineCloneFindings(clones: CountedClone[]): Finding[] {
   return findings;
 }
 
-function growthCloneFindings(
-  clones: CountedClone[],
-  current: DuplicationCounts,
-  prior: DuplicationCounts,
-): Finding[] {
+function efferentCouplingFindings(payload: AnalysisPayload): Finding[] {
   const findings: Finding[] = [];
-  const services = new Set([
-    ...Object.keys(current.internalByService),
-    ...Object.keys(prior.internalByService ?? {}),
-  ]);
-  for (const service of services) {
-    const currentCount = current.internalByService[service] ?? 0;
-    const priorCount = prior.internalByService?.[service] ?? 0;
-    const growth = Math.max(0, currentCount - priorCount);
-    if (growth === 0) {
-      continue;
-    }
-    findings.push({
-      ruleId: "duplication-internal",
-      paths: cloneFiles(clones, "internal", service),
-      characteristic: "duplication",
-      penalty: growth * INTERNAL_CLONE_PENALTY,
-      signal: `jscpd:internal-growth:${service}:${priorCount}->${currentCount}`,
-      service,
-    });
-  }
-  const crossGrowth = Math.max(0, current.crossService - prior.crossService);
-  if (crossGrowth > 0) {
-    findings.push({
-      ruleId: "duplication-cross-service",
-      paths: cloneFiles(clones, "cross-service"),
-      characteristic: "cross-service-integrity",
-      penalty: crossGrowth * CROSS_SERVICE_CLONE_PENALTY,
-      signal: `jscpd:cross-service-growth:${prior.crossService}->${current.crossService}`,
-    });
-  }
-  const sharedGrowth = Math.max(0, current.shared - prior.shared);
-  if (sharedGrowth > 0) {
-    findings.push({
-      ruleId: "duplication-shared",
-      paths: cloneFiles(clones, "shared"),
-      characteristic: "cross-service-integrity",
-      penalty: sharedGrowth * SHARED_CLONE_PENALTY,
-      signal: `jscpd:shared-growth:${prior.shared}->${current.shared}`,
-    });
-  }
-  return findings;
-}
-
-function efferentGrowthFindings(payload: AnalysisPayload): Finding[] {
-  const findings: Finding[] = [];
-  const priors = payload.priorServiceMetrics ?? [];
-  if (priors.length === 0) {
-    return findings;
-  }
   for (const current of payload.dependencyCruiser.serviceMetrics ?? []) {
-    const prior = priors.find((item) => item.service === current.service);
-    if (prior === undefined) {
-      continue;
-    }
-    const growth = Math.max(0, current.efferentCoupling - prior.efferentCoupling);
-    if (growth === 0) {
+    if (current.efferentCoupling <= 0) {
       continue;
     }
     findings.push({
-      ruleId: "efferent-growth",
+      ruleId: "efferent-coupling",
       paths: [`services/${current.service}/`],
       characteristic: "coupling",
-      penalty: growth * EFFERENT_GROWTH_PENALTY,
-      signal: `dependency-cruiser:efferent-growth:${current.service}:${prior.efferentCoupling}->${current.efferentCoupling}`,
+      penalty: current.efferentCoupling * EFFERENT_COUPLING_PENALTY,
+      signal: `dependency-cruiser:efferent:${current.service}:${current.efferentCoupling}`,
       service: current.service,
     });
   }

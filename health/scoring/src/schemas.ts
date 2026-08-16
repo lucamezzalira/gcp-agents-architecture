@@ -211,6 +211,7 @@ export const analysisPayloadSchema = z.object({
   commitSha: z.string(),
   commitMessage: z.string(),
   timestamp: z.string(),
+  committedAt: z.string().optional(),
   services: z.array(z.string()).default([]),
   archTests: z.array(archTestResultSchema),
   dependencyCruiser: dependencyCruiserSchema,

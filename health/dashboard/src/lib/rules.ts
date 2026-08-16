@@ -129,29 +129,29 @@ export const METRIC_SIGNALS: MetricSignal[] = [
     penalty: "10",
   },
   {
-    id: "efferent-growth",
+    id: "efferent-coupling",
     description:
-      "Outgoing dependencies that leave the service, vs the prior run. Increase only. Afferent coupling is not scored.",
+      "Outgoing dependencies that leave the service (current Ce). Afferent coupling is not scored.",
     characteristic: "coupling",
-    penalty: "10 per extra edge",
+    penalty: "10 per current edge",
   },
   {
     id: "internal-clone",
-    description: "Internal clone count (first run) or growth vs prior",
+    description: "Each internal clone currently present",
     characteristic: "duplication",
-    penalty: "8 per extra clone",
+    penalty: "8 per clone",
   },
   {
     id: "cross-service-clone",
-    description: "Clones that span services (first run or growth)",
+    description: "Each clone that currently spans services",
     characteristic: "cross-service-integrity",
-    penalty: "10 per extra clone",
+    penalty: "10 per clone",
   },
   {
     id: "shared-clone",
-    description: "Clones that span a service and code outside services/",
+    description: "Each clone that currently spans a service and code outside services/",
     characteristic: "cross-service-integrity",
-    penalty: "8 per extra clone",
+    penalty: "8 per clone",
   },
 ];
 

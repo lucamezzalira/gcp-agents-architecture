@@ -171,9 +171,9 @@ Rule 8 is unchanged: `domain` (including `domain/ports`) must not depend on `inf
 
 Instability is no longer scored. Folder `I` remains an observation for the reasoner, read against the layer profiles above rather than against zero.
 
-Coupling now penalises efferent coupling growth only: `max(0, currentCe - priorCe) * 10`. No prior means no growth penalty. Afferent coupling is never a penalty.
+Coupling penalised efferent coupling growth only: `max(0, currentCe - priorCe) * 10`. No prior meant no growth penalty. Afferent coupling was never a penalty.
 
-Duplication penalties are increase-only once a prior clone count exists. The first observation still scores the current count as the baseline.
+Duplication penalties were increase-only once a prior clone count existed. The first observation still scored the current count as the baseline.
 
 The reasoner receives those layer profiles and the active rule ids. It must not recommend reducing transport instability, and must not recommend adding a rule that is already in force.
 
@@ -185,8 +185,12 @@ The dashboard reports the worst service and the count of services below 80 on th
 
 ### Version 6
 
-Penalties apply to architectural state, not to recent change. Clone findings always use the current count. Efferent coupling is `currentCe * 10` every run, including the first observation. Prior counts stay on the payload for the reasoner and do not move a score.
+Documented as scoring architectural state rather than recent change. The scorer was not updated. Clone and Ce penalties stayed increase-only, as in version 4. Runs stamped 6 used that growth model.
 
 ### Version 7
 
 Rule 10: every service under `services/` must import `@observability/runtime`. A service that boots its own tracer, clones `createJsonLogger` / `silentLogger`, subclasses the logger, or re-exports the package fails. Penalty 25 on that service's `boundary-integrity`. Not a cross-service-integrity rule. The package remains the only place that talks to the tracing SDK.
+
+### Version 8
+
+Clone and Ce penalties apply to the current count every run. The growth-only branch is gone. Three cross-service clones cost 30 on the commit that created them and 30 on every later commit until they are removed. Prior counts stay on the payload for the reasoner and do not move a score.

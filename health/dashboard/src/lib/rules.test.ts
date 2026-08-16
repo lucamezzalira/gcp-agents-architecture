@@ -41,7 +41,7 @@ describe("architecture rule catalog", () => {
   });
 
   it("documents metric signals that are not architecture rules", () => {
-    expect(METRIC_SIGNALS.some((item) => item.id === "efferent-growth")).toBe(
+    expect(METRIC_SIGNALS.some((item) => item.id === "efferent-coupling")).toBe(
       true,
     );
   });
