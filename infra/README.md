@@ -16,6 +16,7 @@ gcloud auth application-default login
 cd infra/health
 cp terraform.tfvars.example terraform.tfvars
 # edit project_id, and agent_engine_id if a Memory Bank engine already exists
+# agent_score_split defaults true; set it false only to roll back
 terraform init
 terraform apply
 
@@ -56,6 +57,6 @@ Vertex coverage (hashicorp/google-beta `~> 7.37`, locked 7.44.0, resource added 
 
 google 6.50 (what the rest of this root pins with `~> 6.47`) does not have `google_vertex_ai_reasoning_engine`. The engine resources are google-beta `~> 7.37` so the 6.x Cloud Run / SQL stack does not have to move to provider 7.
 
-`agent_score_split` is true. Pub/Sub still pushes to Cloud Run. Cloud Run scores and writes Postgres, then invokes the live engine (`agent_reasoner_image`) for prose. The preview engine is gone. Set the flag false only to roll back.
+`agent_score_split` defaults to true in `infra/health/main.tf`. That is the live value. Pub/Sub still pushes to Cloud Run. Cloud Run scores and writes Postgres, then invokes the live engine (`agent_reasoner_image`) for prose. The preview engine is gone. Set the flag false only to roll back. Do not commit `terraform.tfvars`; it pins this project's image digests. Copy `terraform.tfvars.example` and fill `project_id`, images, and `agent_engine_id`.
 
 MCP Cloud Run is Streamable HTTP at `/mcp`. Cursor connects to that URL.

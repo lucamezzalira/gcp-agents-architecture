@@ -81,8 +81,8 @@ variable "agent_runtime_cutover" {
 
 variable "agent_score_split" {
   type        = bool
-  default     = false
-  description = "When true, Cloud Run scores and writes Postgres, then invokes Agent Runtime for prose. Live traffic uses this. Pub/Sub push still targets Cloud Run."
+  default     = true
+  description = "Cloud Run scores and writes Postgres, then invokes Agent Runtime for prose. This is the live architecture. Pub/Sub push still targets Cloud Run. Set false only to roll back to a combined engine."
 }
 
 variable "agent_engine_id" {

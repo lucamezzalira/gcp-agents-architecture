@@ -145,8 +145,8 @@ moved {
 resource "terraform_data" "score_split_requires_reasoner_image" {
   lifecycle {
     precondition {
-      condition     = !var.agent_score_split || var.agent_reasoner_image != ""
-      error_message = "agent_score_split requires agent_reasoner_image, the image that does not contain health/scoring."
+      condition     = !var.agent_score_split || var.agent_image == "" || var.agent_reasoner_image != ""
+      error_message = "agent_score_split requires agent_reasoner_image, the image that does not contain health/scoring. Empty agent_image still skips Cloud Run and the engine on a first apply."
     }
   }
 }

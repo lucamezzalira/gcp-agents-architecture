@@ -7,7 +7,9 @@ region     = "europe-west1"
 # Required for terraform plan/import against a project that already has one.
 # agent_engine_id = "REPLACE_ENGINE_ID"
 # memory_bank_location = "us-central1"
-# Cloud Run is the Pub/Sub receiver. Live traffic uses the score split.
+# Cloud Run is the Pub/Sub receiver. agent_score_split defaults true in
+# main.tf (the live architecture). Leave it unset, or set false only to
+# roll back to a combined engine. agent_reasoner_image is required once
+# agent_image is set.
 # agent_runtime_cutover = true
-# agent_score_split = true
 # agent_reasoner_image = "europe-west1-docker.pkg.dev/PROJECT/health/reasoner:v1"
