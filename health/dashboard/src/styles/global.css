@@ -298,6 +298,20 @@ a.sha:hover {
   margin: 1rem 0;
 }
 
+.incomplete-banner {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(251, 146, 60, 0.35);
+  background: var(--mid-bg);
+  color: #fdba74;
+}
+
+.incomplete-banner[hidden] {
+  display: none;
+}
+
 .card {
   animation: rise 0.55s ease both;
 }

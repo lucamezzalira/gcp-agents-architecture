@@ -1,1 +1,1 @@
-"""Local health agent. Scores come from health/scoring."""
+"""Health agent. Reasons about scores computed elsewhere. Never changes them."""

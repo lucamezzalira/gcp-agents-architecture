@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 from collections.abc import Coroutine
 from typing import TypeVar
 
+from health_agent.host import hosted_in_cloud
 from health_agent.memory import MemoryBank, NoopMemoryBank
 
 T = TypeVar("T")
@@ -61,21 +61,23 @@ class VertexMemoryBank:
         metadata: dict[str, str] | None = None,
     ) -> None:
         del metadata
-        _run(self._create_memory(observation))
-
-    async def _create_memory(self, observation: str) -> None:
-        engine_id = self._svc._agent_engine_id
-        if not engine_id:
-            raise RuntimeError("Agent Engine ID is required for Memory Bank.")
-        api_client = self._svc._get_api_client()
-        response = await api_client.async_request(
-            http_method="POST",
-            path=f"reasoningEngines/{engine_id}/memories",
-            request_dict=memory_create_request(observation, self._app, self._user),
+        body = memory_create_request(observation, self._app, self._user)
+        fact = body["fact"]
+        raw_scope = body["scope"]
+        if not isinstance(fact, str) or not isinstance(raw_scope, dict):
+            raise RuntimeError("Memory Bank create request is malformed")
+        scope = {
+            key: value
+            for key, value in raw_scope.items()
+            if isinstance(key, str) and isinstance(value, str)
+        }
+        client, engine = self._vertex_client()
+        client.agent_engines.memories.create(
+            name=engine,
+            fact=fact,
+            scope=scope,
+            config={"wait_for_completion": True},
         )
-        payload = _http_payload(response)
-        if payload.get("error"):
-            raise RuntimeError(f"Memory Bank create failed: {payload['error']}")
         print(
             "memory_write_kind=create "
             f"fact_lines={observation.count(chr(10)) + 1}",
@@ -163,17 +165,6 @@ def memory_create_request(
     }
 
 
-def _http_payload(response: object) -> dict[str, object]:
-    body = getattr(response, "body", None)
-    if isinstance(body, str) and body.strip():
-        parsed = json.loads(body)
-        if isinstance(parsed, dict):
-            return parsed
-    if isinstance(response, dict):
-        return response
-    return {}
-
-
 def _memory_text(item: object) -> str:
     content = getattr(item, "content", None)
     parts = getattr(content, "parts", None) if content is not None else None
@@ -206,8 +197,8 @@ def _memory_text(item: object) -> str:
 def choose_memory_bank() -> MemoryBank:
     if os.environ.get("AGENT_ENGINE_ID"):
         return VertexMemoryBank()
-    if os.environ.get("K_SERVICE"):
-        raise RuntimeError("AGENT_ENGINE_ID is required on Cloud Run")
+    if hosted_in_cloud():
+        raise RuntimeError("AGENT_ENGINE_ID is required in cloud")
     return NoopMemoryBank()
 
 

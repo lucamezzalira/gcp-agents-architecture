@@ -7,6 +7,8 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
+from health_agent.host import hosted_in_cloud
+
 _TRACER_NAME = "health-agent"
 _provider: TracerProvider | None = None
 
@@ -17,13 +19,16 @@ def setup_tracing() -> TracerProvider:
         return _provider
     resource = Resource.create({"service.name": "health-agent"})
     provider = TracerProvider(resource=resource)
-    if os.environ.get("K_SERVICE"):
-        from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
+    if hosted_in_cloud() or os.environ.get("HEALTH_TRACE_EXPORT"):
+        try:
+            from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
 
-        exporter = CloudTraceSpanExporter(
-            project_id=os.environ.get("GOOGLE_CLOUD_PROJECT")
-        )
-        provider.add_span_processor(SimpleSpanProcessor(exporter))
+            exporter = CloudTraceSpanExporter(
+                project_id=os.environ.get("GOOGLE_CLOUD_PROJECT")
+            )
+            provider.add_span_processor(SimpleSpanProcessor(exporter))
+        except Exception as exc:
+            print(f"trace_exporter_skipped={type(exc).__name__}: {exc}", flush=True)
     _install_provider(provider)
     return provider
 

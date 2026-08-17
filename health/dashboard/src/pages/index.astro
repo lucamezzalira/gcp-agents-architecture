@@ -7,8 +7,11 @@ import {
   displayName,
   displayedCharacteristics,
   displayedOverall,
+  displayedState,
+  formatReadAt,
   hundredNote,
   improvementCopy,
+  legendScoreLine,
   platformGapLine,
   platformRollupLine,
   platformSpreadLine,
@@ -207,6 +210,22 @@ const historyHref = includeSuperseded
                 <p data-reasoner>{selected.reasoner ?? "unknown"}</p>
               </div>
               <div>
+                <span>Model</span>
+                <p data-model>{selected.model ?? "none"}</p>
+              </div>
+              <div>
+                <span>Host</span>
+                <p data-host>{selected.host ?? "none"}</p>
+              </div>
+              <div>
+                <span>Agent identity</span>
+                <p
+                  class="sha truncate"
+                  data-agent-identity
+                  title={selected.agentIdentity ?? "none"}
+                >{selected.agentIdentity ?? "none"}</p>
+              </div>
+              <div>
                 <span>Trace</span>
                 <p
                   class="sha truncate"
@@ -219,8 +238,12 @@ const historyHref = includeSuperseded
                 <p data-rule-set>v{ruleSetVersionOf(selected)}</p>
               </div>
               <div>
+                <span>Read</span>
+                <p data-read-at>{formatReadAt(selected.createdAt)}</p>
+              </div>
+              <div>
                 <span>State</span>
-                <p data-state>{selected.state ?? "current"}</p>
+                <p data-state>{displayedState(selected)}</p>
               </div>
             </div>
           </div>
@@ -341,6 +364,13 @@ const historyHref = includeSuperseded
     {
       selected !== undefined && (
         <section class="cards" data-cards aria-label="Characteristics">
+          <p
+            class="incomplete-banner"
+            data-incomplete-banner
+            hidden={selected.incomplete !== true || selected.state === "superseded"}
+          >
+            Scores are written. Reasoning did not attach.
+          </p>
           {characteristics.map((item) => {
             const recs = improvementCopy(item.score, item.recommendations);
             const note = hundredNote(item);
@@ -472,9 +502,7 @@ const historyHref = includeSuperseded
                   aria-pressed={run.runId === selected?.runId}
                 >
                   <div class="sha" data-legend-score>
-                    {shortSha(run.commitSha)} · {score}
-                    {run.state === "superseded" ? " · superseded" : ""}
-                    {` · v${ruleSetVersionOf(run)}`}
+                    {legendScoreLine(run, selectedService)}
                   </div>
                   <p>{run.commitMessage}</p>
                 </button>

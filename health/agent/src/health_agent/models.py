@@ -113,6 +113,7 @@ class AnalysisPayload(BaseModel):
     commitSha: str
     commitMessage: str
     timestamp: str
+    committedAt: str | None = None
     archTests: list[ArchTestResult]
     runtime: RuntimePayload
     services: list[str] = Field(default_factory=list)
@@ -187,6 +188,9 @@ class HealthRead(BaseModel):
     characteristics: list[CharacteristicRead]
     reasoner: str
     traceId: str | None = None
+    model: str | None = None
+    host: str | None = None
+    agentIdentity: str | None = None
     metrics: RunMetrics | None = None
     state: str = "current"
     supersededAt: str | None = None

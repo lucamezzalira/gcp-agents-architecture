@@ -67,6 +67,24 @@ variable "agent_image" {
   default = ""
 }
 
+variable "agent_reasoner_image" {
+  type        = string
+  default     = ""
+  description = "Agent Runtime image with no health/scoring. Tag-only URI; the provider rejects digest pins on container_spec.image_uri."
+}
+
+variable "agent_runtime_cutover" {
+  type        = bool
+  default     = false
+  description = "When true and agent_score_split is false, Cloud Run is only the Pub/Sub doorway and invokes the live engine. Live traffic uses agent_score_split instead."
+}
+
+variable "agent_score_split" {
+  type        = bool
+  default     = false
+  description = "When true, Cloud Run scores and writes Postgres, then invokes Agent Runtime for prose. Live traffic uses this. Pub/Sub push still targets Cloud Run."
+}
+
 variable "agent_engine_id" {
   type        = string
   default     = ""
@@ -85,6 +103,7 @@ variable "services_ci_sa_email" {
 }
 
 locals {
+  receiver_mode = var.agent_score_split ? "score" : (var.agent_runtime_cutover ? "doorway" : "legacy")
   apis = [
     "run.googleapis.com",
     "sqladmin.googleapis.com",

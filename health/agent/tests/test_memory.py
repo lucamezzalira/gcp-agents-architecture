@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from health_agent.assemble import assert_scores_unchanged
 from health_agent.memory import (
     NoopMemoryBank,
     RecordingMemoryBank,
@@ -10,7 +11,22 @@ from health_agent.memory import (
 from health_agent.models import AnalysisPayload, CharacteristicRead, HealthRead, ScoreResult
 from health_agent.reasoner import StubReasoner
 from health_agent.run import produce_health_read
-from health_agent.score_bridge import repo_root
+from health_agent.score_bridge import repo_root, score_payload
+
+
+class FailingWriteMemoryBank:
+    def retrieve(self, query: str) -> list[str]:
+        return []
+
+    def write(
+        self,
+        observation: str,
+        metadata: dict[str, str] | None = None,
+    ) -> None:
+        raise AttributeError("'AsyncClient' object has no attribute 'async_request'")
+
+    def purge(self) -> int:
+        return 0
 
 
 def test_memory_retrieve_happens_before_write_and_changes_reasoning() -> None:
@@ -198,3 +214,19 @@ def test_recording_memory_bank_purge_forgets_entries() -> None:
     assert removed == 2
     assert bank.retrieve("layering") == []
     assert bank.purge() == 0
+
+
+def test_memory_write_failure_still_returns_health_read() -> None:
+    payload_path = (
+        repo_root() / "health" / "scoring" / "fixtures" / "zero-findings.json"
+    )
+    scores = score_payload(payload_path)
+    read = produce_health_read(
+        payload_path,
+        reasoner=StubReasoner(),
+        memory=FailingWriteMemoryBank(),
+    )
+    assert_scores_unchanged(scores, read)
+    assert read.commitSha
+    assert read.overall == scores.overall
+    assert read.characteristics

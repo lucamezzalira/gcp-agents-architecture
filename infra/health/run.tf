@@ -52,6 +52,13 @@ resource "google_cloud_run_v2_service" "dashboard" {
     }
   }
 
+  # Provider 6.50 stores GCP's default service-level scaling as min/manual
+  # zeros. The API actually returns maxInstanceCount=20. We scale via
+  # template.scaling. Ignoring this block stops a perpetual no-op plan.
+  lifecycle {
+    ignore_changes = [scaling]
+  }
+
   depends_on = [google_project_service.apis]
 }
 
@@ -113,6 +120,10 @@ resource "google_cloud_run_v2_service" "mcp" {
     }
   }
 
+  lifecycle {
+    ignore_changes = [scaling]
+  }
+
   depends_on = [google_project_service.apis]
 }
 
@@ -139,14 +150,19 @@ resource "google_cloud_run_v2_service" "agent" {
       min_instance_count = 0
       max_instance_count = 1
     }
-    volumes {
-      name = "cloudsql"
-      cloud_sql_instance {
-        instances = [google_sql_database_instance.health.connection_name]
+    dynamic "volumes" {
+      for_each = local.receiver_mode == "doorway" ? [] : [1]
+      content {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [google_sql_database_instance.health.connection_name]
+        }
       }
     }
     containers {
-      image = var.agent_image
+      image   = var.agent_image
+      command = ["health/agent/.venv/bin/python"]
+      args    = ["-m", "health_agent.push_server"]
       resources {
         limits = {
           cpu    = "1"
@@ -154,44 +170,50 @@ resource "google_cloud_run_v2_service" "agent" {
         }
         cpu_idle = true
       }
-      env {
-        name  = "HEALTH_REASONER"
-        value = "adk"
+      dynamic "env" {
+        for_each = local.receiver_mode == "legacy" ? {
+          HEALTH_REASONER           = "adk"
+          HEALTH_ADK_MODEL          = local.adk_model
+          GOOGLE_CLOUD_PROJECT      = var.project_id
+          GOOGLE_CLOUD_LOCATION     = var.memory_bank_location
+          GOOGLE_GENAI_USE_VERTEXAI = "true"
+          MEMORY_BANK_LOCATION      = var.memory_bank_location
+          AGENT_ENGINE_ID           = local.agent_engine_numeric_id
+          } : {
+          GOOGLE_CLOUD_PROJECT   = var.project_id
+          AGENT_RUNTIME_ID       = try(google_vertex_ai_reasoning_engine.agent[0].name, "")
+          AGENT_RUNTIME_LOCATION = var.region
+          HEALTH_TRACE_EXPORT    = "1"
+        }
+        content {
+          name  = env.key
+          value = env.value
+        }
       }
-      env {
-        name  = "GOOGLE_CLOUD_PROJECT"
-        value = var.project_id
-      }
-      env {
-        name  = "GOOGLE_CLOUD_LOCATION"
-        value = var.memory_bank_location
-      }
-      env {
-        name  = "GOOGLE_GENAI_USE_VERTEXAI"
-        value = "true"
-      }
-      env {
-        name  = "MEMORY_BANK_LOCATION"
-        value = var.memory_bank_location
-      }
-      env {
-        name  = "AGENT_ENGINE_ID"
-        value = local.agent_engine_numeric_id
-      }
-      env {
-        name = "DATABASE_URL"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.database_url.secret_id
-            version = google_secret_manager_secret_version.database_url.version
+      dynamic "env" {
+        for_each = local.receiver_mode == "doorway" ? [] : [1]
+        content {
+          name = "DATABASE_URL"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.database_url.secret_id
+              version = google_secret_manager_secret_version.database_url.version
+            }
           }
         }
       }
-      volume_mounts {
-        name       = "cloudsql"
-        mount_path = "/cloudsql"
+      dynamic "volume_mounts" {
+        for_each = local.receiver_mode == "doorway" ? [] : [1]
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
       }
     }
+  }
+
+  lifecycle {
+    ignore_changes = [scaling]
   }
 
   depends_on = [google_project_service.apis]
@@ -243,5 +265,6 @@ resource "google_pubsub_subscription_iam_member" "analysis_dlq" {
   member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
-# Agent Engine (google_vertex_ai_reasoning_engine) lives in agent_engine.tf.
-# Cloud Run stays the Pub/Sub push receiver. The engine is Memory Bank, not the agent host.
+# Agent Engine lives in agent_engine.tf. Cloud Run is the Pub/Sub push
+# receiver. score mode (live): compute scores, write Postgres, invoke the
+# reasoner, attach prose. doorway and legacy remain in the file for rollback.

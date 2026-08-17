@@ -14,10 +14,15 @@ export type HealthToolResult = {
   runId: string;
   commitSha: string;
   commitMessage: string;
+  createdAt: string;
   overall: number;
   reasoner?: string;
   traceId?: string;
+  model?: string;
+  host?: string;
+  agentIdentity?: string;
   ruleSetVersion?: number;
+  incomplete?: boolean;
   characteristics: CharacteristicRead[];
 };
 
@@ -83,8 +88,12 @@ export async function listHealthRuns(
     overall: run.overall,
     reasoner: run.reasoner,
     traceId: run.traceId,
+    model: run.model,
+    host: run.host,
+    agentIdentity: run.agentIdentity,
     ruleSetVersion: run.ruleSetVersion,
     state: run.state,
+    incomplete: run.incomplete,
     characteristics: run.characteristics.map((item) => ({
       id: item.id,
       score: item.score,
@@ -138,10 +147,15 @@ function toResult(
     runId: latest.runId,
     commitSha: latest.commitSha,
     commitMessage: latest.commitMessage,
+    createdAt: latest.createdAt,
     overall,
     reasoner: latest.reasoner,
     traceId: latest.traceId,
+    model: latest.model,
+    host: latest.host,
+    agentIdentity: latest.agentIdentity,
     ruleSetVersion: latest.ruleSetVersion,
+    incomplete: latest.incomplete,
     characteristics,
   };
 }

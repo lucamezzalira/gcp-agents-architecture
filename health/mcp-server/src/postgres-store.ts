@@ -11,8 +11,12 @@ const runRowSchema = z.object({
   overall_score: z.coerce.number(),
   reasoner: z.string().nullable().optional(),
   trace_id: z.string().nullable().optional(),
+  model: z.string().nullable().optional(),
+  host: z.string().nullable().optional(),
+  agent_identity: z.string().nullable().optional(),
   rule_set_version: z.coerce.number().nullable().optional(),
   state: z.string().nullable().optional(),
+  incomplete: z.boolean().nullable().optional(),
   service_overalls: z.unknown().optional(),
 });
 
@@ -171,8 +175,12 @@ function mapRun(
     overall: run.overall_score,
     reasoner: run.reasoner ?? undefined,
     traceId: run.trace_id ?? undefined,
+    model: run.model ?? undefined,
+    host: run.host ?? undefined,
+    agentIdentity: run.agent_identity ?? undefined,
     ruleSetVersion: run.rule_set_version ?? 1,
     state: run.state ?? "current",
+    incomplete: run.incomplete === true,
     characteristics: platform,
     services,
   };
@@ -222,10 +230,11 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
     const sql = sqlClient(url);
     const runRows = await sql`
       select run_id, commit_sha, commit_message, created_at, overall_score,
-             reasoner, trace_id, rule_set_version, state, service_overalls
+             reasoner, trace_id, model, host, agent_identity, rule_set_version,
+             state, incomplete, service_overalls
       from health_run
       where coalesce(state, 'current') = 'current'
-      order by created_at asc
+      order by coalesce(committed_at, created_at) asc, created_at asc
     `;
     const runs = z.array(runRowSchema).parse(runRows);
     if (runs.length === 0) {
@@ -257,7 +266,8 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
     const sql = sqlClient(url);
     const runRows = await sql`
       select run_id, commit_sha, commit_message, created_at, overall_score,
-             reasoner, trace_id, rule_set_version, state, service_overalls
+             reasoner, trace_id, model, host, agent_identity, rule_set_version,
+             state, incomplete, service_overalls
       from health_run
       where run_id = ${runId}
       limit 1

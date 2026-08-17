@@ -7,22 +7,92 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any
 
-from psycopg import Connection
-
-from health_agent.persist import (
-    connect,
-    insert_health_read,
-    load_active_decisions,
-    load_recent_reads,
-    migrate,
-)
-from health_agent.reasoner import Reasoner
-from health_agent.run import choose_reasoner, produce_health_read, reasoner_name
+from health_agent.models import AnalysisPayload
 from health_agent.tracing import flush_traces, setup_tracing, tracer
-from health_agent.vertex_memory import choose_memory_bank
+
+from health_agent.reasoner import Reasoner
 
 SELECTED_REASONER: Reasoner | None = None
+
+
+def runtime_id() -> str:
+    return os.environ.get("AGENT_RUNTIME_ID", "").strip()
+
+
+def decode_push_message(raw: bytes) -> dict[str, Any]:
+    envelope = json.loads(raw.decode("utf-8"))
+    message = envelope.get("message", {})
+    if not isinstance(message, dict):
+        raise ValueError("Pub/Sub envelope is missing message")
+    data = base64.b64decode(message["data"]).decode("utf-8")
+    payload = json.loads(data)
+    if not isinstance(payload, dict):
+        raise ValueError("Pub/Sub message is not an object")
+    AnalysisPayload.model_validate(payload)
+    return payload
+
+
+def handle_payload(payload: dict[str, Any]) -> None:
+    if runtime_id():
+        from health_agent.receiver import receive_payload
+
+        receive_payload(payload)
+        return
+    _legacy_produce(payload)
+
+
+def _legacy_produce(payload: dict[str, Any]) -> None:
+    from health_agent.persist import (
+        connect,
+        insert_health_read,
+        iso_or_none,
+        load_active_decisions,
+        load_recent_reads,
+    )
+    from health_agent.run import produce_health_read
+    from health_agent.vertex_memory import choose_memory_bank
+
+    with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+        handle.write(json.dumps(payload))
+        path = Path(handle.name)
+    decisions_path: Path | None = None
+    conn = None
+    try:
+        conn = connect()
+        decisions = load_active_decisions(conn)
+        with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            handle.write(json.dumps(decisions))
+            decisions_path = Path(handle.name)
+        prior_reads = load_recent_reads(conn)
+        conn.commit()
+        conn.close()
+        conn = None
+        if SELECTED_REASONER is None:
+            raise RuntimeError("reasoner was not initialised at startup")
+        read = produce_health_read(
+            path,
+            decisions_path,
+            reasoner=SELECTED_REASONER,
+            prior_reads=prior_reads,
+            memory=choose_memory_bank(),
+        )
+        conn = connect()
+        insert_health_read(
+            conn,
+            read,
+            str(payload.get("commitMessage", "")),
+            iso_or_none(payload.get("committedAt")),
+        )
+        conn.close()
+        conn = None
+    finally:
+        if conn is not None:
+            conn.close()
+        path.unlink(missing_ok=True)
+        if decisions_path is not None:
+            decisions_path.unlink(missing_ok=True)
 
 
 class PushHandler(BaseHTTPRequestHandler):
@@ -39,47 +109,11 @@ class PushHandler(BaseHTTPRequestHandler):
         with tracer().start_as_current_span("payload_received") as received:
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length)
-            envelope = json.loads(raw.decode("utf-8"))
-            message = envelope.get("message", {})
-            data = base64.b64decode(message["data"]).decode("utf-8")
-            payload = json.loads(data)
+            payload = decode_push_message(raw)
             received.set_attribute("run.id", str(payload.get("runId", "")))
             received.set_attribute("commit.sha", str(payload.get("commitSha", "")))
-            with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
-                handle.write(data)
-                path = Path(handle.name)
-            decisions_path: Path | None = None
-            conn: Connection | None = None
-            try:
-                conn = connect()
-                decisions = load_active_decisions(conn)
-                with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
-                    handle.write(json.dumps(decisions))
-                    decisions_path = Path(handle.name)
-                prior_reads = load_recent_reads(conn)
-                conn.commit()
-                conn.close()
-                conn = None
-                if SELECTED_REASONER is None:
-                    raise RuntimeError("reasoner was not initialised at startup")
-                read = produce_health_read(
-                    path,
-                    decisions_path,
-                    reasoner=SELECTED_REASONER,
-                    prior_reads=prior_reads,
-                    memory=choose_memory_bank(),
-                )
-                conn = connect()
-                insert_health_read(conn, read, str(payload.get("commitMessage", "")))
-                conn.close()
-                conn = None
-            finally:
-                if conn is not None:
-                    conn.close()
-                path.unlink(missing_ok=True)
-                if decisions_path is not None:
-                    decisions_path.unlink(missing_ok=True)
-                flush_traces()
+            handle_payload(payload)
+            flush_traces()
         self.send_response(204)
         self.end_headers()
 
@@ -90,16 +124,31 @@ class PushHandler(BaseHTTPRequestHandler):
 def main() -> None:
     global SELECTED_REASONER
     setup_tracing()
-    try:
-        SELECTED_REASONER = choose_reasoner()
-        choose_memory_bank()
-    except Exception as exc:
-        print(f"reasoner startup failed: {exc}", file=sys.stderr, flush=True)
-        raise SystemExit(1) from exc
-    print(f"reasoner initialised: {reasoner_name(SELECTED_REASONER)}", flush=True)
-    conn = connect()
-    migrate(conn)
-    conn.close()
+    if runtime_id():
+        from health_agent.persist import connect, migrate
+
+        conn = connect()
+        migrate(conn)
+        conn.close()
+        print(
+            f"push receiver initialised runtime={runtime_id()} scoring=local",
+            flush=True,
+        )
+    else:
+        from health_agent.persist import connect, migrate
+        from health_agent.reason import choose_reasoner, reasoner_name
+        from health_agent.vertex_memory import choose_memory_bank
+
+        try:
+            SELECTED_REASONER = choose_reasoner()
+            choose_memory_bank()
+        except Exception as exc:
+            print(f"reasoner startup failed: {exc}", file=sys.stderr, flush=True)
+            raise SystemExit(1) from exc
+        print(f"reasoner initialised: {reasoner_name(SELECTED_REASONER)}", flush=True)
+        conn = connect()
+        migrate(conn)
+        conn.close()
     port = int(os.environ.get("PORT", "8080"))
     server = ThreadingHTTPServer(("0.0.0.0", port), PushHandler)
     print(f"health agent push server on {port}")

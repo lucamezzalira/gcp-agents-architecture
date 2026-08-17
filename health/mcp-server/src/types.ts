@@ -21,8 +21,12 @@ export type LatestHealth = {
   overall: number;
   reasoner?: string;
   traceId?: string;
+  model?: string;
+  host?: string;
+  agentIdentity?: string;
   ruleSetVersion?: number;
   state?: string;
+  incomplete?: boolean;
   characteristics: CharacteristicRead[];
   services: ServiceRead[];
 };
@@ -46,8 +50,12 @@ export type HealthRunSummary = {
   overall: number;
   reasoner?: string;
   traceId?: string;
+  model?: string;
+  host?: string;
+  agentIdentity?: string;
   ruleSetVersion?: number;
   state?: string;
+  incomplete?: boolean;
   characteristics: Array<{ id: string; score: number }>;
   services: Array<{ service: string; overall: number }>;
 };

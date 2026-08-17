@@ -17,8 +17,12 @@ const runRowSchema = z.object({
   overall_score: z.coerce.number(),
   reasoner: z.string().nullable().optional(),
   trace_id: z.string().nullable().optional(),
+  model: z.string().nullable().optional(),
+  host: z.string().nullable().optional(),
+  agent_identity: z.string().nullable().optional(),
   rule_set_version: z.coerce.number().nullable().optional(),
   state: z.string().nullable().optional(),
+  incomplete: z.boolean().nullable().optional(),
   superseded_at: z.union([z.string(), z.date()]).nullable().optional(),
   superseded_by: z.string().nullable().optional(),
   service_overalls: z.unknown().optional(),
@@ -261,8 +265,12 @@ function attachCharacteristics(
       overall: run.overall_score,
       reasoner: run.reasoner ?? undefined,
       traceId: run.trace_id ?? undefined,
+      model: run.model ?? undefined,
+      host: run.host ?? undefined,
+      agentIdentity: run.agent_identity ?? undefined,
       ruleSetVersion: run.rule_set_version ?? 1,
       state: run.state ?? "current",
+      incomplete: run.incomplete === true,
       supersededAt:
         run.superseded_at === null || run.superseded_at === undefined
           ? undefined
@@ -282,20 +290,22 @@ async function queryRuns(
   const runRows = includeSuperseded
     ? await sql`
         select run_id, commit_sha, commit_message, created_at, overall_score,
-               reasoner, trace_id, rule_set_version, state, superseded_at,
+               reasoner, trace_id, model, host, agent_identity, rule_set_version,
+               state, incomplete, superseded_at,
                superseded_by, service_overalls,
                metrics->'runtimeEdges' as runtime_edges
         from health_run
-        order by created_at asc
+        order by coalesce(committed_at, created_at) asc, created_at asc
       `
     : await sql`
         select run_id, commit_sha, commit_message, created_at, overall_score,
-               reasoner, trace_id, rule_set_version, state, superseded_at,
+               reasoner, trace_id, model, host, agent_identity, rule_set_version,
+               state, incomplete, superseded_at,
                superseded_by, service_overalls,
                metrics->'runtimeEdges' as runtime_edges
         from health_run
         where coalesce(state, 'current') = 'current'
-        order by created_at asc
+        order by coalesce(committed_at, created_at) asc, created_at asc
       `;
   const rows = z.array(runRowSchema).parse(runRows);
   if (rows.length === 0) {

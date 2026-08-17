@@ -4,7 +4,9 @@ import {
   displayName,
   displayedCharacteristics,
   displayedOverall,
+  displayedState,
   easeOutCubic,
+  formatReadAt,
   hundredNote,
   improvementCopy,
   legendScoreLine,
@@ -189,6 +191,16 @@ export function paintCopy(
   }
   const reasoner = document.querySelector("[data-reasoner]");
   if (reasoner) reasoner.textContent = run.reasoner ?? "unknown";
+  const model = document.querySelector("[data-model]");
+  if (model) model.textContent = run.model ?? "none";
+  const host = document.querySelector("[data-host]");
+  if (host) host.textContent = run.host ?? "none";
+  const agentIdentity = document.querySelector("[data-agent-identity]");
+  if (agentIdentity instanceof HTMLElement) {
+    const value = run.agentIdentity ?? "none";
+    agentIdentity.textContent = value;
+    agentIdentity.title = value;
+  }
   const traceId = document.querySelector("[data-trace-id]");
   if (traceId instanceof HTMLElement) {
     const value = run.traceId ?? "none";
@@ -198,7 +210,13 @@ export function paintCopy(
   const ruleSet = document.querySelector("[data-rule-set]");
   if (ruleSet) ruleSet.textContent = `v${ruleSetVersionOf(run)}`;
   const state = document.querySelector("[data-state]");
-  if (state) state.textContent = run.state ?? "current";
+  if (state) state.textContent = displayedState(run);
+  const readAt = document.querySelector("[data-read-at]");
+  if (readAt) readAt.textContent = formatReadAt(run.createdAt);
+  const banner = document.querySelector("[data-incomplete-banner]");
+  if (banner instanceof HTMLElement) {
+    banner.hidden = run.incomplete !== true || run.state === "superseded";
+  }
   const caption = document.querySelector("[data-scope-caption]");
   if (caption) {
     caption.textContent =

@@ -271,7 +271,7 @@ create table health_run (
   run_id           text primary key,          -- {sha}:{uuid} so rescores do not collide
   commit_sha       text not null,
   commit_message   text,
-  created_at       timestamptz not null default now(),
+  created_at       timestamptz not null default now(), -- when this read was produced; not copied on rescore
   committed_at     timestamptz,                   -- git committer time; trend/latest use this
   scored_at        timestamptz not null default now(),
   overall_score    int not null,
@@ -281,6 +281,7 @@ create table health_run (
   host             text,                          -- agent-runtime | cloud-run | local
   agent_identity   text,                          -- spec.effectiveIdentity of the runtime engine
   state            text not null default 'current',
+  incomplete       boolean not null default false, -- true until reasoning attaches
   superseded_at    timestamptz,
   superseded_by    text,
   service_overalls jsonb not null default '{}'::jsonb,
@@ -313,7 +314,7 @@ create table accepted_decision (
 );
 ```
 
-A rescore inserts a new row and marks the previous current row `state=superseded`. Score columns are not updated in place. After a split run, reasoning and provenance (`reasoner`, `host`, `model`, `agent_identity`, `trace_id`) are attached to the already-scored row. Latest and the trend order by `committed_at` (git committer time), falling back to `created_at`. Default reads are `state=current`.
+A rescore inserts a new row and marks the previous current row `state=superseded`. Score columns are not updated in place. After a split run, reasoning and provenance (`reasoner`, `host`, `model`, `agent_identity`, `trace_id`) are attached to the already-scored row and `incomplete` is cleared. If reasoning fails after the score is written, the row stays `incomplete` until a retry attaches prose. Latest and the trend order by `committed_at` (git committer time), falling back to `created_at`. The dashboard displays `created_at` as when the read was produced. Default reads are `state=current`.
 
 ## Scoring model
 

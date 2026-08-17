@@ -6,7 +6,13 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from health_agent.persist import connect, insert_health_read, load_recent_reads, migrate
+from health_agent.persist import (
+    connect,
+    insert_health_read,
+    iso_or_none,
+    load_recent_reads,
+    migrate,
+)
 from health_agent.run import produce_health_read
 from health_agent.score_bridge import repo_root
 
@@ -58,7 +64,12 @@ def replay() -> None:
                 read = produce_health_read(
                     payload_path, prior_reads=prior_reads
                 )
-                insert_health_read(conn, read, str(payload.get("commitMessage", "")))
+                insert_health_read(
+                    conn,
+                    read,
+                    str(payload.get("commitMessage", "")),
+                    iso_or_none(payload.get("committedAt")),
+                )
             finally:
                 subprocess.run(
                     ["git", "worktree", "remove", "--force", str(worktree)],

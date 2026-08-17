@@ -35,6 +35,9 @@ def assemble(
     narratives: list[Narrative],
     reasoner: str,
     trace_id: str | None = None,
+    model: str | None = None,
+    host: str | None = None,
+    agent_identity: str | None = None,
 ) -> HealthRead:
     by_id = {item.id: item for item in narratives}
     characteristics = [
@@ -73,6 +76,9 @@ def assemble(
         characteristics=characteristics,
         reasoner=reasoner,
         traceId=trace_id,
+        model=model,
+        host=host,
+        agentIdentity=agent_identity,
         services=services,
     )
 

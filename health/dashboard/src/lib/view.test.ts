@@ -24,6 +24,9 @@ import {
   platformSpreadLine,
   SERVICE_SPREAD_THRESHOLD,
   clientRunsPayload,
+  displayedState,
+  formatReadAt,
+  legendScoreLine,
 } from "./view.js";
 import type { HealthRun } from "./types.js";
 
@@ -261,5 +264,17 @@ describe("clientRunsPayload", () => {
     expect(payload[2]?.characteristics[0]?.reasoning).toBe("boundaries hold");
     expect(payload[1]?.characteristics[0]?.reasoning).toBe("");
     expect(payload[1]?.characteristics[0]?.recommendations).toEqual([]);
+  });
+});
+
+describe("read timestamp and incomplete", () => {
+  it("formats createdAt in London time", () => {
+    expect(formatReadAt("2026-08-17T13:14:31.548Z")).toBe("17 Aug 2026, 14:14");
+  });
+
+  it("marks an unfinished read in state and the legend", () => {
+    const run = { ...restore, incomplete: true };
+    expect(displayedState(run)).toBe("incomplete");
+    expect(legendScoreLine(run)).toContain("incomplete");
   });
 });

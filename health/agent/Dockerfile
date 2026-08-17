@@ -12,10 +12,10 @@ COPY health/agent ./health/agent
 COPY packages/observability/package.json packages/observability/package.json
 RUN pnpm install --frozen-lockfile --filter @health/scoring...
 WORKDIR /repo/health/agent
-RUN python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e ".[adk]"
+RUN python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e "."
 ENV PORT=8080
-ENV HEALTH_REASONER=adk
-ENV GOOGLE_GENAI_USE_VERTEXAI=true
+ENV PYTHONUNBUFFERED=1
+ENV HEALTH_TRACE_EXPORT=1
 EXPOSE 8080
 WORKDIR /repo
-CMD ["health/agent/.venv/bin/python", "-m", "health_agent.push_server"]
+CMD ["/repo/health/agent/.venv/bin/python", "-m", "health_agent.push_server"]

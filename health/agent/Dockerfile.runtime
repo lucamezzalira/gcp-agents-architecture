@@ -1,0 +1,22 @@
+FROM python:3.12-bookworm
+WORKDIR /repo
+COPY health/agent ./health/agent
+RUN rm -rf \
+      /repo/health/agent/src/health_agent/score_bridge.py \
+      /repo/health/agent/src/health_agent/receiver.py \
+      /repo/health/agent/src/health_agent/run.py \
+      /repo/health/agent/src/health_agent/persist.py \
+      /repo/health/agent/src/health_agent/replay.py \
+      /repo/health/agent/src/health_agent/push_server.py \
+      /repo/health/agent/src/health_agent/runtime_client.py \
+      /repo/health/agent/migrations
+WORKDIR /repo/health/agent
+RUN python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -e ".[adk]"
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+ENV HEALTH_REASONER=adk
+ENV HEALTH_HOST=agent-runtime
+ENV GOOGLE_GENAI_USE_VERTEXAI=true
+EXPOSE 8080
+WORKDIR /repo
+CMD ["/repo/health/agent/.venv/bin/python", "-m", "health_agent.runtime_server"]

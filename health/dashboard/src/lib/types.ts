@@ -28,8 +28,12 @@ export type HealthRun = {
   overall: number;
   reasoner?: string;
   traceId?: string;
+  model?: string;
+  host?: string;
+  agentIdentity?: string;
   ruleSetVersion?: number;
   state?: string;
+  incomplete?: boolean;
   supersededAt?: string;
   supersededBy?: string;
   characteristics: CharacteristicRead[];

@@ -332,10 +332,35 @@ export function polyline(points: ChartPoint[]): string {
   return points.map((point) => `${point.x},${point.y}`).join(" ");
 }
 
+export function formatReadAt(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+export function displayedState(run: HealthRun): string {
+  if (run.incomplete === true && run.state !== "superseded") {
+    return "incomplete";
+  }
+  return run.state ?? "current";
+}
+
 export function legendScoreLine(run: HealthRun, service?: string): string {
   const score = displayedOverall(run, service);
   const superseded = run.state === "superseded" ? " · superseded" : "";
-  return `${shortSha(run.commitSha)} · ${score}${superseded} · v${ruleSetVersionOf(run)}`;
+  const incomplete =
+    run.incomplete === true && run.state !== "superseded" ? " · incomplete" : "";
+  return `${shortSha(run.commitSha)} · ${score}${superseded}${incomplete} · v${ruleSetVersionOf(run)}`;
 }
 
 export function ringOffset(score: number, radius: number): number {

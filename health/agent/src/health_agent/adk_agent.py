@@ -1,8 +1,9 @@
-import os
+from health_agent.host import resolve_model
 
 INSTRUCTION = """
 You write reasoning and recommendations for architecture health scores.
-You never compute or change a score. Numbers come from health/scoring.
+You never compute or change a score. Numbers arrive already computed.
+You cannot import health/scoring.
 
 Scores are per service and for the platform. Platform characteristics
 include cross-service-integrity, which is the relationship: rules 3-5
@@ -98,7 +99,7 @@ def build_root_agent():
 
     return Agent(
         name="architecture_health",
-        model=os.environ.get("HEALTH_ADK_MODEL", "gemini-2.5-pro"),
+        model=resolve_model(),
         instruction=INSTRUCTION,
     )
 

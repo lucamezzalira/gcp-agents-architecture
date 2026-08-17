@@ -284,6 +284,7 @@ async function main(): Promise<void> {
     commitSha: git(["rev-parse", "HEAD"]) || "local",
     commitMessage: git(["log", "-1", "--format=%s"]) || "uncommitted",
     timestamp: new Date().toISOString(),
+    committedAt: git(["log", "-1", "--format=%cI"]) || undefined,
     services: listedServices(),
     archTests,
     dependencyCruiser: {
