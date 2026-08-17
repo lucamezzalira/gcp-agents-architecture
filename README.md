@@ -107,3 +107,5 @@ Locally, start `./scripts/dev-services.sh` first and set `CHECKOUT_URL=http://12
 GCP Terraform lives in `infra/`. Do not apply it until a billing account exists. See `infra/README.md`.
 
 Scoring runs on the Cloud Run receiver. `health/scoring` is not in the agent's image, so the agent cannot change a number. Local default is `HEALTH_REASONER=stub`. Set `adk` when credentials exist.
+
+This README line is a collect probe. It does not change a scored signal.
