@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 6.47"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 7.37"
+    }
     random = {
       source  = "hashicorp/random"
       version = "~> 3.7"
@@ -17,6 +21,11 @@ terraform {
 }
 
 provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+provider "google-beta" {
   project = var.project_id
   region  = var.region
 }
@@ -61,7 +70,7 @@ variable "agent_image" {
 variable "agent_engine_id" {
   type        = string
   default     = ""
-  description = "Vertex AI Agent Engine id used as Memory Bank. Required for the agent."
+  description = "Existing Vertex Agent Engine numeric id to import (console-created Memory Bank). Required to take over the live engine; empty skips import and creates a new one on apply."
 }
 
 variable "memory_bank_location" {

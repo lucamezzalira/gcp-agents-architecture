@@ -3,3 +3,7 @@ region     = "europe-west1"
 # github_owner = "lucamezzalira"
 # github_repo  = "gcp-agents-architecture"
 # services_ci_sa_email = "services-ci@REPLACE_SERVICES_PROJECT.iam.gserviceaccount.com"
+# agent_engine_id is the numeric id of the existing Memory Bank engine in us-central1.
+# Required for terraform plan/import against a project that already has one.
+# agent_engine_id = "REPLACE_ENGINE_ID"
+# memory_bank_location = "us-central1"

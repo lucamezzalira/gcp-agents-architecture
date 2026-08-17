@@ -176,7 +176,7 @@ resource "google_cloud_run_v2_service" "agent" {
       }
       env {
         name  = "AGENT_ENGINE_ID"
-        value = var.agent_engine_id
+        value = local.agent_engine_numeric_id
       }
       env {
         name = "DATABASE_URL"
@@ -243,7 +243,5 @@ resource "google_pubsub_subscription_iam_member" "analysis_dlq" {
   member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
-# Agent Runtime, Agent Identity and Memory Bank are attached in the console
-# or a later google_vertex_ai_* resource once the org has those APIs.
-# The Cloud Run agent above is the deployable stand-in: same produce_health_read
-# path, same Postgres writes, HEALTH_REASONER=adk.
+# Agent Engine (google_vertex_ai_reasoning_engine) lives in agent_engine.tf.
+# Cloud Run stays the Pub/Sub push receiver. The engine is Memory Bank, not the agent host.
