@@ -4,6 +4,8 @@ Deterministic. Pure TypeScript. No I/O, no network, no clock, no randomness.
 
 Given an `AnalysisPayload` and the set of active accepted decisions, produces a score from 0 to 100 per architecture characteristic plus a weighted overall.
 
+In production the Cloud Run receiver is the only process that runs this package. It is not copied into the Agent Runtime image. The agent cannot call it because it is not there.
+
 ## Rules
 
 - The same input MUST always produce byte-identical output. Anything non-deterministic is a bug.

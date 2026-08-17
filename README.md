@@ -2,17 +2,17 @@
 
 Two services carved out of a legacy monolith, plus a health system that scores whether the result still matches the intended architecture.
 
-Read `docs/PRD.md` for what and why, `docs/BUILD-SPEC.md` for the tree, contracts, and build order.
+`docs/PRD.md` is the original specification. `docs/BUILD-SPEC.md` is the implementation contract (tree, payloads, schema, build order). `docs/SCORING.md` is the weight specification.
 
 ## What is real and what is not
 
-Real: notification and checkout, their layering, Pub/Sub, Firestore, Postgres, the health agent, Memory Bank, the MCP server, the dashboard, ts-arch, dependency-cruiser, jscpd, Cloud Trace, the commit history, the scoring model, Terraform.
+Real: notification, checkout, inventory, and audit, their layering, Pub/Sub, Firestore, Postgres, the Cloud Run receiver, Agent Runtime, Memory Bank, the MCP server, the dashboard, ts-arch, dependency-cruiser, jscpd, Cloud Trace, the commit history, the scoring model, Terraform.
 
 Illustrative: p95-latency, error-rate, and security signals. They arrive with `illustrative: true` and carry no weight. The runtime call graph is observed from synthetic smoke traffic and is also not scored.
 
 ## Deployed on GCP
 
-Two projects in `europe-west1`. Checkout, the dashboard, and the health MCP are public. Notification and the health agent stay internal. The health agent runs `HEALTH_REASONER=stub`. Only notification talks to the email provider.
+Two projects in `europe-west1`. Checkout, the dashboard, and the health MCP are public. Notification and the Cloud Run receiver stay internal. Agent Runtime runs Gemini 2.5 Pro under Agent Identity. Only notification talks to the email provider.
 
 Dashboard: https://health-dashboard-k3ljxa4a4q-ew.a.run.app
 Checkout: https://checkout-iqcdekwluq-ew.a.run.app
@@ -38,8 +38,10 @@ flowchart LR
     dash["health-dashboard (public)"]
     mcp["health-mcp (public)"]
     analysis["Pub/Sub analysis-payloads"]
-    agent["health-agent (stub)"]
+    receiver["Cloud Run receiver"]
+    runtime["Agent Runtime"]
     sql[("Cloud SQL Postgres")]
+    mb[("Memory Bank")]
   end
 
   gha[GitHub Actions]
@@ -58,11 +60,15 @@ flowchart LR
   mcp --> sql
   gha -->|WIF services-ci| trace
   gha -->|WIF health-ci| analysis
-  analysis -->|push| agent
-  agent --> sql
+  analysis -->|push| receiver
+  receiver -->|score and persist| sql
+  receiver -->|scores already fixed| runtime
+  runtime --> mb
+  runtime -->|prose| receiver
+  receiver -->|attach reasoning| sql
 ```
 
-GitHub Actions authenticates as `services-ci` in `ga-services-mezzalab` via the health project's Workload Identity pool, runs synthetic smoke against the live services, then collects. On `main` it publishes the payload to `analysis-payloads` as `health-ci`. The health agent writes the scored run to Postgres. MCP and the dashboard read that table. Images are in Artifact Registry (`health`, `services`). Health Cloud Run services read `health-database-url` and connect to Cloud SQL over a unix socket.
+GitHub Actions authenticates as `services-ci` in `ga-services-mezzalab` via the health project's Workload Identity pool, runs synthetic smoke against the live services, then collects. On `main` it publishes the payload to `analysis-payloads` as `health-ci`. The Cloud Run receiver validates that payload, scores it with `health/scoring`, and writes the run to Postgres. It then invokes Agent Runtime with those scores already fixed. The agent reasons, reads and writes Memory Bank, and returns prose. The receiver attaches that prose to the existing rows. MCP and the dashboard read Postgres. They never read Memory Bank. Images are in Artifact Registry (`health`, `services`). The receiver reads `health-database-url` and connects to Cloud SQL over a unix socket. The agent image has no database URL.
 
 ## Commands
 
@@ -100,4 +106,4 @@ Locally, start `./scripts/dev-services.sh` first and set `CHECKOUT_URL=http://12
 
 GCP Terraform lives in `infra/`. Do not apply it until a billing account exists. See `infra/README.md`.
 
-The health agent never computes a score. Scores come from `health/scoring` and are deterministic. Local default is `HEALTH_REASONER=stub`. Set `adk` when credentials exist.
+Scoring runs on the Cloud Run receiver. `health/scoring` is not in the agent's image, so the agent cannot change a number. Local default is `HEALTH_REASONER=stub`. Set `adk` when credentials exist.

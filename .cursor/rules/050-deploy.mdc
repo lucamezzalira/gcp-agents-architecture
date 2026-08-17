@@ -5,6 +5,6 @@ alwaysApply: true
 
 # Deploy after major changes
 
-The health stack is live on GCP. After a major change to scoring, the agent, dashboard, MCP, analysis collect, or architecture rules, build and deploy the affected Cloud Run services (`health-agent`, `health-dashboard`, `health-mcp`) before treating the work as done. Git push is not a deploy.
+The health stack is live on GCP. After a major change to scoring, the agent, dashboard, MCP, analysis collect, or architecture rules, build and deploy the affected pieces before treating the work as done. Git push is not a deploy. Scoring and receiver changes go to Cloud Run `health-agent`. Reasoner changes go to the Agent Runtime image (`Dockerfile.runtime`). Dashboard and MCP stay on Cloud Run (`health-dashboard`, `health-mcp`).
 
 Do not wait to be asked. Rescore or backfill history when the scoring model or rule set changed, using superseded runs rather than overwriting.

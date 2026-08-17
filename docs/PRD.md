@@ -1,5 +1,15 @@
 # PRD — Architectural health for an AI-accelerated migration
 
+**Original specification.** Written before the health stack shipped. The body below is the original intent, left as written. It is not a description of the deployed system. `docs/BUILD-SPEC.md` is the implementation contract. `docs/SCORING.md` is the weight specification.
+
+## Where the implementation diverged
+
+- **Scoring and reasoning split.** The flow below has the health agent subscribed to the analysis topic, loading accepted decisions, and producing the health read. The shipped system puts a Cloud Run receiver on that subscription. The receiver validates the payload, scores it with `health/scoring`, persists the run to Postgres, and invokes the agent. The agent on Agent Runtime receives scores already fixed, reasons, reads and writes Memory Bank, and returns prose. The receiver attaches that prose to the existing rows.
+- **The score is a deployment boundary.** The scoring section below says the agent does not set the score. That is still true, and it is true because `health/scoring` is not in the agent's image, not because the model is asked to leave numbers alone.
+- **Who owns which store.** Postgres is the system's record and the receiver owns it, including the accepted decisions used at score time. Memory Bank is the agent's own memory and the agent owns it. Memory Bank stores structured score records, never reasoner prose. Nothing writes to both.
+- **Inventory and audit.** The body describes two services. Inventory and audit were added later and are scored as members of the estate.
+- **Open decisions.** Weights and the commit-history shape were settled in `docs/SCORING.md` and the git history. The items listed under Open decisions below are no longer open.
+
 ## What this is
 
 Two things in one repository.

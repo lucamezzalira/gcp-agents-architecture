@@ -2,6 +2,8 @@
 
 The score is deterministic. These weights are the specification; `health/scoring` must match this document exactly, and any change touches both in the same commit.
 
+The Cloud Run receiver runs this package. The Agent Runtime image does not contain it. Weights and penalties below are unchanged by that split.
+
 ## Characteristics
 
 | Id | What it measures | Where it lives |

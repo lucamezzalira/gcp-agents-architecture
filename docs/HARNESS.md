@@ -10,7 +10,7 @@ How the AI context in this repository is organised, and why it is shaped this wa
 | `services/*/AGENTS.md`, `health/*/AGENTS.md` | Scoped context, loaded when working in that subtree. Nearest file wins. |
 | `.cursor/rules/*.mdc` | Cursor-specific rules with frontmatter-driven activation. |
 | `.cursor/mcp.json` | Project MCP: `architecture-health` over Streamable HTTP to Cloud Run. |
-| `docs/PRD.md` | What is being built. |
+| `docs/PRD.md` | Original specification. See the note at the top for where the implementation diverged. |
 | `docs/BUILD-SPEC.md` | Where things live, the contracts, the schema, the acceptance criteria, the build order. |
 | `docs/SCORING.md` | The published weights. |
 

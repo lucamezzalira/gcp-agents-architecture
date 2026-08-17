@@ -2,7 +2,7 @@
 
 Monorepo containing services under migration and a health system that measures them.
 
-Read `docs/PRD.md` for what this is, `docs/BUILD-SPEC.md` for the tree, contracts, schema and acceptance criteria. Follow the build order in the spec; do not jump ahead to cloud deployment.
+`docs/PRD.md` is the original specification. `docs/BUILD-SPEC.md` is the implementation contract (tree, contracts, schema, acceptance criteria). Follow the build order in the spec for greenfield work.
 
 ## Layout
 
@@ -11,8 +11,8 @@ Read `docs/PRD.md` for what this is, `docs/BUILD-SPEC.md` for the tree, contract
 - `services/checkout` — owns orders, renders its own emails, publishes send instructions, reserves stock through inventory
 - `services/inventory` — owns stock levels and reservations, publishes reservation outcomes
 - `services/audit` — append-only log of send-instructions already on the bus
-- `health/scoring` — deterministic scoring, pure TypeScript, no I/O
-- `health/agent` — Python ADK agent, writes reasoning around the computed scores
+- `health/scoring` — deterministic scoring, pure TypeScript, no I/O. Runs on the Cloud Run receiver. Not present in the agent image.
+- `health/agent` — two images from one tree. Cloud Run receiver (Pub/Sub, scoring, Postgres). Agent Runtime reasoner (ADK, Memory Bank, prose).
 - `health/mcp-server`, `health/dashboard`
 - `analysis/` — ts-arch rules, dependency-cruiser, jscpd config
 - `infra/` — Terraform, two GCP projects
@@ -57,7 +57,7 @@ Layer directory names (`transport/`, `domain/`, `infrastructure/`) are load-bear
 - NEVER import the email provider outside `services/notification`.
 - NEVER create a shared rendering package. Each service renders its own email. The duplication is deliberate.
 - Observability is shared: import `@observability/runtime`. Do not subclass or wrap it.
-- NEVER let the health agent compute or modify a score. Scores are deterministic and come from `health/scoring`.
+- NEVER let the health agent compute or modify a score. Scores are deterministic and come from `health/scoring` on the Cloud Run receiver. The scoring package is not in the agent's image, so this is a deployment boundary, not an instruction the model is asked to obey. Postgres is the system's record (receiver). Memory Bank is the agent's own memory (agent). Nothing writes to both.
 - NEVER add barrel files that re-export across layer boundaries.
 - NEVER use `any`.
 - Do not add a dependency without checking it is not already in the workspace.

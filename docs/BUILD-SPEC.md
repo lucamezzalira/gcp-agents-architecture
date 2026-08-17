@@ -1,6 +1,6 @@
 # Build spec
 
-Companion to `PRD.md`. That document says what and why. This one says where, in what shape, and how you know it works.
+Implementation contract. `docs/PRD.md` is the original specification (see the note at the top of that file for where this diverged). This document says where things live, in what shape, and how you know it works.
 
 ## Stack decisions
 
@@ -9,11 +9,12 @@ Companion to `PRD.md`. That document says what and why. This one says where, in 
 | Monorepo tooling | pnpm workspaces + Turborepo |
 | Services | TypeScript, Node 24, Fastify |
 | Request and payload schemas | Zod |
-| Health agent | Python 3.12, Google ADK |
+| Health receiver | Python 3.12, Cloud Run. Validates `AnalysisPayload`, runs `health/scoring`, writes Postgres, invokes the agent |
+| Health agent | Python 3.12, Google ADK, Agent Runtime. Reasons over already-computed scores. Scoring is not in this image |
 | MCP server | TypeScript, official MCP SDK |
 | Dashboard | Astro |
 | Service state | Firestore, one named database per service |
-| Health history and decisions | Postgres (Cloud SQL), health project only |
+| Health history and decisions | Postgres (Cloud SQL), health project only. The Cloud Run receiver owns this store |
 | Object storage | Cloud Storage. Checkout writes confirmation objects. Notification fetches by `bodyRef`. |
 | IaC | Terraform |
 | Tests | Vitest (TS), pytest (Python) |
@@ -68,8 +69,10 @@ Checkout, notification, inventory and audit do not share a database. Project B h
 │       │   └── infrastructure/   # this service's Firestore tape
 │       └── test/
 ├── health/
-│   ├── agent/                    # Python, ADK
+│   ├── agent/                    # Python. Two images from one tree
 │   │   ├── AGENTS.md
+│   │   ├── Dockerfile            # Cloud Run receiver: Pub/Sub, scoring, Postgres
+│   │   ├── Dockerfile.runtime    # Agent Runtime: ADK, Memory Bank. No scoring, no SQL
 │   │   ├── src/
 │   │   └── tests/
 │   ├── scoring/                  # TypeScript, pure, no I/O
@@ -105,14 +108,15 @@ type SendInstruction = {
 
 ### Analysis payload (CI → health topic)
 
-The most important contract in the system. It is the interface between the deterministic tools and the agent.
+The most important contract in the system. It is the interface between the deterministic tools and the receiver. The receiver scores it. The agent reasons over the already-computed scores.
 
 ```ts
 type AnalysisPayload = {
   runId: string;
   commitSha: string;
   commitMessage: string;
-  timestamp: string;               // ISO 8601
+  timestamp: string;               // ISO 8601 collect time
+  committedAt?: string;            // git committer time, ISO 8601
   ruleSetVersion: number;          // incremented when a rule is added, removed, or changes meaning
   services: string[];              // service folders present in this commit
   archTests: {
@@ -201,7 +205,29 @@ type AnalysisPayload = {
 
 The runtime call graph is observed from synthetic smoke traffic in Cloud Trace. CI authenticates as `services-ci` via Workload Identity Federation, runs `scripts/smoke-runtime.sh` against the live services, then queries Cloud Trace. `traffic: "this-run"` means that smoke produced the traces in `window`. `queried` is true only when the Trace API call succeeded. A failed query omits `edges`; an empty `edges` array means the query ran and found no calls. The graph is not scored. `p95-latency` and `error-rate` remain illustrative. Runtime signals are omitted from the dashboard.
 
-### Health read (agent output)
+### Score result (receiver, from `health/scoring`)
+
+Produced by the Cloud Run receiver before it writes Postgres. The agent never produces this shape. Numeric fields on the agent's response are logged as `agent_returned_numeric` and ignored.
+
+### Agent narratives (Agent Runtime → receiver)
+
+The agent does not return a `HealthRead`. It returns prose keyed to the already-persisted scores.
+
+```ts
+type AgentNarratives = {
+  narratives: Array<{
+    id: string;                 // platform characteristic id, or "{service}:{id}"
+    reasoning: string;
+    recommendations: string[];
+  }>;
+};
+```
+
+The receiver attaches those fields to the existing `health_run` / `health_characteristic` rows. Score columns are not updated.
+
+### Health read (assembled by the receiver)
+
+Scores from `health/scoring` on the receiver. Prose from the agent. The assembled read is what Postgres stores and what MCP and the dashboard serve. The agent does not write it.
 
 ```ts
 type HealthRead = {
@@ -210,6 +236,11 @@ type HealthRead = {
   overall: number;                 // 0-100, platform
   ruleSetVersion: number;
   state: "current" | "superseded";
+  reasoner: string;
+  traceId?: string;
+  model?: string;                  // HEALTH_ADK_MODEL from Agent Runtime Terraform
+  host?: string;                   // agent-runtime | cloud-run | local
+  agentIdentity?: string;          // spec.effectiveIdentity of the runtime engine
   characteristics: Array<{         // platform, including cross-service-integrity
     id: string;
     score: number;                 // 0-100, deterministic
@@ -241,10 +272,14 @@ create table health_run (
   commit_sha       text not null,
   commit_message   text,
   created_at       timestamptz not null default now(),
+  committed_at     timestamptz,                   -- git committer time; trend/latest use this
   scored_at        timestamptz not null default now(),
   overall_score    int not null,
   reasoner         text,
   trace_id         text,
+  model            text,                          -- HEALTH_ADK_MODEL, gemini-2.5-pro from Terraform
+  host             text,                          -- agent-runtime | cloud-run | local
+  agent_identity   text,                          -- spec.effectiveIdentity of the runtime engine
   state            text not null default 'current',
   superseded_at    timestamptz,
   superseded_by    text,
@@ -278,7 +313,7 @@ create table accepted_decision (
 );
 ```
 
-A rescore inserts a new row and marks the previous current row `state=superseded`. Nothing is updated in place. The new row copies `created_at` from the superseded row so chronological order stays. Default reads are `state=current`.
+A rescore inserts a new row and marks the previous current row `state=superseded`. Score columns are not updated in place. After a split run, reasoning and provenance (`reasoner`, `host`, `model`, `agent_identity`, `trace_id`) are attached to the already-scored row. Latest and the trend order by `committed_at` (git committer time), falling back to `created_at`. Default reads are `state=current`.
 
 ## Scoring model
 
@@ -286,7 +321,7 @@ Lives in `health/scoring`, pure TypeScript, no I/O, fully unit tested against fi
 
 Shape: each characteristic starts at 100. Each deterministic finding applies a stated penalty. An active `accepted_decision` matching the rule and path suppresses that penalty and is recorded in `suppressedBy`.
 
-The agent receives the computed scores and writes reasoning and recommendations around them. It never modifies a number.
+The Cloud Run receiver computes the scores and writes them to Postgres. The agent on Agent Runtime receives those scores already fixed and writes reasoning and recommendations around them. It never sees `health/scoring`. If the agent response contains a number, the receiver logs `agent_returned_numeric` and keeps the persisted scores. Reasoning is attached to the existing rows. Score columns are not updated.
 
 ## Acceptance criteria
 
@@ -317,7 +352,7 @@ The agent receives the computed scores and writes reasoning and recommendations 
 - A push produces an `AnalysisPayload` on the health topic within 90 seconds. Collection does not fail when a rule fails.
 - Collect authenticates to Cloud Trace as `services-ci` via WIF, runs `scripts/smoke-runtime.sh` against the live services, then queries. The payload records `traffic: "this-run"`, the trace window, and `queried: true` only when the query succeeded. A failed query omits `edges`.
 - The guard is a separate CI step that blocks when a rule is violated.
-- The agent produces a `HealthRead` persisted to Postgres.
+- The Cloud Run receiver scores an `AnalysisPayload` with `health/scoring` and persists the run. Agent Runtime reasons over those scores and returns prose. Scoring is absent from the agent image.
 - Replay across N commits produces N current rows in `health_run`. A rescore supersedes the previous current row for that SHA.
 
 **MCP server**
@@ -344,7 +379,7 @@ Strictly sequential. Each step is demonstrable before the next begins.
 4. **Checkout service, local.** Same.
 5. **Analysis tooling.** ts-arch rules, dependency-cruiser config, jscpd config. Verify each rule fails on a deliberate fixture.
 6. **Commit history.** The sequence of improvements and regressions, including the provider-bypass regression.
-7. **Health agent, local.** ADK agent consuming an `AnalysisPayload` file, calling the scoring model, writing a `HealthRead`.
+7. **Health agent, local.** ADK agent consuming an `AnalysisPayload` file and already-computed scores, writing reasoning. Scoring stays in `health/scoring`. This is the local reasoner. The deployed agent is the same shape: it does not score.
 8. **Postgres and persistence.** Schema, migrations, replay across the commit history.
 9. **Dashboard.** Reads Postgres, renders scores and trend.
 10. **MCP server.**

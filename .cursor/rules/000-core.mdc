@@ -11,8 +11,8 @@ Monorepo: two services under migration plus a health system measuring them. See 
 - NEVER import the email provider outside `services/notification`.
 - NEVER create a shared rendering package. Duplication of email HTML between services is deliberate.
 - Observability lives in `packages/observability`. Services import `@observability/runtime` as-is. Do not subclass or wrap it.
-- NEVER let the health agent compute or modify a score. Scores are deterministic.
+- NEVER let the health agent compute or modify a score. Scores are deterministic and come from `health/scoring` on the Cloud Run receiver. The scoring package is not in the agent's image. Postgres is the system's record (receiver). Memory Bank is the agent's own memory (agent). Nothing writes to both.
 - No `any`. Use `unknown` and narrow. Parse unknown input with Zod.
 - Domain defines interfaces; infrastructure implements them.
-- Follow the build order in the spec for greenfield work. Once the health stack is live, deploy Cloud Run after each major scoring, agent, dashboard, MCP, or analysis change.
+- Follow the build order in the spec for greenfield work. Once the health stack is live, deploy the affected Cloud Run services and the Agent Runtime reasoner image after each major scoring, agent, dashboard, MCP, or analysis change.
 - Architecture health lives in Postgres. Call MCP `list_health_runs`, `get_health`, and `get_prior_decisions` instead of guessing scores.

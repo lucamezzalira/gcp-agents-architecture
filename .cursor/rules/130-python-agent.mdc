@@ -6,9 +6,9 @@ alwaysApply: false
 
 # Health agent
 
-Python 3.12, Google ADK. Consumes an `AnalysisPayload`, produces a `HealthRead`.
+Python 3.12, Google ADK, Agent Runtime. Receives an `AnalysisPayload` whose scores are already fixed. Returns narratives (reasoning and recommendations). The Cloud Run receiver assembles the `HealthRead` and writes Postgres.
 
-- The agent NEVER computes or modifies scores. Numbers come from `health/scoring`. The agent writes reasoning and recommendations around them.
+- The agent NEVER computes or modifies scores. That is a deployment boundary: `health/scoring` is not in this image. If a number appears in the response, the receiver logs it and ignores it.
 - The agent NEVER runs analysis tools. It consumes CI output.
 - Deterministic findings are authoritative. A failed architecture test is a fact.
 - Runtime signals arrive with `illustrative: true`. Say so in the reasoning.
