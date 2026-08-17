@@ -17,7 +17,7 @@ import { renderExpeditedConfirmation } from "./render-expedited-confirmation.js"
 import type { SendInstruction } from "./send-instruction.js";
 import { CHECKOUT_SKU, CHECKOUT_UNITS, confirmCommand } from "./stock-command.js";
 import { StockUnavailableError } from "./stock-unavailable.js";
-import { InMemoryEmailProvider } from "../../notification/src/infrastructure/email-provider.js";
+import { InMemoryEmailProvider } from "../../../notification/src/infrastructure/email-provider.js";
 
 void InMemoryEmailProvider;
 
