@@ -40,6 +40,9 @@ def invoke_runtime(
         score_payload = scores
     else:
         raise ValueError("scores are required; the receiver computes them")
+    # QueryReasoningEngine returns ACCESS_TOKEN_SCOPE_INSUFFICIENT for the
+    # aiplatform OAuth scope. IAM on this SA is the custom query role, not
+    # Vertex User. The token still needs cloud-platform.
     creds, _ = google.auth.default(
         scopes=["https://www.googleapis.com/auth/cloud-platform"]
     )

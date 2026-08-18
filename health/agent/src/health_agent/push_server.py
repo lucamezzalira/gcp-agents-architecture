@@ -43,6 +43,13 @@ def handle_payload(payload: dict[str, Any]) -> None:
     _legacy_produce(payload)
 
 
+def handle_reason(raw: bytes) -> None:
+    from health_agent.reason_queue import decode_reason_job
+    from health_agent.receiver import reason_scored_run
+
+    reason_scored_run(decode_reason_job(raw))
+
+
 def _legacy_produce(payload: dict[str, Any]) -> None:
     from health_agent.persist import (
         connect,
@@ -106,9 +113,17 @@ class PushHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(length)
+        path = self.path.split("?", 1)[0]
+        if path == "/reason":
+            with tracer().start_as_current_span("reason_received"):
+                handle_reason(raw)
+                flush_traces()
+            self.send_response(204)
+            self.end_headers()
+            return
         with tracer().start_as_current_span("payload_received") as received:
-            length = int(self.headers.get("Content-Length", "0"))
-            raw = self.rfile.read(length)
             payload = decode_push_message(raw)
             received.set_attribute("run.id", str(payload.get("runId", "")))
             received.set_attribute("commit.sha", str(payload.get("commitSha", "")))

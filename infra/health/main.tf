@@ -7,7 +7,7 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "~> 6.47"
+      version = "~> 7.37"
     }
     google-beta = {
       source  = "hashicorp/google-beta"
@@ -70,7 +70,7 @@ variable "agent_image" {
 variable "agent_reasoner_image" {
   type        = string
   default     = ""
-  description = "Agent Runtime image with no health/scoring. Tag-only URI; the provider rejects digest pins on container_spec.image_uri."
+  description = "Agent Runtime image with no health/scoring. Prefer a digest pin (image:tag@sha256:...). Terraform refuses apply if the tag in Artifact Registry does not match that digest. The Agent Engine API still stores a tag URI."
 }
 
 variable "agent_runtime_cutover" {
@@ -82,7 +82,7 @@ variable "agent_runtime_cutover" {
 variable "agent_score_split" {
   type        = bool
   default     = true
-  description = "Cloud Run scores and writes Postgres, then invokes Agent Runtime for prose. This is the live architecture. Pub/Sub push still targets Cloud Run. Set false only to roll back to a combined engine."
+  description = "Cloud Run scores and writes Postgres, then enqueues Agent Runtime for prose. Pub/Sub analysis-payloads acks after the insert. Reasoning is a second push on analysis-reason. Set false only to roll back to a combined engine."
 }
 
 variable "agent_engine_id" {
@@ -115,5 +115,7 @@ locals {
     "sts.googleapis.com",
     "secretmanager.googleapis.com",
     "aiplatform.googleapis.com",
+    "compute.googleapis.com",
+    "servicenetworking.googleapis.com",
   ]
 }

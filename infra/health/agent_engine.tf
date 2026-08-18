@@ -6,20 +6,23 @@
 # - agent: Agent Runtime in europe-west1. Image is agent_reasoner_image.
 #   It reasons and talks to Memory Bank. It has no Postgres env and no
 #   health/scoring package. identity_type is AGENT_IDENTITY. min_instances is
-#   1 so a cold engine does not 502 the first payload after idle.
+#   1 so a cold engine does not 502 the first payload after idle. The image
+#   URI stored by Agent Engine is tag-only; Terraform pins the digest against
+#   Artifact Registry and refuses apply on mismatch.
 # - reasoner_preview: absent. It existed only while the split was proven
 #   beside the live engine. count is 0 while agent_score_split is true.
 # Cloud Run health-agent is the Pub/Sub HTTPS push target. That path does not
 # change with this flag. Cloud Run scores with health/scoring, writes Postgres,
-# and invokes this runtime with scores already attached. The engine never
-# writes the database.
+# acks analysis-payloads, then analysis-reason invokes this runtime with scores
+# already attached. The engine never writes the database.
 
 locals {
   agent_engine_numeric_id = google_vertex_ai_reasoning_engine.memory.name
   adk_model               = "gemini-2.5-pro"
   agent_image_uri         = split("@", var.agent_image)[0]
-  reasoner_image_uri      = var.agent_reasoner_image == "" ? "" : split("@", var.agent_reasoner_image)[0]
-  live_engine_image_uri   = var.agent_score_split ? local.reasoner_image_uri : local.agent_image_uri
+  reasoner_image_tagged   = var.agent_reasoner_image == "" ? "" : split("@", var.agent_reasoner_image)[0]
+  reasoner_image_digest   = length(split("@", var.agent_reasoner_image)) > 1 ? split("@", var.agent_reasoner_image)[1] : ""
+  live_engine_image_uri   = var.agent_score_split ? local.reasoner_image_tagged : local.agent_image_uri
   scoring_class_methods = jsonencode([
     {
       name        = "query"
@@ -124,10 +127,24 @@ resource "google_artifact_registry_repository_iam_member" "reasoning_engine_pull
   member     = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
 }
 
-resource "google_project_iam_member" "reasoning_engine_pull_project" {
-  project = var.project_id
-  role    = "roles/artifactregistry.reader"
-  member  = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
+data "google_artifact_registry_docker_image" "reasoner" {
+  count         = local.reasoner_image_tagged == "" ? 0 : 1
+  location      = var.region
+  repository_id = google_artifact_registry_repository.health.repository_id
+  image_name    = regex("[^/]+$", local.reasoner_image_tagged)
+}
+
+resource "terraform_data" "reasoner_digest_pin" {
+  count = local.reasoner_image_digest == "" ? 0 : 1
+  lifecycle {
+    precondition {
+      condition = strcontains(
+        data.google_artifact_registry_docker_image.reasoner[0].name,
+        local.reasoner_image_digest,
+      )
+      error_message = "agent_reasoner_image digest does not match the tagged image in Artifact Registry. The Agent Engine API stores a tag URI; this check is the pin."
+    }
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "reasoning_engine_sql" {
@@ -239,8 +256,8 @@ resource "google_vertex_ai_reasoning_engine" "agent" {
   depends_on = [
     google_project_service.apis,
     google_artifact_registry_repository_iam_member.reasoning_engine_pull,
-    google_project_iam_member.reasoning_engine_pull_project,
     terraform_data.score_split_requires_reasoner_image,
+    terraform_data.reasoner_digest_pin,
   ]
 }
 
@@ -257,7 +274,7 @@ resource "google_vertex_ai_reasoning_engine" "reasoner_preview" {
     class_methods   = local.reasoner_class_methods
 
     container_spec {
-      image_uri = local.reasoner_image_uri
+      image_uri = local.reasoner_image_tagged
     }
 
     deployment_spec {
@@ -311,7 +328,6 @@ resource "google_vertex_ai_reasoning_engine" "reasoner_preview" {
   depends_on = [
     google_project_service.apis,
     google_artifact_registry_repository_iam_member.reasoning_engine_pull,
-    google_project_iam_member.reasoning_engine_pull_project,
   ]
 }
 

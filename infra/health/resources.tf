@@ -23,6 +23,12 @@ resource "google_pubsub_topic" "analysis" {
   depends_on = [google_project_service.apis]
 }
 
+resource "google_pubsub_topic" "reason" {
+  #checkov:skip=CKV_GCP_83:Google-managed encryption is enough for this demo
+  name       = "analysis-reason"
+  depends_on = [google_project_service.apis]
+}
+
 resource "google_pubsub_topic" "dead_letters" {
   #checkov:skip=CKV_GCP_83:Google-managed encryption is enough for this demo
   name       = "analysis-dead-letters"
@@ -55,11 +61,56 @@ resource "random_password" "sql" {
   special = false
 }
 
-# Public IP is assigned so Cloud Run can use the Auth Proxy (instance
-# connection name) without a VPC. There are no authorized_networks, so
-# clients cannot connect to that IP directly.
-resource "google_sql_database_instance" "health" { #tfsec:ignore:google-sql-no-public-access #tfsec:ignore:google-sql-encrypt-in-transit-data
-  #checkov:skip=CKV_GCP_60:Cloud Run Auth Proxy; no authorized networks
+resource "google_compute_network" "health" {
+  name                    = "health"
+  auto_create_subnetworks = false
+  depends_on              = [google_project_service.apis]
+}
+
+resource "google_compute_subnetwork" "health" {
+  name                     = "health"
+  ip_cidr_range            = "10.8.0.0/24"
+  region                   = var.region
+  network                  = google_compute_network.health.id
+  private_ip_google_access = true
+}
+
+resource "google_compute_global_address" "sql_psa" {
+  name          = "health-sql-psa"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.health.id
+}
+
+resource "google_service_networking_connection" "sql" {
+  network                 = google_compute_network.health.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.sql_psa.name]
+  depends_on              = [google_project_service.apis]
+}
+
+resource "google_compute_subnetwork_iam_member" "run_direct_vpc" {
+  project    = var.project_id
+  region     = var.region
+  subnetwork = google_compute_subnetwork.health.name
+  role       = "roles/compute.networkUser"
+  member     = "serviceAccount:service-${data.google_project.this.number}@serverless-robot-prod.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_custom_role" "reasoning_engine_query" {
+  role_id     = "reasoningEngineQuery"
+  title       = "Query Agent Runtime"
+  description = "Cloud Run receiver may query and describe the reasoner. Not Vertex User."
+  permissions = [
+    "aiplatform.reasoningEngines.query",
+    "aiplatform.reasoningEngines.get",
+  ]
+}
+
+# Public IP is off. Cloud Run reaches this instance over Direct VPC and the
+# Cloud SQL Auth Proxy unix socket (private path for Google APIs).
+resource "google_sql_database_instance" "health" { #tfsec:ignore:google-sql-encrypt-in-transit-data
   #checkov:skip=CKV_GCP_79:Postgres 16 is the version this demo pins
   #checkov:skip=CKV_GCP_110:pgAudit needs an extension step at migrate time
   #checkov:skip=CKV_GCP_6:ssl_mode ENCRYPTED_ONLY is the current TLS setting; checkov still looks for require_ssl
@@ -75,8 +126,10 @@ resource "google_sql_database_instance" "health" { #tfsec:ignore:google-sql-no-p
     disk_size                   = 10
     disk_autoresize             = false
     ip_configuration {
-      ipv4_enabled = true
-      ssl_mode     = "ENCRYPTED_ONLY"
+      ipv4_enabled                                  = false
+      private_network                               = google_compute_network.health.id
+      ssl_mode                                      = "ENCRYPTED_ONLY"
+      enable_private_path_for_google_cloud_services = true
     }
     backup_configuration {
       enabled                        = true
@@ -132,7 +185,10 @@ resource "google_sql_database_instance" "health" { #tfsec:ignore:google-sql-no-p
     }
   }
   deletion_protection = true
-  depends_on          = [google_project_service.apis]
+  depends_on = [
+    google_project_service.apis,
+    google_service_networking_connection.sql,
+  ]
 }
 
 resource "google_sql_database" "health" {
@@ -200,14 +256,20 @@ resource "google_project_iam_member" "agent_cloudsql" {
   member  = "serviceAccount:${google_service_account.agent.email}"
 }
 
+resource "google_pubsub_topic_iam_member" "agent_reason_publish" {
+  topic  = google_pubsub_topic.reason.name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:${google_service_account.agent.email}"
+}
+
 resource "google_project_iam_member" "agent_trace" {
   project = var.project_id
   role    = "roles/cloudtrace.agent"
   member  = "serviceAccount:${google_service_account.agent.email}"
 }
 
-resource "google_project_iam_member" "agent_vertex" {
+resource "google_project_iam_member" "agent_runtime_query" {
   project = var.project_id
-  role    = "roles/aiplatform.user"
+  role    = google_project_iam_custom_role.reasoning_engine_query.name
   member  = "serviceAccount:${google_service_account.agent.email}"
 }

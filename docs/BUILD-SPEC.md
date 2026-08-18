@@ -9,7 +9,7 @@ Implementation contract. `docs/PRD.md` is the original specification (see the no
 | Monorepo tooling | pnpm workspaces + Turborepo |
 | Services | TypeScript, Node 24, Fastify |
 | Request and payload schemas | Zod |
-| Health receiver | Python 3.12, Cloud Run. Validates `AnalysisPayload`, runs `health/scoring`, writes Postgres, invokes the agent |
+| Health receiver | Python 3.12, Cloud Run. Validates `AnalysisPayload`, runs `health/scoring`, writes Postgres, enqueues Agent Runtime for prose |
 | Health agent | Python 3.12, Google ADK, Agent Runtime. Reasons over already-computed scores. Scoring is not in this image |
 | MCP server | TypeScript, official MCP SDK |
 | Dashboard | Astro |
@@ -322,7 +322,7 @@ Lives in `health/scoring`, pure TypeScript, no I/O, fully unit tested against fi
 
 Shape: each characteristic starts at 100. Each deterministic finding applies a stated penalty. An active `accepted_decision` matching the rule and path suppresses that penalty and is recorded in `suppressedBy`.
 
-The Cloud Run receiver computes the scores and writes them to Postgres. The agent on Agent Runtime receives those scores already fixed and writes reasoning and recommendations around them. It never sees `health/scoring`. If the agent response contains a number, the receiver logs `agent_returned_numeric` and keeps the persisted scores. Reasoning is attached to the existing rows. Score columns are not updated.
+The Cloud Run receiver computes the scores and writes them to Postgres. It acks the collect push there. A second Pub/Sub push invokes the agent on Agent Runtime with those scores already fixed. The agent writes reasoning and recommendations around them. It never sees `health/scoring`. If the agent response contains a number, the receiver logs `agent_returned_numeric` and keeps the persisted scores. Reasoning is attached to the existing rows. Score columns are not updated.
 
 ## Acceptance criteria
 

@@ -8,7 +8,7 @@ from typing import Any
 
 from health_agent.assemble import assemble, assert_scores_unchanged
 from health_agent.host import fetch_engine_identity
-from health_agent.models import AnalysisPayload
+from health_agent.models import AnalysisPayload, ScoreResult
 from health_agent.narratives import empty_narratives, narratives_from_agent
 from health_agent.persist import (
     attach_reasoning,
@@ -19,6 +19,7 @@ from health_agent.persist import (
     load_recent_reads,
     migrate,
 )
+from health_agent.reason_queue import publish_reason_job, reason_topic
 from health_agent.reasoner_facts import metrics_from_payload
 from health_agent.runtime_client import invoke_runtime
 from health_agent.score_bridge import score_payload
@@ -26,16 +27,47 @@ from health_agent.tracing import current_trace_id, setup_tracing, tracer
 
 
 def receive_payload(payload: dict[str, Any]) -> str:
-    """Score, persist, ask the runtime for prose, attach it. Never touches Memory Bank."""
+    """Score and persist. Enqueue prose, or attach it inline when REASON_TOPIC is unset."""
     setup_tracing()
     parsed = AnalysisPayload.model_validate(payload)
     with tracer().start_as_current_span("receive_payload") as span:
         span.set_attribute("run.id", parsed.runId)
         span.set_attribute("commit.sha", parsed.commitSha)
-        return _receive_payload(parsed, payload)
+        run_id, scores, priors = _score_and_insert(parsed, payload)
+        prior_dicts = [
+            item.model_dump(by_alias=True, exclude_none=True) for item in priors
+        ]
+        score_dump = scores.model_dump(by_alias=True)
+        if reason_topic():
+            with tracer().start_as_current_span("enqueue_reason"):
+                publish_reason_job(run_id, payload, score_dump, prior_dicts)
+            return run_id
+        attach_runtime_reasoning(run_id, payload, scores, prior_dicts)
+        return run_id
 
 
-def _receive_payload(parsed: AnalysisPayload, payload: dict[str, Any]) -> str:
+def reason_scored_run(body: dict[str, Any]) -> str:
+    """Attach Agent Runtime prose to an already-scored row. Never rescores."""
+    setup_tracing()
+    run_id = str(body["runId"])
+    payload = body["payload"]
+    if not isinstance(payload, dict):
+        raise ValueError("reason job payload must be an object")
+    scores = ScoreResult.model_validate(body["scores"])
+    raw_priors = body.get("priorReads")
+    prior_dicts = (
+        [item for item in raw_priors if isinstance(item, dict)]
+        if isinstance(raw_priors, list)
+        else []
+    )
+    with tracer().start_as_current_span("reason_scored_run") as span:
+        span.set_attribute("run.id", run_id)
+        return attach_runtime_reasoning(run_id, payload, scores, prior_dicts)
+
+
+def _score_and_insert(
+    parsed: AnalysisPayload, payload: dict[str, Any]
+) -> tuple[str, ScoreResult, list[Any]]:
     with NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
         handle.write(parsed.model_dump_json(by_alias=True, exclude_none=True))
         path = Path(handle.name)
@@ -72,13 +104,29 @@ def _receive_payload(parsed: AnalysisPayload, payload: dict[str, Any]) -> str:
             parsed.commitMessage,
             iso_or_none(parsed.committedAt),
         )
+        return run_id, scores, priors
+    finally:
+        if conn is not None:
+            conn.close()
+        path.unlink(missing_ok=True)
+        if decisions_path is not None:
+            decisions_path.unlink(missing_ok=True)
+
+
+def attach_runtime_reasoning(
+    run_id: str,
+    payload: dict[str, Any],
+    scores: ScoreResult,
+    prior_reads: list[dict[str, Any]],
+) -> str:
+    conn = None
+    try:
+        conn = connect()
         try:
             output = invoke_runtime(
                 payload,
                 scores=scores.model_dump(by_alias=True),
-                prior_reads=[
-                    item.model_dump(by_alias=True, exclude_none=True) for item in priors
-                ],
+                prior_reads=prior_reads,
             )
         except Exception as exc:
             print(f"reasoning_failed={type(exc).__name__}: {exc}", flush=True)
@@ -87,7 +135,7 @@ def _receive_payload(parsed: AnalysisPayload, payload: dict[str, Any]) -> str:
         identity = _optional_str(output.get("agentIdentity")) or _receiver_runtime_identity()
         read = assemble(
             run_id,
-            parsed.commitSha,
+            str(payload.get("commitSha") or ""),
             scores,
             narratives,
             reasoner=str(output.get("reasoner") or "adk"),
@@ -96,12 +144,7 @@ def _receive_payload(parsed: AnalysisPayload, payload: dict[str, Any]) -> str:
             host=_optional_str(output.get("host")) or "agent-runtime",
             agent_identity=identity,
         )
-        read = read.model_copy(
-            update={
-                "metrics": scored.metrics,
-                "ruleSetVersion": parsed.ruleSetVersion,
-            }
-        )
+        read = read.model_copy(update={"ruleSetVersion": int(payload.get("ruleSetVersion") or 1)})
         assert_scores_unchanged(scores, read)
         attach_reasoning(
             conn,
@@ -117,9 +160,6 @@ def _receive_payload(parsed: AnalysisPayload, payload: dict[str, Any]) -> str:
     finally:
         if conn is not None:
             conn.close()
-        path.unlink(missing_ok=True)
-        if decisions_path is not None:
-            decisions_path.unlink(missing_ok=True)
 
 
 def _receiver_runtime_identity() -> str | None:

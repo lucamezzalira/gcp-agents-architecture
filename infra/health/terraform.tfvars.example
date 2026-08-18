@@ -12,4 +12,4 @@ region     = "europe-west1"
 # roll back to a combined engine. agent_reasoner_image is required once
 # agent_image is set.
 # agent_runtime_cutover = true
-# agent_reasoner_image = "europe-west1-docker.pkg.dev/PROJECT/health/reasoner:v1"
+# agent_reasoner_image = "europe-west1-docker.pkg.dev/PROJECT/health/reasoner:v1@sha256:DIGEST"

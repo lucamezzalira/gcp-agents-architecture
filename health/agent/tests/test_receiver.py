@@ -161,3 +161,100 @@ def test_receive_payload_keeps_score_when_runtime_fails(monkeypatch) -> None:
     assert inserted["overall"] == 93
     assert inserted["reasoner"] == ""
     assert attached["called"] is False
+
+
+SAMPLE = {
+    "runId": "r1",
+    "commitSha": "a" * 40,
+    "commitMessage": "test",
+    "timestamp": "2026-08-17T00:00:00Z",
+    "archTests": [],
+    "runtime": {},
+    "ruleSetVersion": 8,
+}
+
+
+def test_receive_payload_enqueues_when_topic_set(monkeypatch) -> None:
+    published: dict[str, object] = {}
+    invoked = {"called": False}
+
+    monkeypatch.setenv("REASON_TOPIC", "projects/p/topics/analysis-reason")
+    monkeypatch.setattr(
+        "health_agent.receiver.reason_topic",
+        lambda: "projects/p/topics/analysis-reason",
+    )
+    monkeypatch.setattr("health_agent.receiver.connect", lambda: FakeConn())
+    monkeypatch.setattr("health_agent.receiver.migrate", lambda _conn: None)
+    monkeypatch.setattr("health_agent.receiver.load_active_decisions", lambda _conn: [])
+    monkeypatch.setattr("health_agent.receiver.load_recent_reads", lambda _conn: [])
+    monkeypatch.setattr("health_agent.receiver.score_payload", lambda *_a, **_k: SCORES)
+    monkeypatch.setattr(
+        "health_agent.receiver.insert_health_read",
+        lambda *_a, **_k: "sha:run",
+    )
+    monkeypatch.setattr(
+        "health_agent.receiver.invoke_runtime",
+        lambda *_a, **_k: invoked.__setitem__("called", True),
+    )
+
+    def fake_publish(run_id, payload, scores, prior_reads) -> None:
+        published["run_id"] = run_id
+        published["overall"] = scores["overall"]
+        published["sha"] = payload["commitSha"]
+        published["priors"] = prior_reads
+
+    monkeypatch.setattr("health_agent.receiver.publish_reason_job", fake_publish)
+
+    run_id = receive_payload(SAMPLE)
+    assert run_id == "sha:run"
+    assert published["run_id"] == "sha:run"
+    assert published["overall"] == 93
+    assert invoked["called"] is False
+
+
+def test_reason_scored_run_attaches_prose(monkeypatch, capsys) -> None:
+    from health_agent.receiver import reason_scored_run
+
+    attached: dict[str, object] = {}
+
+    monkeypatch.setattr("health_agent.receiver.connect", lambda: FakeConn())
+
+    def fake_invoke(payload, scores=None, prior_reads=None, persist=False):
+        narratives = []
+        for item in empty_narratives(SCORES):
+            narratives.append(
+                {
+                    "id": item.id,
+                    "reasoning": f"prose for {item.id}",
+                    "recommendations": ["do not accept 1"],
+                }
+            )
+        return {
+            "overall": 1,
+            "narratives": narratives,
+            "reasoner": "adk",
+            "host": "agent-runtime",
+            "model": "gemini-2.5-pro",
+            "agentIdentity": "principal://agents.example/health-agent",
+        }
+
+    def fake_attach(_conn, run_id, narratives, **provenance) -> None:
+        attached["run_id"] = run_id
+        attached["host"] = provenance["host"]
+
+    monkeypatch.setattr("health_agent.receiver.invoke_runtime", fake_invoke)
+    monkeypatch.setattr("health_agent.receiver.attach_reasoning", fake_attach)
+
+    run_id = reason_scored_run(
+        {
+            "runId": "sha:run",
+            "payload": SAMPLE,
+            "scores": SCORES.model_dump(by_alias=True),
+            "priorReads": [],
+        }
+    )
+    err = capsys.readouterr().err
+    assert run_id == "sha:run"
+    assert attached["run_id"] == "sha:run"
+    assert attached["host"] == "agent-runtime"
+    assert "agent_returned_numeric=" in err

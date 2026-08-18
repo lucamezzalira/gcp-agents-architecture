@@ -5,10 +5,23 @@ resource "google_cloud_run_v2_service" "dashboard" {
   deletion_protection = false
   ingress             = "INGRESS_TRAFFIC_ALL"
 
+  scaling {
+    scaling_mode       = "AUTOMATIC"
+    min_instance_count = 1
+    max_instance_count = 3
+  }
+
   template {
     timeout                          = "60s"
     max_instance_request_concurrency = 8
     service_account                  = google_service_account.dashboard.email
+    vpc_access {
+      egress = "PRIVATE_RANGES_ONLY"
+      network_interfaces {
+        network    = google_compute_network.health.id
+        subnetwork = google_compute_subnetwork.health.id
+      }
+    }
     scaling {
       min_instance_count = 1
       max_instance_count = 3
@@ -52,14 +65,7 @@ resource "google_cloud_run_v2_service" "dashboard" {
     }
   }
 
-  # Provider 6.50 stores GCP's default service-level scaling as min/manual
-  # zeros. The API actually returns maxInstanceCount=20. We scale via
-  # template.scaling. Ignoring this block stops a perpetual no-op plan.
-  lifecycle {
-    ignore_changes = [scaling]
-  }
-
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.apis, google_compute_subnetwork_iam_member.run_direct_vpc]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "dashboard_public" {
@@ -77,10 +83,23 @@ resource "google_cloud_run_v2_service" "mcp" {
   deletion_protection = false
   ingress             = "INGRESS_TRAFFIC_ALL"
 
+  scaling {
+    scaling_mode       = "AUTOMATIC"
+    min_instance_count = 1
+    max_instance_count = 1
+  }
+
   template {
     timeout                          = "60s"
     max_instance_request_concurrency = 8
     service_account                  = google_service_account.mcp.email
+    vpc_access {
+      egress = "PRIVATE_RANGES_ONLY"
+      network_interfaces {
+        network    = google_compute_network.health.id
+        subnetwork = google_compute_subnetwork.health.id
+      }
+    }
     scaling {
       min_instance_count = 1
       max_instance_count = 1
@@ -120,11 +139,7 @@ resource "google_cloud_run_v2_service" "mcp" {
     }
   }
 
-  lifecycle {
-    ignore_changes = [scaling]
-  }
-
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.apis, google_compute_subnetwork_iam_member.run_direct_vpc]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "mcp_public" {
@@ -142,10 +157,23 @@ resource "google_cloud_run_v2_service" "agent" {
   deletion_protection = false
   ingress             = "INGRESS_TRAFFIC_ALL"
 
+  scaling {
+    scaling_mode       = "AUTOMATIC"
+    min_instance_count = 0
+    max_instance_count = 1
+  }
+
   template {
     timeout                          = "300s"
     max_instance_request_concurrency = 1
     service_account                  = google_service_account.agent.email
+    vpc_access {
+      egress = "PRIVATE_RANGES_ONLY"
+      network_interfaces {
+        network    = google_compute_network.health.id
+        subnetwork = google_compute_subnetwork.health.id
+      }
+    }
     scaling {
       min_instance_count = 0
       max_instance_count = 1
@@ -184,6 +212,7 @@ resource "google_cloud_run_v2_service" "agent" {
           AGENT_RUNTIME_ID       = try(google_vertex_ai_reasoning_engine.agent[0].name, "")
           AGENT_RUNTIME_LOCATION = var.region
           HEALTH_TRACE_EXPORT    = "1"
+          REASON_TOPIC           = google_pubsub_topic.reason.id
         }
         content {
           name  = env.key
@@ -212,11 +241,7 @@ resource "google_cloud_run_v2_service" "agent" {
     }
   }
 
-  lifecycle {
-    ignore_changes = [scaling]
-  }
-
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.apis, google_compute_subnetwork_iam_member.run_direct_vpc]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "agent_pubsub" {
@@ -244,7 +269,7 @@ resource "google_pubsub_subscription" "analysis_push" {
       audience              = google_cloud_run_v2_service.agent[0].uri
     }
   }
-  ack_deadline_seconds = 240
+  ack_deadline_seconds = 60
   expiration_policy {
     ttl = ""
   }
@@ -265,6 +290,38 @@ resource "google_pubsub_subscription_iam_member" "analysis_dlq" {
   member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
+resource "google_pubsub_subscription" "analysis_reason_push" {
+  count = var.agent_image == "" ? 0 : 1
+  name  = "analysis-reason-agent"
+  topic = google_pubsub_topic.reason.id
+  push_config {
+    push_endpoint = "${google_cloud_run_v2_service.agent[0].uri}/reason"
+    oidc_token {
+      service_account_email = google_service_account.agent.email
+      audience              = google_cloud_run_v2_service.agent[0].uri
+    }
+  }
+  ack_deadline_seconds = 240
+  expiration_policy {
+    ttl = ""
+  }
+  dead_letter_policy {
+    dead_letter_topic     = google_pubsub_topic.dead_letters.id
+    max_delivery_attempts = 5
+  }
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+}
+
+resource "google_pubsub_subscription_iam_member" "analysis_reason_dlq" {
+  count        = var.agent_image == "" ? 0 : 1
+  subscription = google_pubsub_subscription.analysis_reason_push[0].name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
 # Agent Engine lives in agent_engine.tf. Cloud Run is the Pub/Sub push
-# receiver. score mode (live): compute scores, write Postgres, invoke the
-# reasoner, attach prose. doorway and legacy remain in the file for rollback.
+# receiver. score mode (live): persist scores, ack analysis-payloads, enqueue
+# analysis-reason, attach prose on /reason. doorway and legacy remain for rollback.
