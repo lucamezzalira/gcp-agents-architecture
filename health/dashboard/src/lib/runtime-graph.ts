@@ -12,12 +12,6 @@ export const DESIGNED_RUNTIME_EDGES: RuntimeEdgeView[] = [
   {
     from: "checkout",
     to: "inventory",
-    protocol: "http",
-    purpose: "stock lookup",
-  },
-  {
-    from: "checkout",
-    to: "inventory",
     protocol: "pubsub",
     purpose: "reservations",
   },
@@ -153,7 +147,6 @@ const EDGE_LANES: Record<string, Lane> = {
   "checkout->notification:pubsub": "skip-top",
   "checkout->inventory:pubsub": "upper-far",
   "inventory->notification:pubsub": "upper-near",
-  "checkout->inventory:http": "upper-near",
   "inventory->checkout:pubsub": "lower",
   "checkout->audit:pubsub": "drop",
 };

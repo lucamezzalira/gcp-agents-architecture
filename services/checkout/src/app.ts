@@ -62,7 +62,8 @@ function buildServer(
         reservationOutcomes,
         logger,
       }),
-    (orderId) => getOrderView(orderId, { orderStore }),
+    (orderId) =>
+      getOrderView(orderId, { orderStore, reservationOutcomes }),
     (orderId) => cancelOrder(orderId, { orderStore, reservations, logger }),
     logger,
   );

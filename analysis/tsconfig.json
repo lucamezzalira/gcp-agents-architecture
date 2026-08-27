@@ -5,5 +5,5 @@
     "outDir": "dist",
     "noEmit": true
   },
-  "include": ["arch-tests", "collect-payload.ts", "runtime-graph.ts", "runtime-graph.test.ts"]
+  "include": ["arch-tests", "collect-payload.ts", "contracts.ts", "runtime-graph.ts", "runtime-graph.test.ts"]
 }

@@ -9,7 +9,7 @@ describe("mergeRuntimeEdges", () => {
   it("keeps designed event channels and attaches observed counts", () => {
     const merged = mergeRuntimeEdges([
       { from: "checkout", to: "notification", protocol: "pubsub", count: 3 },
-      { from: "checkout", to: "inventory", protocol: "http", count: 2 },
+      { from: "checkout", to: "inventory", protocol: "pubsub", count: 2 },
     ]);
     expect(merged).toHaveLength(DESIGNED_RUNTIME_EDGES.length);
     expect(
@@ -25,9 +25,24 @@ describe("mergeRuntimeEdges", () => {
         (edge) =>
           edge.from === "checkout" &&
           edge.to === "inventory" &&
-          edge.protocol === "http",
+          edge.protocol === "pubsub",
       )?.count,
     ).toBe(2);
+  });
+
+  it("keeps unexpected observed edges as observed-only", () => {
+    const merged = mergeRuntimeEdges([
+      { from: "checkout", to: "inventory", protocol: "http", count: 2 },
+    ]);
+    expect(merged).toHaveLength(DESIGNED_RUNTIME_EDGES.length + 1);
+    expect(
+      merged.find(
+        (edge) =>
+          edge.from === "checkout" &&
+          edge.to === "inventory" &&
+          edge.protocol === "http",
+      ),
+    ).toMatchObject({ purpose: "observed", count: 2 });
   });
 });
 

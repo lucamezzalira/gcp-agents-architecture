@@ -5,7 +5,9 @@ import type { ReservationOutcomeSink } from "../domain/ports/reservation-outcome
 /**
  * In-process publisher for tests and local mode. When an outcome sink is
  * provided, reserve/release/confirm are applied immediately so local checkout
- * does not need HTTP to inventory (events stay the contract).
+ * can pay without inventory or Pub/Sub. This is a local shortcut, not cloud
+ * behavior: cloud place publishes a command and pay waits for the outcome push
+ * (409 reservation not ready until then).
  */
 export class MemoryReservationPublisher implements ReservationPublisher {
   readonly published: ReservationCommand[] = [];

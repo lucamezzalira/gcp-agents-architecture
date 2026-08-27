@@ -92,6 +92,9 @@ class _PgConn:
     def commit(self) -> None:
         getattr(self._raw, "commit")()
 
+    def rollback(self) -> None:
+        getattr(self._raw, "rollback")()
+
     def close(self) -> None:
         getattr(self._raw, "close")()
 
@@ -219,6 +222,7 @@ def insert_health_read(
             select run_id, committed_at, coalesce(incomplete, false)
             from health_run
             where commit_sha = %s and state = 'current'
+            for update
             """,
             (read.commitSha,),
         ).fetchone()
@@ -243,43 +247,59 @@ def insert_health_read(
             )
         metrics = _metrics_payload(read)
         service_overalls = {item.service: item.overall for item in read.services}
-        conn.execute(
-            """
-            insert into health_run (
-              run_id, commit_sha, commit_message, overall_score, reasoner, trace_id,
-              modules, dependencies, duplication_pct, orphan_count, cycle_count,
-              state, service_overalls, metrics, created_at, scored_at, rule_set_version,
-              committed_at, model, host, agent_identity, incomplete
+        try:
+            conn.execute(
+                """
+                insert into health_run (
+                  run_id, commit_sha, commit_message, overall_score, reasoner, trace_id,
+                  modules, dependencies, duplication_pct, orphan_count, cycle_count,
+                  state, service_overalls, metrics, created_at, scored_at, rule_set_version,
+                  committed_at, model, host, agent_identity, incomplete
+                )
+                values (
+                  %s, %s, %s, %s, %s, %s,
+                  %s, %s, %s, %s, %s,
+                  'current', %s::jsonb, %s::jsonb, now(), now(), %s,
+                  %s, %s, %s, %s, %s
+                )
+                """,
+                (
+                    run_id,
+                    read.commitSha,
+                    commit_message,
+                    read.overall,
+                    read.reasoner,
+                    read.traceId,
+                    None if read.metrics is None else read.metrics.modules,
+                    None if read.metrics is None else read.metrics.dependencies,
+                    None if read.metrics is None else read.metrics.duplicationPercentage,
+                    None if read.metrics is None else read.metrics.orphanCount,
+                    None if read.metrics is None else read.metrics.cycleCount,
+                    json.dumps(service_overalls),
+                    json.dumps(metrics) if metrics is not None else None,
+                    read.ruleSetVersion,
+                    persisted_committed_at,
+                    read.model,
+                    read.host,
+                    read.agentIdentity,
+                    incomplete,
+                ),
             )
-            values (
-              %s, %s, %s, %s, %s, %s,
-              %s, %s, %s, %s, %s,
-              'current', %s::jsonb, %s::jsonb, now(), now(), %s,
-              %s, %s, %s, %s, %s
-            )
-            """,
-            (
-                run_id,
-                read.commitSha,
-                commit_message,
-                read.overall,
-                read.reasoner,
-                read.traceId,
-                None if read.metrics is None else read.metrics.modules,
-                None if read.metrics is None else read.metrics.dependencies,
-                None if read.metrics is None else read.metrics.duplicationPercentage,
-                None if read.metrics is None else read.metrics.orphanCount,
-                None if read.metrics is None else read.metrics.cycleCount,
-                json.dumps(service_overalls),
-                json.dumps(metrics) if metrics is not None else None,
-                read.ruleSetVersion,
-                persisted_committed_at,
-                read.model,
-                read.host,
-                read.agentIdentity,
-                incomplete,
-            ),
-        )
+        except Exception as error:
+            if not _is_unique_violation(error):
+                raise
+            conn.rollback()
+            raced = conn.execute(
+                """
+                select run_id, coalesce(incomplete, false)
+                from health_run
+                where commit_sha = %s and state = 'current'
+                """,
+                (read.commitSha,),
+            ).fetchone()
+            if raced is None:
+                raise
+            return InsertResult(str(raced[0]), bool(raced[1]))
         scopes: list[tuple[str, list[CharacteristicRead]]] = [
             ("platform", read.characteristics)
         ]
@@ -306,6 +326,13 @@ def insert_health_read(
                 )
         conn.commit()
         return InsertResult(run_id, False)
+
+
+def _is_unique_violation(error: object) -> bool:
+    if isinstance(error, psycopg.errors.UniqueViolation):
+        return True
+    text = str(error).lower()
+    return "unique" in text and ("health_run_one_current_per_sha" in text or "duplicate" in text)
 
 
 def load_score_result(conn: psycopg.Connection, run_id: str) -> ScoreResult:
@@ -408,7 +435,7 @@ def attach_reasoning(
                 characteristic,
             ),
         )
-    conn.execute(
+    updated = conn.execute(
         """
         update health_run
            set reasoner = %s,
@@ -418,9 +445,16 @@ def attach_reasoning(
                trace_id = coalesce(%s, trace_id),
                incomplete = false
          where run_id = %s
+           and state = 'current'
+           and coalesce(incomplete, false) = true
         """,
         (reasoner, host, model, agent_identity, trace_id, run_id),
     )
+    rowcount = getattr(updated, "rowcount", None)
+    if rowcount == 0:
+        raise RuntimeError(
+            f"refusing to attach reasoning to non-current or complete run {run_id}"
+        )
     conn.commit()
 
 

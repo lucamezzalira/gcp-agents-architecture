@@ -94,14 +94,6 @@ resource "google_cloud_run_v2_service" "notification" {
   depends_on = [google_project_service.apis]
 }
 
-resource "google_cloud_run_v2_service_iam_member" "inventory_checkout" {
-  count    = var.inventory_image == "" || var.checkout_image == "" ? 0 : 1
-  name     = google_cloud_run_v2_service.inventory[0].name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.checkout.email}"
-}
-
 resource "google_cloud_run_v2_service_iam_member" "checkout_pubsub" {
   count    = var.checkout_image == "" ? 0 : 1
   name     = google_cloud_run_v2_service.checkout[0].name

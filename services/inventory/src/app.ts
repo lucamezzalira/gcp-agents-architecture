@@ -12,11 +12,13 @@ import type { ReservationStore } from "./domain/ports/reservation-store.js";
 import type { StockStore } from "./domain/ports/stock-store.js";
 import { DEFAULT_SKU } from "./domain/stock.js";
 import { expireHeld, HELD_TTL_MS } from "./domain/expire-held.js";
+import type { HoldStock } from "./domain/ports/hold-stock.js";
 import {
   asReservationStore,
   FirestoreInventory,
 } from "./infrastructure/firestore-inventory.js";
 import { GcsHtml } from "./infrastructure/gcs-html.js";
+import { MemoryHold } from "./infrastructure/memory-hold.js";
 import { MemoryHtml } from "./infrastructure/memory-html.js";
 import { MemoryMail } from "./infrastructure/memory-mail.js";
 import { MemoryOutcomes } from "./infrastructure/memory-outcomes.js";
@@ -43,6 +45,7 @@ export type InventoryApp = {
 function buildServer(
   stock: StockStore,
   reservations: ReservationStore,
+  hold: HoldStock,
   outcomes: OutcomePublisher,
   logger: Logger,
   ttlMs: number,
@@ -57,6 +60,7 @@ function buildServer(
     await handleReservation(command, {
       stock,
       reservations,
+      hold,
       outcomes,
       logger,
       now: () => new Date(),
@@ -89,6 +93,7 @@ export function createApp(logger: Logger = silentLogger()): InventoryApp {
     server: buildServer(
       stock,
       reservations,
+      new MemoryHold(stock, reservations),
       outcomes,
       logger,
       HELD_TTL_MS,
@@ -105,11 +110,13 @@ export function createApp(logger: Logger = silentLogger()): InventoryApp {
 export function createLocalApp(): FastifyInstance {
   const stock = new MemoryStock();
   void stock.save({ sku: DEFAULT_SKU, available: 100 });
+  const reservations = new MemoryReservations();
   const html = new MemoryHtml();
   const mailer = new MemoryMail();
   return buildServer(
     stock,
-    new MemoryReservations(),
+    reservations,
+    new MemoryHold(stock, reservations),
     new MemoryOutcomes(),
     createJsonLogger("inventory"),
     HELD_TTL_MS,
@@ -134,6 +141,7 @@ export function createCloudApp(): FastifyInstance {
   return buildServer(
     firestore,
     asReservationStore(firestore),
+    firestore,
     PubSubOutcomes.forTopic(requireEnv("RESERVATION_OUTCOMES_TOPIC")),
     createJsonLogger("inventory"),
     Number(process.env.RESERVATION_TTL_MS ?? HELD_TTL_MS),

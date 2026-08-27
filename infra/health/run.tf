@@ -179,7 +179,7 @@ resource "google_cloud_run_v2_service" "agent" {
       max_instance_count = 1
     }
     dynamic "volumes" {
-      for_each = local.receiver_mode == "doorway" ? [] : [1]
+      for_each = [1]
       content {
         name = "cloudsql"
         cloud_sql_instance {
@@ -213,7 +213,7 @@ resource "google_cloud_run_v2_service" "agent" {
         }
       }
       dynamic "env" {
-        for_each = local.receiver_mode == "doorway" ? [] : [1]
+        for_each = [1]
         content {
           name = "DATABASE_URL"
           value_source {
@@ -225,7 +225,7 @@ resource "google_cloud_run_v2_service" "agent" {
         }
       }
       dynamic "volume_mounts" {
-        for_each = local.receiver_mode == "doorway" ? [] : [1]
+        for_each = [1]
         content {
           name       = "cloudsql"
           mount_path = "/cloudsql"
@@ -316,5 +316,5 @@ resource "google_pubsub_subscription_iam_member" "analysis_reason_dlq" {
 }
 
 # Agent Engine lives in agent_engine.tf. Cloud Run is the Pub/Sub push
-# receiver. score mode (live): persist scores, ack analysis-payloads, enqueue
-# analysis-reason, attach prose on /reason. doorway and legacy remain for rollback.
+# receiver: persist scores, ack analysis-payloads, enqueue analysis-reason,
+# attach prose on /reason. Doorway and legacy receiver modes are gone.

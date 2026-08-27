@@ -73,16 +73,15 @@ variable "agent_reasoner_image" {
   description = "Agent Runtime image with no health/scoring. Prefer a digest pin (image:tag@sha256:...). Terraform refuses apply if the tag in Artifact Registry does not match that digest. The Agent Engine API still stores a tag URI."
 }
 
-variable "agent_runtime_cutover" {
-  type        = bool
-  default     = false
-  description = "When true and agent_score_split is false, Cloud Run is only the Pub/Sub doorway and invokes the live engine. Live traffic uses agent_score_split instead."
-}
-
 variable "agent_score_split" {
   type        = bool
   default     = true
-  description = "Cloud Run scores and writes Postgres, then enqueues Agent Runtime for prose. Pub/Sub analysis-payloads acks after the insert. Reasoning is a second push on analysis-reason. Set false only to roll back to a combined engine."
+  description = "Required true. Cloud Run scores and writes Postgres, then enqueues Agent Runtime for prose. Combined-engine and doorway rollback paths were removed."
+
+  validation {
+    condition     = var.agent_score_split == true
+    error_message = "agent_score_split must be true. The score/reason split is the only supported layout."
+  }
 }
 
 variable "agent_engine_id" {
@@ -109,7 +108,6 @@ variable "services_ci_sa_email" {
 }
 
 locals {
-  receiver_mode = var.agent_score_split ? "score" : (var.agent_runtime_cutover ? "doorway" : "legacy")
   apis = [
     "run.googleapis.com",
     "sqladmin.googleapis.com",

@@ -6,6 +6,7 @@ import { classifyClone } from "@health/scoring/classify";
 import { analysisPayloadSchema } from "@health/scoring/schemas";
 import { serviceFromPath } from "@health/scoring/types";
 import { checkArchitecture, RULE_SET_VERSION } from "./arch-tests/check.js";
+import { extractContracts } from "./contracts.js";
 import { buildRuntimePayload } from "./runtime-graph.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -311,6 +312,7 @@ async function main(): Promise<void> {
       relativize,
       services: listedServices(),
     }),
+    contracts: extractContracts(repoRoot),
     recentCommits: recentCommits(),
     changedFiles: changedFiles(),
     ruleSetVersion: RULE_SET_VERSION,

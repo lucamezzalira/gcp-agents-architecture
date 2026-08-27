@@ -1,6 +1,7 @@
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order, OrderStatus, ShippingTier } from "./order.js";
 import type { OrderStore } from "./ports/order-store.js";
+import type { ReservationOutcomeSink } from "./ports/reservation-outcome-sink.js";
 
 export function confirmationMessageId(orderId: string): string {
   return `checkout:${orderId}:paid`;
@@ -11,10 +12,12 @@ export type OrderView = {
   email: string;
   status: OrderStatus;
   shippingTier: ShippingTier;
+  reservationReady: boolean;
 };
 
 export type GetOrderViewDeps = {
   orderStore: OrderStore;
+  reservationOutcomes: ReservationOutcomeSink;
 };
 
 export async function getOrderView(
@@ -30,5 +33,6 @@ export async function getOrderView(
     email: order.email,
     status: order.status,
     shippingTier: order.shippingTier,
+    reservationReady: await deps.reservationOutcomes.hasReserved(orderId),
   };
 }

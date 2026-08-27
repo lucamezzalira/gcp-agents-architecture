@@ -52,7 +52,7 @@ flowchart LR
   checkout --> fsC
   checkout -->|write| gcs
   checkout --> send
-  send -->|pull| notif
+  send -->|push| notif
   notif -->|read| gcs
   notif --> fsN
   notif --> stub
@@ -100,7 +100,11 @@ Same loop as scripts, against local or the Cloud Run checkout URL (authenticated
 ./scripts/demo-outbox.sh
 ```
 
-Locally, start `./scripts/dev-services.sh` first and set `CHECKOUT_URL=http://127.0.0.1:3000`. `demo-outbox.sh` then calls `GET /sent` on notification. On GCP, Pub/Sub pushes to notification (authenticated, not public) so a scaled-to-zero instance still wakes and writes the deliveries doc.
+Locally, start `./scripts/dev-services.sh` first and set `CHECKOUT_URL=http://127.0.0.1:3000`. That script starts checkout and notification only. Local checkout uses `MemoryReservationPublisher`, which records `reserved` in-process so pay does not wait on inventory. On GCP, place publishes a reservation command and pay returns 409 `reservation not ready` until the outcome push lands (`demo-order.sh` retries). `demo-outbox.sh` then calls `GET /sent` on notification. On GCP, Pub/Sub pushes to notification (authenticated, not public) so a scaled-to-zero instance still wakes and writes the deliveries doc.
+
+`GET /orders/:id` includes `reservationReady` so clients can poll before pay.
+
+Cloud pay race and the 409 contract: place does not wait for inventory. Retry `POST /orders/:id/pay` until 200, or poll `reservationReady` on GET.
 
 `pnpm arch`, `pnpm depcruise`, `pnpm jscpd`, and `pnpm collect` run the analysis tools and write an `AnalysisPayload`.
 

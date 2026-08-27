@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { handleReservation } from "./handle-reservation.js";
 import { silentLogger } from "@observability/runtime";
+import { MemoryHold } from "../infrastructure/memory-hold.js";
 import { MemoryOutcomes } from "../infrastructure/memory-outcomes.js";
 import { MemoryReservations } from "../infrastructure/memory-reservations.js";
 import { MemoryStock } from "../infrastructure/memory-stock.js";
 
 function setup() {
+  const stock = new MemoryStock();
+  const reservations = new MemoryReservations();
   return {
-    stock: new MemoryStock(),
-    reservations: new MemoryReservations(),
+    stock,
+    reservations,
+    hold: new MemoryHold(stock, reservations),
     outcomes: new MemoryOutcomes(),
     logger: silentLogger(),
     now: () => new Date("2026-08-14T10:00:00.000Z"),
@@ -117,5 +121,25 @@ describe("handleReservation", () => {
     expect((await deps.stock.get("standard-item"))?.available).toBe(4);
     expect((await deps.reservations.get("ord-4"))?.status).toBe("confirmed");
     expect(deps.outcomes.published.at(-1)?.result).toBe("confirmed");
+  });
+
+  it("does not double-decrement on reserve redelivery", async () => {
+    const deps = setup();
+    await deps.stock.save({ sku: "standard-item", available: 5 });
+    const command = {
+      action: "reserve" as const,
+      orderId: "ord-6",
+      sku: "standard-item",
+      units: 2,
+    };
+
+    await handleReservation(command, deps);
+    await handleReservation(command, deps);
+
+    expect((await deps.stock.get("standard-item"))?.available).toBe(3);
+    expect(deps.outcomes.published).toHaveLength(2);
+    expect(deps.outcomes.published.every((item) => item.result === "reserved")).toBe(
+      true,
+    );
   });
 });

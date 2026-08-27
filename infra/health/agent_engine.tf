@@ -27,38 +27,9 @@
 locals {
   agent_engine_numeric_id = google_vertex_ai_reasoning_engine.memory.name
   adk_model               = "gemini-2.5-pro"
-  agent_image_uri         = split("@", var.agent_image)[0]
   reasoner_image_tagged   = var.agent_reasoner_image == "" ? "" : split("@", var.agent_reasoner_image)[0]
   reasoner_image_digest   = length(split("@", var.agent_reasoner_image)) > 1 ? split("@", var.agent_reasoner_image)[1] : ""
-  live_engine_image_uri   = var.agent_score_split ? local.reasoner_image_tagged : local.agent_image_uri
-  scoring_class_methods = jsonencode([
-    {
-      name        = "query"
-      api_mode    = ""
-      description = "Score an AnalysisPayload and persist a HealthRead"
-      parameters = {
-        type     = "object"
-        required = ["payload"]
-        properties = {
-          payload = { type = "object" }
-          persist = { type = "boolean" }
-        }
-      }
-    },
-    {
-      name        = "stream_query"
-      api_mode    = "stream"
-      description = "Same as query, one streamed HealthRead"
-      parameters = {
-        type     = "object"
-        required = ["payload"]
-        properties = {
-          payload = { type = "object" }
-          persist = { type = "boolean" }
-        }
-      }
-    }
-  ])
+  live_engine_image_uri   = local.reasoner_image_tagged
   reasoner_class_methods = jsonencode([
     {
       name        = "query"
@@ -180,20 +151,20 @@ resource "google_vertex_ai_reasoning_engine" "agent" {
   count        = var.agent_image == "" ? 0 : 1
   provider     = google-beta
   display_name = "health-agent"
-  description  = var.agent_score_split ? "Architecture health reasoner. Scores arrive already computed. Model from HEALTH_ADK_MODEL." : "Architecture health agent hosted on Agent Runtime. Scores from health/scoring. Model from HEALTH_ADK_MODEL."
+  description  = "Architecture health reasoner on Agent Runtime. Scores arrive already computed. Model from HEALTH_ADK_MODEL."
   region       = var.region
 
   spec {
     agent_framework = "custom"
     identity_type   = "AGENT_IDENTITY"
-    class_methods   = var.agent_score_split ? local.reasoner_class_methods : local.scoring_class_methods
+    class_methods   = local.reasoner_class_methods
 
     container_spec {
       image_uri = local.live_engine_image_uri
     }
 
     deployment_spec {
-      min_instances         = var.agent_score_split ? 1 : 0
+      min_instances         = 1
       max_instances         = 1
       container_concurrency = 1
       resource_limits = {
@@ -247,27 +218,6 @@ resource "google_vertex_ai_reasoning_engine" "agent" {
       env {
         name  = "AGENT_ENGINE_ID"
         value = local.agent_engine_numeric_id
-      }
-      dynamic "env" {
-        for_each = var.agent_score_split ? [] : [1]
-        content {
-          name  = "GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES"
-          value = "false"
-        }
-      }
-      dynamic "env" {
-        for_each = var.agent_score_split ? [] : [1]
-        content {
-          name  = "CLOUD_SQL_CONNECTION_NAME"
-          value = google_sql_database_instance.health.connection_name
-        }
-      }
-      dynamic "env" {
-        for_each = var.agent_score_split ? [] : [1]
-        content {
-          name  = "HEALTH_DATABASE_URL_SECRET"
-          value = google_secret_manager_secret.database_url.secret_id
-        }
       }
     }
   }

@@ -2,6 +2,7 @@ from health_agent.persist import BOOTSTRAP_MIGRATIONS, iso_or_none
 
 
 def test_later_migrations_are_not_treated_as_bootstrap() -> None:
+    assert "008_one_current_per_sha.sql" not in BOOTSTRAP_MIGRATIONS
     assert "007_incomplete.sql" not in BOOTSTRAP_MIGRATIONS
     assert "006_agent_identity.sql" not in BOOTSTRAP_MIGRATIONS
     assert "005_committed_at.sql" not in BOOTSTRAP_MIGRATIONS
@@ -93,6 +94,10 @@ def test_attach_reasoning_does_not_update_score_columns() -> None:
         def fetchall(self) -> list[tuple[str, str, int]]:
             return [("platform", "layering", 100)]
 
+        @property
+        def rowcount(self) -> int:
+            return 1
+
     class FakeConn:
         def execute(self, statement: str, params: object = None) -> FakeCursor:
             sql.append(statement)
@@ -116,6 +121,7 @@ def test_attach_reasoning_does_not_update_score_columns() -> None:
     assert all("score" not in item.split("set", 1)[-1].split("where", 1)[0] for item in updates)
     assert any("reasoning" in item for item in updates)
     assert any("incomplete = false" in item.replace("\n", " ") for item in updates)
+    assert any("state = 'current'" in item.replace("\n", " ") for item in updates)
 
 
 def test_insert_does_not_copy_created_at_and_marks_incomplete() -> None:

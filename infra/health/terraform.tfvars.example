@@ -10,9 +10,7 @@ region     = "europe-west1"
 # After the first apply, optionally pin identity lookup to the runtime engine id
 # (terraform output agent_runtime_id). Not the Memory Bank id.
 # health_runtime_engine_id = "REPLACE_RUNTIME_ENGINE_ID"
-# Cloud Run is the Pub/Sub receiver. agent_score_split defaults true in
-# main.tf (the live architecture). Leave it unset, or set false only to
-# roll back to a combined engine. agent_reasoner_image is required once
-# agent_image is set.
-# agent_runtime_cutover = true
+# Cloud Run is the Pub/Sub receiver. agent_score_split must stay true (the live
+# score/reason split). Doorway and combined-engine rollback were removed.
+# agent_reasoner_image is required once agent_image is set.
 # agent_reasoner_image = "europe-west1-docker.pkg.dev/PROJECT/health/reasoner:v1@sha256:DIGEST"
