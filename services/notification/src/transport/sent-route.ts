@@ -4,6 +4,10 @@ import type { Logger } from "@observability/runtime";
 
 export type SentReader = () => EmailMessage[];
 
+/**
+ * Process-local view of emails this instance recorded (in-memory / stub provider).
+ * Not durable across instances or restarts.
+ */
 export function registerSentRoute(
   app: FastifyInstance,
   readSent: SentReader,

@@ -13,8 +13,8 @@ Owns stock levels and reservations. Checkout reserves stock when an order is pla
 ## Layers
 
 - `src/transport/` — Pub/Sub push for reservation commands, HTTP for stock. Validates shape, hands off. NEVER imports from `infrastructure/`.
-- `src/domain/` — reserve, release, confirm. Ports live in `domain/ports/`.
-- `src/infrastructure/` — this service's Firestore database, the Pub/Sub publisher for outcomes, and the reservation TTL decision (timestamps already live on the store). Never checkout's or notification's database.
+- `src/domain/` — reserve, release, confirm, and held-reservation expiry. Ports live in `domain/ports/`.
+- `src/infrastructure/` — this service's Firestore database and the Pub/Sub publisher for outcomes. Never checkout's or notification's database.
 
 ## Flow
 

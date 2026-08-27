@@ -25,6 +25,10 @@ resource "google_cloud_run_v2_service" "checkout" {
         value = google_storage_bucket.bodies.name
       }
       env {
+        name  = "RUNTIME_MODE"
+        value = "cloud"
+      }
+      env {
         name  = "SEND_INSTRUCTIONS_TOPIC"
         value = google_pubsub_topic.send_instructions.id
       }
@@ -35,10 +39,6 @@ resource "google_cloud_run_v2_service" "checkout" {
       env {
         name  = "STOCK_RESERVATIONS_TOPIC"
         value = google_pubsub_topic.stock_reservations.id
-      }
-      env {
-        name  = "INVENTORY_URL"
-        value = try(google_cloud_run_v2_service.inventory[0].uri, "")
       }
       env {
         name  = "OTEL_SERVICE_NAME"
@@ -79,6 +79,10 @@ resource "google_cloud_run_v2_service" "notification" {
       env {
         name  = "FIRESTORE_DATABASE"
         value = google_firestore_database.notification.name
+      }
+      env {
+        name  = "RUNTIME_MODE"
+        value = "cloud"
       }
       env {
         name  = "OTEL_SERVICE_NAME"
@@ -157,6 +161,10 @@ resource "google_cloud_run_v2_service" "inventory" {
         value = google_firestore_database.inventory.name
       }
       env {
+        name  = "RUNTIME_MODE"
+        value = "cloud"
+      }
+      env {
         name  = "RESERVATION_OUTCOMES_TOPIC"
         value = google_pubsub_topic.reservation_outcomes.id
       }
@@ -211,6 +219,10 @@ resource "google_cloud_run_v2_service" "audit" {
       env {
         name  = "FIRESTORE_DATABASE"
         value = google_firestore_database.audit.name
+      }
+      env {
+        name  = "RUNTIME_MODE"
+        value = "cloud"
       }
       env {
         name  = "OTEL_SERVICE_NAME"

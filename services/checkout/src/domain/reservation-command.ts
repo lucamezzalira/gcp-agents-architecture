@@ -11,7 +11,8 @@ export type OrderSnapshot = {
   lineItems: Array<{ sku: string; units: number; name: string }>;
 };
 
-export type StockCommand = {
+/** Wire shape shared with inventory (same JSON on stock-reservations). */
+export type ReservationCommand = {
   action: "reserve" | "release" | "confirm";
   orderId: string;
   sku: string;
@@ -31,7 +32,7 @@ function snapshotOf(order: Order): OrderSnapshot {
   };
 }
 
-export function reserveCommand(order: Order): StockCommand {
+export function reserveCommand(order: Order): ReservationCommand {
   return {
     action: "reserve",
     orderId: order.id,
@@ -41,7 +42,7 @@ export function reserveCommand(order: Order): StockCommand {
   };
 }
 
-export function releaseCommand(order: Order): StockCommand {
+export function releaseCommand(order: Order): ReservationCommand {
   return {
     action: "release",
     orderId: order.id,
@@ -51,7 +52,7 @@ export function releaseCommand(order: Order): StockCommand {
   };
 }
 
-export function confirmCommand(order: Order): StockCommand {
+export function confirmCommand(order: Order): ReservationCommand {
   return {
     action: "confirm",
     orderId: order.id,

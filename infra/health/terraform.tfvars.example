@@ -7,6 +7,9 @@ region     = "europe-west1"
 # Required for terraform plan/import against a project that already has one.
 # agent_engine_id = "REPLACE_ENGINE_ID"
 # memory_bank_location = "us-central1"
+# After the first apply, optionally pin identity lookup to the runtime engine id
+# (terraform output agent_runtime_id). Not the Memory Bank id.
+# health_runtime_engine_id = "REPLACE_RUNTIME_ENGINE_ID"
 # Cloud Run is the Pub/Sub receiver. agent_score_split defaults true in
 # main.tf (the live architecture). Leave it unset, or set false only to
 # roll back to a combined engine. agent_reasoner_image is required once

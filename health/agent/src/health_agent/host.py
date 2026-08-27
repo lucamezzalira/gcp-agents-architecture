@@ -5,6 +5,13 @@ import os
 import urllib.error
 import urllib.request
 
+from health_agent.settings import (
+    AIPLATFORM_GET_TIMEOUT_S,
+    DEFAULT_ADK_MODEL,
+    DEFAULT_MEMORY_BANK_LOCATION,
+    DEFAULT_RUNTIME_LOCATION,
+)
+
 _IDENTITY_CACHE: str | None = None
 
 
@@ -34,7 +41,7 @@ def resolve_model() -> str:
             "HEALTH_ADK_MODEL is unset. Agent Runtime must take gemini-2.5-pro "
             "from spec.deployment_spec.env, not a code default."
         )
-    return "gemini-2.5-pro"
+    return DEFAULT_ADK_MODEL
 
 
 def resolved_identity() -> str | None:
@@ -60,19 +67,31 @@ def fetch_engine_identity(engine_id: str, location: str, project: str) -> str | 
     return _identity_from_engine(body)
 
 
+def runtime_location() -> str:
+    """Region for Agent Runtime identity lookup.
+
+    On Agent Runtime, never fall through to MEMORY_BANK_LOCATION (often us-central1).
+    Prefer HEALTH_RUNTIME_LOCATION, else DEFAULT_RUNTIME_LOCATION (europe-west1).
+    """
+    explicit = os.environ.get("HEALTH_RUNTIME_LOCATION", "").strip()
+    if explicit:
+        return explicit
+    if hosted_on_runtime():
+        return DEFAULT_RUNTIME_LOCATION
+    return (
+        os.environ.get("GOOGLE_CLOUD_LOCATION", "").strip()
+        or os.environ.get("MEMORY_BANK_LOCATION", "").strip()
+        or DEFAULT_MEMORY_BANK_LOCATION
+    )
+
+
 def fetch_effective_identity() -> str | None:
     """Read spec.effectiveIdentity from the deployed engine, not from Terraform config."""
     global _IDENTITY_CACHE
     if _IDENTITY_CACHE:
         return _IDENTITY_CACHE
     project = os.environ.get("GOOGLE_CLOUD_PROJECT", "").strip()
-    location = os.environ.get(
-        "HEALTH_RUNTIME_LOCATION",
-        os.environ.get(
-            "GOOGLE_CLOUD_LOCATION",
-            os.environ.get("MEMORY_BANK_LOCATION", "us-central1"),
-        ),
-    )
+    location = runtime_location()
     if not project:
         return None
     engine_id = os.environ.get("HEALTH_RUNTIME_ENGINE_ID", "").strip()
@@ -136,7 +155,7 @@ def _aiplatform_get(url: str) -> dict[str, object]:
             "Content-Type": "application/json",
         },
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
+    with urllib.request.urlopen(request, timeout=AIPLATFORM_GET_TIMEOUT_S) as response:
         raw = json.loads(response.read().decode("utf-8"))
     if not isinstance(raw, dict):
         raise RuntimeError("Agent Engine lookup returned a non-object")

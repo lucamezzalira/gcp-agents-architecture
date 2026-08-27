@@ -36,6 +36,10 @@ class MemoryDeliveryStore implements DeliveryStore {
   async claim(): Promise<boolean> {
     return true;
   }
+
+  async markSent(): Promise<void> {}
+
+  async release(): Promise<void> {}
 }
 
 class MemoryEmailProvider implements EmailProvider {

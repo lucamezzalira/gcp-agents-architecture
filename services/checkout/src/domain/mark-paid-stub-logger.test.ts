@@ -7,8 +7,10 @@ import type { Order } from "./order.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { OrderStore } from "./ports/order-store.js";
 import type { SendInstruction } from "./send-instruction.js";
-import type { StockLookup } from "./ports/stock-lookup.js";
-import type { StockCommand } from "./stock-command.js";
+import type { ReservationCommand } from "./reservation-command.js";
+import type { ReservationPublisher } from "./ports/reservation-publisher.js";
+import type { ReservationOutcomeSink } from "./ports/reservation-outcome-sink.js";
+import type { ReservationOutcome } from "./reservation-outcome.js";
 
 const order: Order = {
   id: "ord-1",
@@ -53,13 +55,15 @@ class MemoryPublisher implements InstructionPublisher {
   }
 }
 
-class MemoryStockPublisher implements StockReservationPublisher {
-  async publish(_command: StockCommand): Promise<void> {}
+class MemoryReservations implements ReservationPublisher {
+  async publish(_command: ReservationCommand): Promise<void> {}
 }
 
-class PlentyStock implements StockLookup {
-  async available(): Promise<number> {
-    return 99;
+class ReadyOutcomes implements ReservationOutcomeSink {
+  async record(_outcome: ReservationOutcome): Promise<void> {}
+
+  async hasReserved(): Promise<boolean> {
+    return true;
   }
 }
 
@@ -70,8 +74,8 @@ describe("markPaid with a stub logger", () => {
       orderStore: new MemoryOrderStore(order),
       bodyStore: new MemoryBodyStore(),
       publisher,
-      stockReservations: new MemoryStockPublisher(),
-      stockLookup: new PlentyStock(),
+      reservations: new MemoryReservations(),
+      reservationOutcomes: new ReadyOutcomes(),
       logger: new StubLogger(),
     });
 
@@ -85,8 +89,8 @@ describe("markPaid with a stub logger", () => {
         orderStore: new MemoryOrderStore(undefined),
         bodyStore: new MemoryBodyStore(),
         publisher: new MemoryPublisher(),
-        stockReservations: new MemoryStockPublisher(),
-        stockLookup: new PlentyStock(),
+        reservations: new MemoryReservations(),
+        reservationOutcomes: new ReadyOutcomes(),
         logger: new StubLogger(),
       }),
     ).rejects.toBeInstanceOf(OrderNotFoundError);

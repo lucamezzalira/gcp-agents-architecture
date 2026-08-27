@@ -7,6 +7,11 @@ export type RetryPolicy = {
   maxDelayMs: number;
 };
 
+export const DEFAULT_EMAIL_RETRY_MAX_ATTEMPTS = 3;
+export const DEFAULT_EMAIL_RETRY_INITIAL_DELAY_MS = 100;
+export const DEFAULT_EMAIL_RETRY_FACTOR = 2;
+export const DEFAULT_EMAIL_RETRY_MAX_DELAY_MS = 2000;
+
 const retryPolicySchema = z.object({
   maxAttempts: z.number().int().min(1),
   initialDelayMs: z.number().min(0),
@@ -30,10 +35,22 @@ export function retryPolicyFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): RetryPolicy {
   return retryPolicySchema.parse({
-    maxAttempts: readNumber(env, "EMAIL_RETRY_MAX_ATTEMPTS", 3),
-    initialDelayMs: readNumber(env, "EMAIL_RETRY_INITIAL_DELAY_MS", 100),
-    factor: readNumber(env, "EMAIL_RETRY_FACTOR", 2),
-    maxDelayMs: readNumber(env, "EMAIL_RETRY_MAX_DELAY_MS", 2000),
+    maxAttempts: readNumber(
+      env,
+      "EMAIL_RETRY_MAX_ATTEMPTS",
+      DEFAULT_EMAIL_RETRY_MAX_ATTEMPTS,
+    ),
+    initialDelayMs: readNumber(
+      env,
+      "EMAIL_RETRY_INITIAL_DELAY_MS",
+      DEFAULT_EMAIL_RETRY_INITIAL_DELAY_MS,
+    ),
+    factor: readNumber(env, "EMAIL_RETRY_FACTOR", DEFAULT_EMAIL_RETRY_FACTOR),
+    maxDelayMs: readNumber(
+      env,
+      "EMAIL_RETRY_MAX_DELAY_MS",
+      DEFAULT_EMAIL_RETRY_MAX_DELAY_MS,
+    ),
   });
 }
 

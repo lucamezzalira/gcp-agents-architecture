@@ -73,6 +73,13 @@ class DuplicationPayload(BaseModel):
     percentage: float = 0
 
 
+class DuplicationCounts(BaseModel):
+    internal: int = 0
+    crossService: int = 0
+    shared: int = 0
+    internalByService: dict[str, int] = Field(default_factory=dict)
+
+
 class DependencyMetrics(BaseModel):
     modules: int = 0
     dependencies: int = 0
@@ -90,6 +97,23 @@ class ServiceCouplingMetric(BaseModel):
     service: str
     afferentCoupling: float = 0
     efferentCoupling: float = 0
+
+
+class MessageContract(BaseModel):
+    name: str
+    fields: list[str] = Field(default_factory=list)
+    publishers: list[str] = Field(default_factory=list)
+    consumers: list[str] = Field(default_factory=list)
+
+
+class PriorMetricsEntry(BaseModel):
+    commitSha: str
+    modules: int = 0
+    dependencies: int = 0
+    folderInstability: dict[str, float] = Field(default_factory=dict)
+    duplicationCounts: DuplicationCounts | None = None
+    orphanCount: int = 0
+    cycleCount: int = 0
 
 
 class DependencyCruiserPayload(BaseModel):
@@ -121,18 +145,13 @@ class AnalysisPayload(BaseModel):
         default_factory=DependencyCruiserPayload
     )
     duplication: DuplicationPayload = Field(default_factory=DuplicationPayload)
+    contracts: list[MessageContract] = Field(default_factory=list)
     recentCommits: list[RecentCommit] = Field(default_factory=list)
     changedFiles: list[str] = Field(default_factory=list)
+    priorMetrics: list[PriorMetricsEntry] = Field(default_factory=list)
     priorServiceMetrics: list[ServiceCouplingMetric] = Field(default_factory=list)
     priorDuplicationCounts: DuplicationCounts | None = None
     ruleSetVersion: int = 1
-
-
-class DuplicationCounts(BaseModel):
-    internal: int = 0
-    crossService: int = 0
-    shared: int = 0
-    internalByService: dict[str, int] = Field(default_factory=dict)
 
 
 class RunMetrics(BaseModel):

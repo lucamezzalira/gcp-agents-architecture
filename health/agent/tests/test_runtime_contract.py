@@ -83,6 +83,24 @@ def test_receiver_scores_then_invokes_runtime(monkeypatch) -> None:
     assert called["payload"]["runId"] == "r1"
 
 
+def test_handle_payload_requires_agent_runtime_id(monkeypatch) -> None:
+    monkeypatch.delenv("AGENT_RUNTIME_ID", raising=False)
+    try:
+        handle_payload(
+            {
+                "runId": "r1",
+                "commitSha": "a" * 40,
+                "commitMessage": "test",
+                "timestamp": "2026-08-17T00:00:00Z",
+                "archTests": [],
+                "runtime": {},
+            }
+        )
+        raise AssertionError("expected AGENT_RUNTIME_ID requirement")
+    except RuntimeError as exc:
+        assert "AGENT_RUNTIME_ID" in str(exc)
+
+
 def test_numeric_fields_flags_scores_and_overall() -> None:
     found = numeric_fields(
         {

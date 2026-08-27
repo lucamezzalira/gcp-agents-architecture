@@ -7,9 +7,12 @@ const outcomeSchema = z.object({
   units: z.number().int().nonnegative(),
 });
 
-export type StockOutcome = z.infer<typeof outcomeSchema>;
+/** Wire shape shared with inventory (same JSON on reservation-outcomes). */
+export type ReservationOutcome = z.infer<typeof outcomeSchema>;
 
-export function parseStockOutcome(value: unknown): StockOutcome | undefined {
+export function parseReservationOutcome(
+  value: unknown,
+): ReservationOutcome | undefined {
   const parsed = outcomeSchema.safeParse(value);
   return parsed.success ? parsed.data : undefined;
 }

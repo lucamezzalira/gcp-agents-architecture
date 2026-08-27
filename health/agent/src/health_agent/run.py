@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
@@ -21,9 +22,12 @@ if TYPE_CHECKING:
 
 
 def load_file_priors() -> list[HealthRead]:
+    """Wave fixture priors are opt-in. Set HEALTH_FILE_PRIORS=1 to load analysis/wave-*."""
+    if os.environ.get("HEALTH_FILE_PRIORS", "").strip() != "1":
+        return []
     reads: list[HealthRead] = []
     seen: set[str] = set()
-    for folder in ("wave-2-reads", "wave-3-reads"):
+    for folder in ("wave-2-reads", "wave-3-reads", "wave-5-reads"):
         directory = repo_root() / "analysis" / folder
         if not directory.is_dir():
             continue
@@ -31,7 +35,10 @@ def load_file_priors() -> list[HealthRead]:
             raw = json.loads(path.read_text())
             if "reasoner" not in raw:
                 raw["reasoner"] = "stub"
-            read = HealthRead.model_validate(raw)
+            try:
+                read = HealthRead.model_validate(raw)
+            except Exception:
+                continue
             if read.commitSha in seen:
                 continue
             seen.add(read.commitSha)

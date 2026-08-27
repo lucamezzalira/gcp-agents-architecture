@@ -1,4 +1,3 @@
-import type { DeliveryStatusLookup } from "./ports/delivery-status-lookup.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order, OrderStatus, ShippingTier } from "./order.js";
 import type { OrderStore } from "./ports/order-store.js";
@@ -12,12 +11,10 @@ export type OrderView = {
   email: string;
   status: OrderStatus;
   shippingTier: ShippingTier;
-  confirmationDelivered: boolean;
 };
 
 export type GetOrderViewDeps = {
   orderStore: OrderStore;
-  deliveryStatus: DeliveryStatusLookup;
 };
 
 export async function getOrderView(
@@ -28,14 +25,10 @@ export async function getOrderView(
   if (order === undefined) {
     throw new OrderNotFoundError(orderId);
   }
-  const confirmationDelivered = await deps.deliveryStatus.wasDelivered(
-    confirmationMessageId(order.id),
-  );
   return {
     id: order.id,
     email: order.email,
     status: order.status,
     shippingTier: order.shippingTier,
-    confirmationDelivered,
   };
 }

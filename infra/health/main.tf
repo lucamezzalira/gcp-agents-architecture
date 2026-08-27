@@ -91,6 +91,12 @@ variable "agent_engine_id" {
   description = "Existing Vertex Agent Engine numeric id to import (console-created Memory Bank). Required to take over the live engine; empty skips import and creates a new one on apply."
 }
 
+variable "health_runtime_engine_id" {
+  type        = string
+  default     = ""
+  description = "Optional HEALTH_RUNTIME_ENGINE_ID for Agent Runtime identity lookup. Set to terraform output agent_runtime_id after the first apply. Empty uses HEALTH_RUNTIME_DISPLAY_NAME list lookup. Not the Memory Bank id (AGENT_ENGINE_ID)."
+}
+
 variable "memory_bank_location" {
   type    = string
   default = "us-central1"

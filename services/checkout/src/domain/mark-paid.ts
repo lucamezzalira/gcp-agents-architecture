@@ -2,8 +2,8 @@ import type { BodyStore } from "./ports/body-store.js";
 import { confirmationMessageId } from "./get-order-view.js";
 import type { InstructionPublisher } from "./ports/instruction-publisher.js";
 import type { Logger } from "@observability/runtime";
-import type { StockLookup } from "./ports/stock-lookup.js";
-import type { StockReservationPublisher } from "./ports/stock-reservation-publisher.js";
+import type { ReservationOutcomeSink } from "./ports/reservation-outcome-sink.js";
+import type { ReservationPublisher } from "./ports/reservation-publisher.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
@@ -14,9 +14,13 @@ import {
   renderConfirmation,
 } from "./render-confirmation.js";
 import { renderExpeditedConfirmation } from "./render-expedited-confirmation.js";
+import { ReservationNotReadyError } from "./reservation-not-ready.js";
 import type { SendInstruction } from "./send-instruction.js";
-import { CHECKOUT_SKU, CHECKOUT_UNITS, confirmCommand } from "./stock-command.js";
-import { StockUnavailableError } from "./stock-unavailable.js";
+import {
+  CHECKOUT_SKU,
+  CHECKOUT_UNITS,
+  confirmCommand,
+} from "./reservation-command.js";
 
 export type MarkPaidResult = {
   status: "paid";
@@ -27,8 +31,8 @@ export type MarkPaidDeps = {
   orderStore: OrderStore;
   bodyStore: BodyStore;
   publisher: InstructionPublisher;
-  stockReservations: StockReservationPublisher;
-  stockLookup: StockLookup;
+  reservations: ReservationPublisher;
+  reservationOutcomes: ReservationOutcomeSink;
   logger: Logger;
 };
 
@@ -52,10 +56,10 @@ export async function markPaid(
     throw new OrderNotFoundError(orderId);
   }
 
-  const available = await deps.stockLookup.available(CHECKOUT_SKU);
-  if (available < CHECKOUT_UNITS) {
-    log.warn("mark-paid.stock-unavailable", { available });
-    throw new StockUnavailableError(CHECKOUT_SKU, CHECKOUT_UNITS, available);
+  const reserved = await deps.reservationOutcomes.hasReserved(orderId);
+  if (!reserved) {
+    log.warn("mark-paid.reservation-not-ready");
+    throw new ReservationNotReadyError(orderId);
   }
 
   let paid: Order;
@@ -84,7 +88,9 @@ export async function markPaid(
     bodyRef,
   };
   await deps.publisher.publish(instruction);
-  await deps.stockReservations.publish(confirmCommand(paid));
+  await deps.reservations.publish(confirmCommand(paid));
   log.info("instruction.published");
   return { status: "paid", instruction };
 }
+
+export { CHECKOUT_SKU, CHECKOUT_UNITS };

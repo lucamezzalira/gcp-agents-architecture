@@ -11,10 +11,7 @@ import type { OutcomePublisher } from "./domain/ports/outcome-publisher.js";
 import type { ReservationStore } from "./domain/ports/reservation-store.js";
 import type { StockStore } from "./domain/ports/stock-store.js";
 import { DEFAULT_SKU } from "./domain/stock.js";
-import {
-  expireHeldInAdapter,
-  HELD_TTL_MS,
-} from "./infrastructure/expire-held.js";
+import { expireHeld, HELD_TTL_MS } from "./domain/expire-held.js";
 import {
   asReservationStore,
   FirestoreInventory,
@@ -52,7 +49,7 @@ function buildServer(
   lowStock?: LowStockMailer,
 ): FastifyInstance {
   const handle: ReservationHandler = async (command) => {
-    await expireHeldInAdapter(
+    await expireHeld(
       { stock, reservations, outcomes, log: logger },
       new Date(),
       ttlMs,
@@ -72,7 +69,7 @@ function buildServer(
   registerStockRoutes(server, stock, logger);
   registerReservationPushRoute(server, handle, logger);
   server.post("/expire", async (_request, reply) => {
-    const count = await expireHeldInAdapter(
+    const count = await expireHeld(
       { stock, reservations, outcomes, log: logger },
       new Date(),
       ttlMs,
@@ -145,10 +142,21 @@ export function createCloudApp(): FastifyInstance {
 }
 
 export function createRuntimeApp(): FastifyInstance {
-  if (process.env.FIRESTORE_DATABASE) {
+  if (preferCloudRuntime()) {
     return createCloudApp();
   }
   return createLocalApp();
+}
+
+function preferCloudRuntime(): boolean {
+  const mode = process.env.RUNTIME_MODE;
+  if (mode === "cloud") {
+    return true;
+  }
+  if (mode === "local") {
+    return false;
+  }
+  return Boolean(process.env.BODY_BUCKET) || Boolean(process.env.FIRESTORE_DATABASE);
 }
 
 function requireEnv(name: string): string {

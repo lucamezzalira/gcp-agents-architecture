@@ -8,13 +8,17 @@ import google.auth
 from google.auth.transport.requests import AuthorizedSession
 
 from health_agent.models import AnalysisPayload, ScoreResult
+from health_agent.settings import (
+    DEFAULT_RUNTIME_LOCATION,
+    RUNTIME_QUERY_TIMEOUT_S,
+)
 
 
 def runtime_query_url() -> str:
     project = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
     location = os.environ.get(
         "AGENT_RUNTIME_LOCATION",
-        os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
+        os.environ.get("GOOGLE_CLOUD_LOCATION", DEFAULT_RUNTIME_LOCATION),
     )
     engine_id = os.environ.get("AGENT_RUNTIME_ID", "").strip()
     if not project or not engine_id:
@@ -57,7 +61,7 @@ def invoke_runtime(
                 "prior_reads": prior_reads or [],
             },
         },
-        timeout=240,
+        timeout=RUNTIME_QUERY_TIMEOUT_S,
     )
     if response.status_code >= 400:
         raise RuntimeError(

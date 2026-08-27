@@ -3,7 +3,7 @@ import { InvalidTransitionError } from "../domain/invalid-transition.js";
 import type { Logger } from "@observability/runtime";
 import type { MarkPaidResult } from "../domain/mark-paid.js";
 import { OrderNotFoundError } from "../domain/order-not-found.js";
-import { StockUnavailableError } from "../domain/stock-unavailable.js";
+import { ReservationNotReadyError } from "../domain/reservation-not-ready.js";
 import type { OrderView } from "../domain/get-order-view.js";
 import {
   parseCreateOrder,
@@ -60,15 +60,11 @@ export function registerOrderRoutes(
           .code(404)
           .send({ error: "order not found", orderId: error.orderId });
       }
-      if (error instanceof StockUnavailableError) {
-        log.warn("order.stock-unavailable", {
-          sku: error.sku,
-          available: error.available,
-        });
+      if (error instanceof ReservationNotReadyError) {
+        log.warn("order.reservation-not-ready");
         return reply.code(409).send({
-          error: "stock unavailable",
-          sku: error.sku,
-          available: error.available,
+          error: "reservation not ready",
+          orderId: error.orderId,
         });
       }
       if (error instanceof InvalidTransitionError) {
@@ -97,9 +93,7 @@ export function registerOrderRoutes(
     log.info("order.view-requested");
     try {
       const view = await getOrder(orderId);
-      log.info("order.viewed", {
-        confirmationDelivered: view.confirmationDelivered,
-      });
+      log.info("order.viewed", { status: view.status });
       return reply.code(200).send(view);
     } catch (error: unknown) {
       if (error instanceof OrderNotFoundError) {

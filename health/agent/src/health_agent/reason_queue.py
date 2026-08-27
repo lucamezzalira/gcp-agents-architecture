@@ -7,6 +7,8 @@ from typing import Any
 
 from health_agent.models import AnalysisPayload, ScoreResult
 from health_agent.narratives import priors_from_dicts, scores_from_dict
+from health_agent.pubsub_envelope import decode_pubsub_data
+from health_agent.settings import REASON_PUBLISH_TIMEOUT_S
 
 
 def reason_topic() -> str:
@@ -30,12 +32,7 @@ def encode_reason_job(
 
 
 def decode_reason_job(raw: bytes) -> dict[str, Any]:
-    envelope = json.loads(raw.decode("utf-8"))
-    message = envelope.get("message", {})
-    if not isinstance(message, dict):
-        raise ValueError("Pub/Sub envelope is missing message")
-    data = base64.b64decode(message["data"]).decode("utf-8")
-    body = json.loads(data)
+    body = decode_pubsub_data(raw)
     if not isinstance(body, dict):
         raise ValueError("reason job is not an object")
     run_id = body.get("runId")
@@ -75,7 +72,11 @@ def publish_reason_job(
     creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/pubsub"])
     session = AuthorizedSession(creds)
     url = f"https://pubsub.googleapis.com/v1/{topic}:publish"
-    response = session.post(url, json={"messages": [{"data": encoded}]}, timeout=30)
+    response = session.post(
+        url,
+        json={"messages": [{"data": encoded}]},
+        timeout=REASON_PUBLISH_TIMEOUT_S,
+    )
     if response.status_code >= 400:
         raise RuntimeError(
             f"reason publish failed: {response.status_code} {response.text}"

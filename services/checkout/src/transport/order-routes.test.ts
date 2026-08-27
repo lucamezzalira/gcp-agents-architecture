@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp, type CheckoutApp } from "../app.js";
-import { confirmationMessageId } from "../domain/get-order-view.js";
 import { confirmationBodyRef } from "../domain/render-confirmation.js";
 
 describe("checkout HTTP", () => {
@@ -39,7 +38,7 @@ describe("checkout HTTP", () => {
       payload: { id: "ord-1", email: "buyer@example.com" },
     });
     expect(created.statusCode).toBe(201);
-    expect(app.stockReservations.published).toEqual([
+    expect(app.reservations.published).toEqual([
       {
         action: "reserve",
         orderId: "ord-1",
@@ -63,7 +62,7 @@ describe("checkout HTTP", () => {
     });
     expect(paid.statusCode).toBe(200);
     expect(paid.json()).toMatchObject({ status: "paid" });
-    expect(app.stockReservations.published.at(-1)?.action).toBe("confirm");
+    expect(app.reservations.published.at(-1)?.action).toBe("confirm");
 
     const bodyRef = confirmationBodyRef("ord-1");
     expect(app.publisher.published).toHaveLength(1);
@@ -143,15 +142,9 @@ describe("checkout HTTP", () => {
     expect(before.json()).toMatchObject({
       id: "ord-1",
       status: "paid",
-      confirmationDelivered: false,
+      shippingTier: "standard",
     });
-
-    app.deliveryStatus.markDelivered(confirmationMessageId("ord-1"));
-    const after = await app.server.inject({
-      method: "GET",
-      url: "/orders/ord-1",
-    });
-    expect(after.json()).toMatchObject({ confirmationDelivered: true });
+    expect(before.json()).not.toHaveProperty("confirmationDelivered");
   });
 
   it("returns 404 when viewing a missing order", async () => {
@@ -174,7 +167,7 @@ describe("checkout HTTP", () => {
     });
     expect(cancelled.statusCode).toBe(200);
     expect(cancelled.json()).toEqual({ status: "cancelled" });
-    expect(app.stockReservations.published.at(-1)?.action).toBe("release");
+    expect(app.reservations.published.at(-1)?.action).toBe("release");
   });
 
   it("records a reservation outcome from the push envelope", async () => {
@@ -194,6 +187,6 @@ describe("checkout HTTP", () => {
       },
     });
     expect(response.statusCode).toBe(204);
-    expect(app.stockOutcomes.recorded).toEqual([outcome]);
+    expect(app.reservationOutcomes.recorded).toEqual([outcome]);
   });
 });

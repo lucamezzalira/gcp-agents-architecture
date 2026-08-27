@@ -98,4 +98,23 @@ describe("deliver", () => {
     expect(deps.emailProvider.calls).toHaveLength(0);
     expect(deps.deliveryStore.hasClaimed(instruction.messageId)).toBe(false);
   });
+
+  it("releases the claim when send fails so redelivery can retry", async () => {
+    const deps = setup();
+    deps.bodyStore.put(instruction.bodyRef, storedBody);
+    const failing: EmailProvider = {
+      async send(): Promise<void> {
+        throw new Error("provider down");
+      },
+    };
+
+    await expect(
+      deliver(instruction, { ...deps, emailProvider: failing }),
+    ).rejects.toThrow("provider down");
+    expect(deps.deliveryStore.hasClaimed(instruction.messageId)).toBe(false);
+
+    const second = await deliver(instruction, deps);
+    expect(second).toEqual({ status: "sent" });
+    expect(deps.emailProvider.calls).toHaveLength(1);
+  });
 });

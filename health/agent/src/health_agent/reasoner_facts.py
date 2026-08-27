@@ -10,8 +10,12 @@ from health_agent.models import (
     RuntimeEdge,
     ScoreResult,
 )
+from health_agent.settings import (
+    HEALTHY_TRANSPORT_INSTABILITY,
+    KNOWN_ARCH_RULE_IDS,
+)
 
-KNOWN_RULE_IDS = [f"rule-{n}" for n in range(1, 11)]
+KNOWN_RULE_IDS = list(KNOWN_ARCH_RULE_IDS)
 
 
 def leftover_runtime_illustrative(payload: AnalysisPayload) -> bool:
@@ -28,7 +32,8 @@ LAYER_PROFILES = {
         "meaning": (
             "Depends on domain; nothing should depend on it. "
             "Low I means something depends on transport. "
-            "A transport folder at 0.78 is healthy. Never recommend reducing it."
+            f"A transport folder at {HEALTHY_TRANSPORT_INSTABILITY} is healthy. "
+            "Never recommend reducing it."
         ),
     },
     "domain": {

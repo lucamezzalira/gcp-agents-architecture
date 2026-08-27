@@ -36,11 +36,17 @@ export async function deliver(
   }
 
   log.info("deliver.sending");
-  await deps.emailProvider.send({
-    to: instruction.to,
-    subject: instruction.subject,
-    html,
-  });
+  try {
+    await deps.emailProvider.send({
+      to: instruction.to,
+      subject: instruction.subject,
+      html,
+    });
+  } catch (error) {
+    await deps.deliveryStore.release(instruction.messageId);
+    throw error;
+  }
+  await deps.deliveryStore.markSent(instruction.messageId);
   log.info("deliver.sent");
   return { status: "sent" };
 }

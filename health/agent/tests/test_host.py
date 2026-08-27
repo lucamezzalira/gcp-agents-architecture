@@ -46,6 +46,39 @@ def test_identity_lookup_uses_runtime_location(monkeypatch: pytest.MonkeyPatch) 
     assert "us-central1" not in seen["url"]
 
 
+def test_identity_lookup_defaults_runtime_location_not_memory_bank(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HEALTH_HOST", "agent-runtime")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "ga-health-mezzalab")
+    monkeypatch.delenv("HEALTH_RUNTIME_LOCATION", raising=False)
+    monkeypatch.setenv("MEMORY_BANK_LOCATION", "us-central1")
+    monkeypatch.delenv("AGENT_IDENTITY", raising=False)
+    monkeypatch.delenv("HEALTH_RUNTIME_ENGINE_ID", raising=False)
+    import health_agent.host as host_mod
+    from health_agent.host import runtime_location
+
+    host_mod._IDENTITY_CACHE = None
+    seen: dict[str, str] = {}
+
+    def fake_get(url: str) -> dict[str, object]:
+        seen["url"] = url
+        return {
+            "reasoningEngines": [
+                {
+                    "displayName": "health-agent",
+                    "spec": {"effectiveIdentity": "principal://agents.example/health-agent"},
+                }
+            ]
+        }
+
+    monkeypatch.setattr("health_agent.host._aiplatform_get", fake_get)
+    assert runtime_location() == "europe-west1"
+    assert resolved_identity() == "principal://agents.example/health-agent"
+    assert "europe-west1-aiplatform.googleapis.com" in seen["url"]
+    assert "us-central1" not in seen["url"]
+
+
 def test_identity_lookup_uses_runtime_display_name(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HEALTH_HOST", "agent-runtime")
     monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "ga-health-mezzalab")

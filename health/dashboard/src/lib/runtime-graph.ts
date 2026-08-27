@@ -243,13 +243,20 @@ function linkLabel(edge: RuntimeEdgeView): string {
 }
 
 export function layoutRuntimeGraph(edges: RuntimeEdgeView[]): RuntimeGraphLayout {
-  const nodes: GraphNode[] = Object.entries(NODE_POSITIONS).map(([id, pos]) => ({
-    id,
-    x: pos.x,
-    y: pos.y,
-    width: NODE_W,
-    height: NODE_H,
-  }));
+  const present = new Set<string>();
+  for (const edge of edges) {
+    present.add(edge.from);
+    present.add(edge.to);
+  }
+  const nodes: GraphNode[] = Object.entries(NODE_POSITIONS)
+    .filter(([id]) => present.has(id))
+    .map(([id, pos]) => ({
+      id,
+      x: pos.x,
+      y: pos.y,
+      width: NODE_W,
+      height: NODE_H,
+    }));
   const used = new Set<string>();
   const links: GraphLink[] = [];
   for (const edge of edges) {

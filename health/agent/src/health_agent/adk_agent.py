@@ -1,6 +1,7 @@
 from health_agent.host import resolve_model
+from health_agent.settings import HEALTHY_TRANSPORT_INSTABILITY
 
-INSTRUCTION = """
+INSTRUCTION = f"""
 You write reasoning and recommendations for architecture health scores.
 You never compute or change a score. Numbers arrive already computed.
 You cannot import health/scoring.
@@ -40,7 +41,7 @@ Read folder instability I against the expected layer profile, not
 against zero:
 - transport should be highly unstable. It depends on domain; nothing
   should depend on it. Low I means something depends on transport.
-  A transport folder at 0.78 is healthy. Never recommend reducing it.
+  A transport folder at {HEALTHY_TRANSPORT_INSTABILITY} is healthy. Never recommend reducing it.
 - domain should be stable. Things depend on it; it depends on little.
   Rising I is drift.
 - infrastructure should be unstable. It implements ports and is

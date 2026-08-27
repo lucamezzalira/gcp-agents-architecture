@@ -17,6 +17,7 @@ from health_agent.persist import (
     iso_or_none,
     load_active_decisions,
     load_recent_reads,
+    load_score_result,
     migrate,
 )
 from health_agent.reason_queue import publish_reason_job, reason_topic
@@ -104,7 +105,9 @@ def _score_and_insert(
             parsed.commitMessage,
             iso_or_none(parsed.committedAt),
         )
-        return run_id, scores, priors
+        if run_id.reused_incomplete:
+            scores = load_score_result(conn, run_id.run_id)
+        return run_id.run_id, scores, priors
     finally:
         if conn is not None:
             conn.close()

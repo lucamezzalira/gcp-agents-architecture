@@ -1,13 +1,13 @@
 import type { Logger } from "@observability/runtime";
 import type { OrderStore } from "./ports/order-store.js";
-import type { StockReservationPublisher } from "./ports/stock-reservation-publisher.js";
+import type { ReservationPublisher } from "./ports/reservation-publisher.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import { applyTransition } from "./order-transition.js";
-import { releaseCommand } from "./stock-command.js";
+import { releaseCommand } from "./reservation-command.js";
 
 export type CancelOrderDeps = {
   orderStore: OrderStore;
-  stockReservations: StockReservationPublisher;
+  reservations: ReservationPublisher;
   logger: Logger;
 };
 
@@ -22,7 +22,7 @@ export async function cancelOrder(
   }
   const cancelled = applyTransition(order, "cancelled");
   await deps.orderStore.save(cancelled);
-  await deps.stockReservations.publish(releaseCommand(cancelled));
-  log.info("stock.release-published");
+  await deps.reservations.publish(releaseCommand(cancelled));
+  log.info("reservation.release-published");
   return { status: "cancelled" };
 }

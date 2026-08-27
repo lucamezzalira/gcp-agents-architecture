@@ -1,5 +1,6 @@
 from health_agent.models import ScoreResult
 from health_agent.narratives import empty_narratives
+from health_agent.persist import InsertResult
 from health_agent.receiver import receive_payload
 
 
@@ -48,7 +49,7 @@ def test_receive_payload_ignores_agent_numbers(monkeypatch, capsys) -> None:
     monkeypatch.setattr("health_agent.receiver.load_recent_reads", lambda _conn: [])
     monkeypatch.setattr("health_agent.receiver.score_payload", lambda *_a, **_k: SCORES)
 
-    def fake_insert(_conn, read, _message, _committed=None) -> str:
+    def fake_insert(_conn, read, _message, _committed=None) -> InsertResult:
         inserted["overall"] = read.overall
         inserted["csi"] = next(
             item.score for item in read.characteristics if item.id == "cross-service-integrity"
@@ -58,7 +59,7 @@ def test_receive_payload_ignores_agent_numbers(monkeypatch, capsys) -> None:
             for item in read.characteristics
             if item.id == "cross-service-integrity"
         )
-        return "sha:run"
+        return InsertResult("sha:run", False)
 
     def fake_invoke(payload, scores=None, prior_reads=None, persist=False):
         invoked["scores"] = scores
@@ -126,10 +127,10 @@ def test_receive_payload_keeps_score_when_runtime_fails(monkeypatch) -> None:
     monkeypatch.setattr("health_agent.receiver.load_recent_reads", lambda _conn: [])
     monkeypatch.setattr("health_agent.receiver.score_payload", lambda *_a, **_k: SCORES)
 
-    def fake_insert(_conn, read, _message, _committed=None) -> str:
+    def fake_insert(_conn, read, _message, _committed=None) -> InsertResult:
         inserted["reasoner"] = read.reasoner
         inserted["overall"] = read.overall
-        return "sha:run"
+        return InsertResult("sha:run", False)
 
     monkeypatch.setattr("health_agent.receiver.insert_health_read", fake_insert)
     monkeypatch.setattr(
@@ -190,7 +191,7 @@ def test_receive_payload_enqueues_when_topic_set(monkeypatch) -> None:
     monkeypatch.setattr("health_agent.receiver.score_payload", lambda *_a, **_k: SCORES)
     monkeypatch.setattr(
         "health_agent.receiver.insert_health_read",
-        lambda *_a, **_k: "sha:run",
+        lambda *_a, **_k: InsertResult("sha:run", False),
     )
     monkeypatch.setattr(
         "health_agent.receiver.invoke_runtime",
@@ -210,6 +211,85 @@ def test_receive_payload_enqueues_when_topic_set(monkeypatch) -> None:
     assert published["run_id"] == "sha:run"
     assert published["overall"] == 93
     assert invoked["called"] is False
+
+
+def test_incomplete_reuse_enqueues_db_scores(monkeypatch) -> None:
+    published: dict[str, object] = {}
+    db_scores = ScoreResult.model_validate(
+        {
+            "overall": 55,
+            "characteristics": [
+                {"id": "boundary-integrity", "score": 55, "signalsUsed": ["ts-arch:rule-3"]},
+                {"id": "layering", "score": 100, "signalsUsed": []},
+                {"id": "coupling", "score": 100, "signalsUsed": []},
+                {"id": "duplication", "score": 100, "signalsUsed": []},
+                {"id": "cross-service-integrity", "score": 40, "signalsUsed": []},
+            ],
+            "services": [],
+        }
+    )
+
+    monkeypatch.setattr(
+        "health_agent.receiver.reason_topic",
+        lambda: "projects/p/topics/analysis-reason",
+    )
+    monkeypatch.setattr("health_agent.receiver.connect", lambda: FakeConn())
+    monkeypatch.setattr("health_agent.receiver.migrate", lambda _conn: None)
+    monkeypatch.setattr("health_agent.receiver.load_active_decisions", lambda _conn: [])
+    monkeypatch.setattr("health_agent.receiver.load_recent_reads", lambda _conn: [])
+    monkeypatch.setattr("health_agent.receiver.score_payload", lambda *_a, **_k: SCORES)
+    monkeypatch.setattr(
+        "health_agent.receiver.insert_health_read",
+        lambda *_a, **_k: InsertResult("sha:run", True),
+    )
+    monkeypatch.setattr(
+        "health_agent.receiver.load_score_result",
+        lambda _conn, run_id: db_scores if run_id == "sha:run" else SCORES,
+    )
+    monkeypatch.setattr(
+        "health_agent.receiver.publish_reason_job",
+        lambda run_id, payload, scores, prior_reads: published.update(
+            {"run_id": run_id, "overall": scores["overall"]}
+        ),
+    )
+
+    run_id = receive_payload(SAMPLE)
+    assert run_id == "sha:run"
+    assert published["overall"] == 55
+
+
+def test_incomplete_supersede_enqueues_fresh_scores(monkeypatch) -> None:
+    published: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "health_agent.receiver.reason_topic",
+        lambda: "projects/p/topics/analysis-reason",
+    )
+    monkeypatch.setattr("health_agent.receiver.connect", lambda: FakeConn())
+    monkeypatch.setattr("health_agent.receiver.migrate", lambda _conn: None)
+    monkeypatch.setattr("health_agent.receiver.load_active_decisions", lambda _conn: [])
+    monkeypatch.setattr("health_agent.receiver.load_recent_reads", lambda _conn: [])
+    monkeypatch.setattr("health_agent.receiver.score_payload", lambda *_a, **_k: SCORES)
+    monkeypatch.setattr(
+        "health_agent.receiver.insert_health_read",
+        lambda *_a, **_k: InsertResult("sha:new", False),
+    )
+    loaded = {"called": False}
+    monkeypatch.setattr(
+        "health_agent.receiver.load_score_result",
+        lambda *_a, **_k: loaded.__setitem__("called", True) or SCORES,
+    )
+    monkeypatch.setattr(
+        "health_agent.receiver.publish_reason_job",
+        lambda run_id, payload, scores, prior_reads: published.update(
+            {"run_id": run_id, "overall": scores["overall"]}
+        ),
+    )
+
+    run_id = receive_payload(SAMPLE)
+    assert run_id == "sha:new"
+    assert published["overall"] == 93
+    assert loaded["called"] is False
 
 
 def test_reason_scored_run_attaches_prose(monkeypatch, capsys) -> None:

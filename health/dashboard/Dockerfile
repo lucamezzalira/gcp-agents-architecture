@@ -11,7 +11,9 @@ COPY health/dashboard/package.json health/dashboard/package.json
 COPY health/mcp-server/package.json health/mcp-server/package.json
 COPY analysis/package.json analysis/package.json
 COPY packages/observability/package.json packages/observability/package.json
+COPY packages/health-postgres/package.json packages/health-postgres/package.json
 RUN pnpm install --frozen-lockfile
+COPY packages/health-postgres ./packages/health-postgres
 COPY health/dashboard ./health/dashboard
 RUN pnpm --filter @health/dashboard build
 

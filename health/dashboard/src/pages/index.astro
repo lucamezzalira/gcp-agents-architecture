@@ -271,49 +271,26 @@ const historyHref = includeSuperseded
               ]}
               href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}${includeSuperseded ? "&history=all" : ""}`}
               data-service=""
+              data-platform
             >
               platform
               <strong data-platform-overall>{selected.overall}</strong>
             </a>
-            <a
-              class:list={[
-                "svc",
-                selectedService === "checkout" ? "is-selected" : "",
-              ]}
-              href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}&service=checkout${includeSuperseded ? "&history=all" : ""}`}
-              data-service="checkout"
-            >
-              checkout
-              <strong data-checkout-overall>
-                {selected.services.find((item) => item.service === "checkout")?.overall ?? "n/a"}
-              </strong>
-            </a>
-            <a
-              class:list={[
-                "svc",
-                selectedService === "inventory" ? "is-selected" : "",
-              ]}
-              href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}&service=inventory${includeSuperseded ? "&history=all" : ""}`}
-              data-service="inventory"
-            >
-              inventory
-              <strong data-inventory-overall>
-                {selected.services.find((item) => item.service === "inventory")?.overall ?? "n/a"}
-              </strong>
-            </a>
-            <a
-              class:list={[
-                "svc",
-                selectedService === "notification" ? "is-selected" : "",
-              ]}
-              href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}&service=notification${includeSuperseded ? "&history=all" : ""}`}
-              data-service="notification"
-            >
-              notification
-              <strong data-notification-overall>
-                {selected.services.find((item) => item.service === "notification")?.overall ?? "n/a"}
-              </strong>
-            </a>
+            {
+              selected.services.map((item) => (
+                <a
+                  class:list={[
+                    "svc",
+                    selectedService === item.service ? "is-selected" : "",
+                  ]}
+                  href={`?commit=${shortSha(selected.commitSha)}&run=${encodeURIComponent(selected.runId)}&service=${encodeURIComponent(item.service)}${includeSuperseded ? "&history=all" : ""}`}
+                  data-service={item.service}
+                >
+                  {item.service}
+                  <strong data-service-overall>{item.overall}</strong>
+                </a>
+              ))
+            }
           </div>
           <h3 class="runtime-heading">Runtime channels</h3>
           <svg

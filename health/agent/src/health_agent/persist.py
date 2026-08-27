@@ -2,18 +2,26 @@ from __future__ import annotations
 
 import json
 import os
+from typing import NamedTuple
 from uuid import uuid4
 
 import psycopg
 
 from health_agent.models import (
     CharacteristicRead,
+    CharacteristicScore,
     HealthRead,
     Narrative,
     RunMetrics,
+    ScoreResult,
     ServiceRead,
+    ServiceScore,
 )
 from health_agent.score_bridge import repo_root
+from health_agent.settings import (
+    DEFAULT_DATABASE_URL,
+    DEFAULT_PRIOR_READ_LIMIT,
+)
 from health_agent.tracing import tracer
 
 BOOTSTRAP_MIGRATIONS = (
@@ -27,6 +35,11 @@ _SQL_CONNECTOR: object | None = None
 _DATABASE_URL: str | None = None
 
 
+class InsertResult(NamedTuple):
+    run_id: str
+    reused_incomplete: bool
+
+
 def database_url() -> str:
     global _DATABASE_URL
     existing = os.environ.get("DATABASE_URL", "").strip()
@@ -38,7 +51,7 @@ def database_url() -> str:
     if secret_id:
         _DATABASE_URL = _secret_payload(secret_id)
         return _DATABASE_URL
-    return "postgresql://health:health@127.0.0.1:5433/health"
+    return DEFAULT_DATABASE_URL
 
 
 def _secret_payload(secret_id: str) -> str:
@@ -167,12 +180,39 @@ def iso_or_none(value: object) -> str | None:
     return text if text else None
 
 
+def _score_fingerprint_from_read(read: HealthRead) -> dict[str, int]:
+    fingerprint: dict[str, int] = {"__overall__": read.overall}
+    for item in read.characteristics:
+        fingerprint[f"platform:{item.id}"] = item.score
+    for service in read.services:
+        fingerprint[f"{service.service}:__overall__"] = service.overall
+        for item in service.characteristics:
+            fingerprint[f"{service.service}:{item.id}"] = item.score
+    return fingerprint
+
+
+def _score_fingerprint_from_run(conn: psycopg.Connection, run_id: str) -> dict[str, int]:
+    existing = load_score_result(conn, run_id)
+    fingerprint: dict[str, int] = {"__overall__": existing.overall}
+    for item in existing.characteristics:
+        fingerprint[f"platform:{item.id}"] = item.score
+    for service in existing.services:
+        fingerprint[f"{service.service}:__overall__"] = service.overall
+        for item in service.characteristics:
+            fingerprint[f"{service.service}:{item.id}"] = item.score
+    return fingerprint
+
+
+def scores_match_run(conn: psycopg.Connection, run_id: str, read: HealthRead) -> bool:
+    return _score_fingerprint_from_run(conn, run_id) == _score_fingerprint_from_read(read)
+
+
 def insert_health_read(
     conn: psycopg.Connection,
     read: HealthRead,
     commit_message: str,
     committed_at: str | None = None,
-) -> str:
+) -> InsertResult:
     with tracer().start_as_current_span("persistence"):
         previous = conn.execute(
             """
@@ -189,8 +229,8 @@ def insert_health_read(
             previous_id, previous_committed_at, previous_incomplete = previous
             if persisted_committed_at is None:
                 persisted_committed_at = previous_committed_at
-            if previous_incomplete:
-                return str(previous_id)
+            if previous_incomplete and scores_match_run(conn, str(previous_id), read):
+                return InsertResult(str(previous_id), True)
             conn.execute(
                 """
                 update health_run
@@ -265,7 +305,59 @@ def insert_health_read(
                     ),
                 )
         conn.commit()
-        return run_id
+        return InsertResult(run_id, False)
+
+
+def load_score_result(conn: psycopg.Connection, run_id: str) -> ScoreResult:
+    """Rebuild ScoreResult from Postgres for an existing run. Used when reusing incomplete rows."""
+    row = conn.execute(
+        """
+        select overall_score, service_overalls
+        from health_run
+        where run_id = %s
+        """,
+        (run_id,),
+    ).fetchone()
+    if row is None:
+        raise RuntimeError(f"no health_run for {run_id}")
+    overall = int(row[0])
+    service_overalls = row[1] if isinstance(row[1], dict) else json.loads(row[1] or "{}")
+    platform = _characteristics(conn, run_id, "platform")
+    if not platform:
+        raise RuntimeError(f"no platform characteristics for {run_id}")
+    characteristics = [
+        CharacteristicScore(
+            id=item.id,
+            score=item.score,
+            signalsUsed=item.signalsUsed,
+            suppressedBy=item.suppressedBy,
+        )
+        for item in platform
+    ]
+    services: list[ServiceScore] = []
+    if isinstance(service_overalls, dict):
+        for name in sorted(service_overalls):
+            chars = _characteristics(conn, run_id, str(name))
+            services.append(
+                ServiceScore(
+                    service=str(name),
+                    overall=int(service_overalls[name]),
+                    characteristics=[
+                        CharacteristicScore(
+                            id=item.id,
+                            score=item.score,
+                            signalsUsed=item.signalsUsed,
+                            suppressedBy=item.suppressedBy,
+                        )
+                        for item in chars
+                    ],
+                )
+            )
+    return ScoreResult(
+        overall=overall,
+        characteristics=characteristics,
+        services=services,
+    )
 
 
 def attach_reasoning(
@@ -492,7 +584,9 @@ def _read_from_run_row(
     )
 
 
-def load_recent_reads(conn: psycopg.Connection, limit: int = 64) -> list[HealthRead]:
+def load_recent_reads(
+    conn: psycopg.Connection, limit: int = DEFAULT_PRIOR_READ_LIMIT
+) -> list[HealthRead]:
     runs = conn.execute(
         """
         select run_id, commit_sha, overall_score, reasoner, trace_id,
@@ -501,7 +595,7 @@ def load_recent_reads(conn: psycopg.Connection, limit: int = 64) -> list[HealthR
                model, host, agent_identity
         from health_run
         where state = 'current'
-        order by coalesce(committed_at, created_at) asc, created_at asc
+        order by coalesce(committed_at, created_at) desc, created_at desc
         limit %s
         """,
         (limit,),
@@ -511,4 +605,6 @@ def load_recent_reads(conn: psycopg.Connection, limit: int = 64) -> list[HealthR
         read = _read_from_run_row(conn, *row)
         if read is not None:
             reads.append(read)
+    # Newest-first from SQL; consumers expect chronological ASC.
+    reads.reverse()
     return reads

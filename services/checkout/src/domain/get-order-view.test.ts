@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { InMemoryDeliveryStatusLookup } from "../infrastructure/in-memory-delivery-status-lookup.js";
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
-import { confirmationMessageId, getOrderView } from "./get-order-view.js";
+import { getOrderView } from "./get-order-view.js";
 import { OrderNotFoundError } from "./order-not-found.js";
 import type { Order } from "./order.js";
 
@@ -13,22 +12,16 @@ const order: Order = {
 };
 
 describe("getOrderView", () => {
-  it("includes confirmation delivery status", async () => {
+  it("returns the order fields checkout owns", async () => {
     const orderStore = new InMemoryOrderStore();
-    const deliveryStatus = new InMemoryDeliveryStatusLookup();
     await orderStore.save(order);
 
-    const before = await getOrderView(order.id, { orderStore, deliveryStatus });
-    expect(before.confirmationDelivered).toBe(false);
-
-    deliveryStatus.markDelivered(confirmationMessageId(order.id));
-    const after = await getOrderView(order.id, { orderStore, deliveryStatus });
-    expect(after).toEqual({
+    const view = await getOrderView(order.id, { orderStore });
+    expect(view).toEqual({
       id: order.id,
       email: order.email,
       status: "paid",
       shippingTier: "standard",
-      confirmationDelivered: true,
     });
   });
 
@@ -36,7 +29,6 @@ describe("getOrderView", () => {
     await expect(
       getOrderView("missing", {
         orderStore: new InMemoryOrderStore(),
-        deliveryStatus: new InMemoryDeliveryStatusLookup(),
       }),
     ).rejects.toBeInstanceOf(OrderNotFoundError);
   });

@@ -42,32 +42,29 @@ Checkout, notification, inventory and audit do not share a database. Project B h
 ├── services/
 │   ├── notification/
 │   │   ├── AGENTS.md
-│   │   ├── src/
-│   │   │   ├── transport/        # pubsub subscriber, http
-│   │   │   ├── domain/           # idempotency decision, ports
-│   │   │   └── infrastructure/   # firestore, storage, provider
-│   │   └── test/
+│   │   └── src/
+│   │       ├── transport/        # pubsub subscriber, http
+│   │       ├── domain/           # idempotency decision, ports
+│   │       └── infrastructure/   # firestore, storage, provider
+│   │                             # tests colocated as *.test.ts
 │   ├── checkout/
 │   │   ├── AGENTS.md
-│   │   ├── src/
-│   │   │   ├── transport/
-│   │   │   ├── domain/           # order state, notify decision, rendering
-│   │   │   └── infrastructure/
-│   │   └── test/
+│   │   └── src/
+│   │       ├── transport/
+│   │       ├── domain/           # order state, notify decision, rendering
+│   │       └── infrastructure/
 │   ├── inventory/
 │   │   ├── AGENTS.md
-│   │   ├── src/
-│   │   │   ├── transport/
-│   │   │   ├── domain/           # stock, reservations, expiry
-│   │   │   └── infrastructure/
-│   │   └── test/
+│   │   └── src/
+│   │       ├── transport/
+│   │       ├── domain/           # stock, reservations, expiry
+│   │       └── infrastructure/
 │   └── audit/
 │       ├── AGENTS.md
-│       ├── src/
-│       │   ├── transport/        # push intake
-│       │   ├── domain/           # record arrivals
-│       │   └── infrastructure/   # this service's Firestore tape
-│       └── test/
+│       └── src/
+│           ├── transport/        # push intake
+│           ├── domain/           # record arrivals
+│           └── infrastructure/   # this service's Firestore tape
 ├── health/
 │   ├── agent/                    # Python. Two images from one tree
 │   │   ├── AGENTS.md

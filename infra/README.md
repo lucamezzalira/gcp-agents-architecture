@@ -9,7 +9,7 @@ Cloud Run services are skipped while `*_image` variables are empty. Apply the da
 
 Live meter (talk shape, 2026-08): Cloud SQL `db-custom-1-3840` ALWAYS on (~$90–110/month, private IP, 10 GB), dashboard Cloud Run min 1 with CPU allocated (~$50–70/month in `europe-west1`), MCP min 1 during a talk, Agent Runtime min 1 (1 vCPU, 2 GiB, ~$76/month at published Agent Engine runtime rates), Vertex tokens for the agent. Scale-to-zero checkout/inventory/notification/audit are small next to that. Set billing budgets at the current number, not £40. Destroy the stacks when the demo is done.
 
-Checkout, inventory, notification, and audit pick cloud adapters when `BODY_BUCKET` is set (GCS, named Firestore, Pub/Sub). Local `./scripts/dev-services.sh` leaves that unset and uses the file store plus HTTP. Smoke against Cloud Run uses `gcloud auth print-identity-token`. Inventory and checkout are not `allUsers`. Notification and the Cloud Run receiver are not public either. Dashboard and MCP are.
+Checkout, inventory, notification, and audit pick cloud adapters when `RUNTIME_MODE=cloud` (or, for backward compatibility, when `BODY_BUCKET` / `FIRESTORE_DATABASE` is set). Local `./scripts/dev-services.sh` leaves those unset (or sets `RUNTIME_MODE=local`) and uses the file store plus HTTP. Smoke against Cloud Run uses `gcloud auth print-identity-token`. Inventory and checkout are not `allUsers`. Notification and the Cloud Run receiver are not public either. Dashboard and MCP are.
 
 ```
 gcloud auth application-default login
@@ -54,6 +54,7 @@ Vertex coverage (hashicorp/google-beta `~> 7.37`, locked 7.44.0, resource added 
 | Agent Identity | `spec.identity_type = AGENT_IDENTITY` on `.agent` and `.reasoner_preview` (GA google 7.28.0) | No `google_vertex_ai_agent_identity` resource. `service_account` is unset. Confirm with the deployed `spec.effective_identity`, not the `.tf` file. IAM grants use that principal. |
 | Gemini Pro | `spec.deployment_spec.env HEALTH_ADK_MODEL=gemini-2.5-pro` (`local.adk_model`) | The container reads `HEALTH_ADK_MODEL` in `health_agent.host.resolve_model()` and passes it to `google.adk.agents.Agent(model=...)`. No Flash default on Agent Runtime. The persisted read copies that value onto `health_run.model`. |
 | Postgres URL | Cloud Run `DATABASE_URL` secret after `agent_score_split` | The receiver owns Postgres. The reasoner image has no Cloud SQL env. |
+| Env split | Receiver vs runtime vs Memory Bank | Cloud Run uses `AGENT_RUNTIME_ID` / `AGENT_RUNTIME_LOCATION` to invoke the reasoner. The reasoner uses `HEALTH_RUNTIME_LOCATION` / `HEALTH_RUNTIME_DISPLAY_NAME` / optional `HEALTH_RUNTIME_ENGINE_ID` (set `health_runtime_engine_id` = output `agent_runtime_id` after first apply) for identity lookup. Memory Bank uses `AGENT_ENGINE_ID` + `MEMORY_BANK_LOCATION`. Do not point runtime identity at the Memory Bank region. |
 
 google 7.44 (locked, `~> 7.37` for both `google` and `google-beta`). Cloud Run service-level `scaling { scaling_mode = AUTOMATIC }` is set explicitly so the plan does not echo provider 6's min/manual zeros. Reasoning Engine stays on google-beta because that is where the resource landed.
 

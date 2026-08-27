@@ -702,6 +702,41 @@ describe("score", () => {
   });
 });
 
+describe("fail closed on unknown signals", () => {
+  it("throws when a failed archTests ruleId is not in ARCH_PENALTIES", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      archTests: [
+        {
+          ruleId: "rule-99",
+          passed: false,
+          violations: [
+            { file: "services/checkout/src/domain/mark-paid.ts", detail: "x" },
+          ],
+        },
+      ],
+    };
+    expect(() => score(payload)).toThrow(/unknown archTests ruleId rule-99/);
+  });
+
+  it("throws when a dependencyCruiser rule is unknown", () => {
+    const payload: AnalysisPayload = {
+      ...zeroFindings,
+      dependencyCruiser: {
+        ...zeroFindings.dependencyCruiser,
+        violations: [
+          {
+            rule: "made-up-rule",
+            from: "services/checkout/src/a.ts",
+            to: "services/checkout/src/b.ts",
+          },
+        ],
+      },
+    };
+    expect(() => score(payload)).toThrow(/unknown dependencyCruiser rule made-up-rule/);
+  });
+});
+
 describe("classifyClone", () => {
   it("labels a self-clone internal", () => {
     expect(

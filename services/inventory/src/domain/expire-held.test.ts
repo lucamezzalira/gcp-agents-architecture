@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { silentLogger } from "@observability/runtime";
-import { expireHeldInAdapter } from "./expire-held.js";
-import { MemoryOutcomes } from "./memory-outcomes.js";
-import { MemoryReservations } from "./memory-reservations.js";
-import { MemoryStock } from "./memory-stock.js";
+import { expireHeld } from "./expire-held.js";
+import { MemoryOutcomes } from "../infrastructure/memory-outcomes.js";
+import { MemoryReservations } from "../infrastructure/memory-reservations.js";
+import { MemoryStock } from "../infrastructure/memory-stock.js";
 
-describe("expireHeldInAdapter", () => {
+describe("expireHeld", () => {
   it("releases unconfirmed holds whose reservedAt is older than ttl", async () => {
     const stock = new MemoryStock();
     const reservations = new MemoryReservations();
@@ -19,7 +19,7 @@ describe("expireHeldInAdapter", () => {
       reservedAt: "2026-08-14T09:00:00.000Z",
     });
 
-    const count = await expireHeldInAdapter(
+    const count = await expireHeld(
       { stock, reservations, outcomes, log: silentLogger() },
       new Date("2026-08-14T09:20:00.000Z"),
       15 * 60 * 1000,
@@ -44,7 +44,7 @@ describe("expireHeldInAdapter", () => {
       reservedAt: "2026-08-14T09:18:00.000Z",
     });
 
-    const count = await expireHeldInAdapter(
+    const count = await expireHeld(
       { stock, reservations, outcomes, log: silentLogger() },
       new Date("2026-08-14T09:20:00.000Z"),
       15 * 60 * 1000,

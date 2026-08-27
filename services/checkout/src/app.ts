@@ -4,7 +4,6 @@ import { getOrderView } from "./domain/get-order-view.js";
 import { markPaid } from "./domain/mark-paid.js";
 import { placeOrder } from "./domain/place-order.js";
 import type { BodyStore } from "./domain/ports/body-store.js";
-import type { DeliveryStatusLookup } from "./domain/ports/delivery-status-lookup.js";
 import type { InstructionPublisher } from "./domain/ports/instruction-publisher.js";
 import {
   createJsonLogger,
@@ -13,25 +12,20 @@ import {
   type Logger,
 } from "@observability/runtime";
 import type { OrderStore } from "./domain/ports/order-store.js";
-import type { StockLookup } from "./domain/ports/stock-lookup.js";
-import type { StockOutcomeSink } from "./domain/ports/stock-outcome-sink.js";
-import type { StockReservationPublisher } from "./domain/ports/stock-reservation-publisher.js";
+import type { ReservationOutcomeSink } from "./domain/ports/reservation-outcome-sink.js";
+import type { ReservationPublisher } from "./domain/ports/reservation-publisher.js";
 import { FileBodyStore } from "./infrastructure/file-body-store.js";
-import { FirestoreDeliveryStatusLookup } from "./infrastructure/firestore-delivery-status-lookup.js";
 import { FirestoreOrderStore } from "./infrastructure/firestore-order-store.js";
-import { FirestoreStockOutcomes } from "./infrastructure/firestore-stock-outcomes.js";
+import { FirestoreReservationOutcomes } from "./infrastructure/firestore-reservation-outcomes.js";
 import { GcsBodyStore } from "./infrastructure/gcs-body-store.js";
 import { HttpInstructionPublisher } from "./infrastructure/http-instruction-publisher.js";
-import { HttpStockLookup } from "./infrastructure/http-stock-lookup.js";
 import { InMemoryBodyStore } from "./infrastructure/in-memory-body-store.js";
-import { InMemoryDeliveryStatusLookup } from "./infrastructure/in-memory-delivery-status-lookup.js";
 import { InMemoryInstructionPublisher } from "./infrastructure/in-memory-instruction-publisher.js";
 import { InMemoryOrderStore } from "./infrastructure/in-memory-order-store.js";
-import { MemoryStockLookup } from "./infrastructure/memory-stock-lookup.js";
-import { MemoryStockOutcomes } from "./infrastructure/memory-stock-outcomes.js";
-import { MemoryStockReservations } from "./infrastructure/memory-stock-reservations.js";
+import { MemoryReservationOutcomes } from "./infrastructure/memory-reservation-outcomes.js";
+import { MemoryReservationPublisher } from "./infrastructure/memory-reservation-publisher.js";
 import { PubSubInstructionPublisher } from "./infrastructure/pubsub-instruction-publisher.js";
-import { PubSubStockReservations } from "./infrastructure/pubsub-stock-reservations.js";
+import { PubSubReservationPublisher } from "./infrastructure/pubsub-reservation-publisher.js";
 import { registerHealthRoute } from "./transport/health-route.js";
 import { registerOrderRoutes } from "./transport/order-routes.js";
 import { registerOutcomePushRoute } from "./transport/outcome-push.js";
@@ -41,20 +35,16 @@ export type CheckoutApp = {
   orderStore: InMemoryOrderStore;
   bodyStore: InMemoryBodyStore;
   publisher: InMemoryInstructionPublisher;
-  stockReservations: MemoryStockReservations;
-  stockOutcomes: MemoryStockOutcomes;
-  stockLookup: MemoryStockLookup;
-  deliveryStatus: InMemoryDeliveryStatusLookup;
+  reservations: MemoryReservationPublisher;
+  reservationOutcomes: MemoryReservationOutcomes;
 };
 
 function buildServer(
   orderStore: OrderStore,
   bodyStore: BodyStore,
   publisher: InstructionPublisher,
-  stockReservations: StockReservationPublisher,
-  stockOutcomes: StockOutcomeSink,
-  stockLookup: StockLookup,
-  deliveryStatus: DeliveryStatusLookup,
+  reservations: ReservationPublisher,
+  reservationOutcomes: ReservationOutcomeSink,
   logger: Logger,
 ): FastifyInstance {
   const server = Fastify();
@@ -62,21 +52,21 @@ function buildServer(
   registerHealthRoute(server);
   registerOrderRoutes(
     server,
-    (order) => placeOrder(order, { orderStore, stockReservations, logger }),
+    (order) => placeOrder(order, { orderStore, reservations, logger }),
     (orderId) =>
       markPaid(orderId, {
         orderStore,
         bodyStore,
         publisher,
-        stockReservations,
-        stockLookup,
+        reservations,
+        reservationOutcomes,
         logger,
       }),
-    (orderId) => getOrderView(orderId, { orderStore, deliveryStatus }),
-    (orderId) => cancelOrder(orderId, { orderStore, stockReservations, logger }),
+    (orderId) => getOrderView(orderId, { orderStore }),
+    (orderId) => cancelOrder(orderId, { orderStore, reservations, logger }),
     logger,
   );
-  registerOutcomePushRoute(server, stockOutcomes, logger);
+  registerOutcomePushRoute(server, reservationOutcomes, logger);
   return server;
 }
 
@@ -84,29 +74,22 @@ export function createApp(logger: Logger = silentLogger()): CheckoutApp {
   const orderStore = new InMemoryOrderStore();
   const bodyStore = new InMemoryBodyStore();
   const publisher = new InMemoryInstructionPublisher();
-  const stockReservations = new MemoryStockReservations();
-  const stockOutcomes = new MemoryStockOutcomes();
-  const stockLookup = new MemoryStockLookup();
-  stockLookup.set("standard-item", 100);
-  const deliveryStatus = new InMemoryDeliveryStatusLookup();
+  const reservationOutcomes = new MemoryReservationOutcomes();
+  const reservations = new MemoryReservationPublisher(reservationOutcomes);
   return {
     server: buildServer(
       orderStore,
       bodyStore,
       publisher,
-      stockReservations,
-      stockOutcomes,
-      stockLookup,
-      deliveryStatus,
+      reservations,
+      reservationOutcomes,
       logger,
     ),
     orderStore,
     bodyStore,
     publisher,
-    stockReservations,
-    stockOutcomes,
-    stockLookup,
-    deliveryStatus,
+    reservations,
+    reservationOutcomes,
   };
 }
 
@@ -118,17 +101,14 @@ export function createLocalApp(): FastifyInstance {
   const publisher = new HttpInstructionPublisher(
     process.env.NOTIFICATION_URL ?? "http://127.0.0.1:3001/instructions",
   );
-  const stockLookup = new HttpStockLookup(
-    process.env.INVENTORY_URL ?? "http://127.0.0.1:3002",
-  );
+  const reservationOutcomes = new MemoryReservationOutcomes();
+  const reservations = new MemoryReservationPublisher(reservationOutcomes);
   return buildServer(
     orderStore,
     bodyStore,
     publisher,
-    new MemoryStockReservations(),
-    new MemoryStockOutcomes(),
-    stockLookup,
-    new InMemoryDeliveryStatusLookup(),
+    reservations,
+    reservationOutcomes,
     createJsonLogger("checkout"),
   );
 }
@@ -140,30 +120,35 @@ export function createCloudApp(): FastifyInstance {
   const publisher = PubSubInstructionPublisher.fromTopicName(
     requireEnv("SEND_INSTRUCTIONS_TOPIC"),
   );
-  const stockReservations = PubSubStockReservations.forTopic(
+  const reservations = PubSubReservationPublisher.forTopic(
     requireEnv("STOCK_RESERVATIONS_TOPIC"),
   );
   return buildServer(
     orderStore,
     bodyStore,
     publisher,
-    stockReservations,
-    FirestoreStockOutcomes.connect(database),
-    new HttpStockLookup(
-      process.env.INVENTORY_URL && process.env.INVENTORY_URL.length > 0
-        ? process.env.INVENTORY_URL
-        : "http://127.0.0.1:3002",
-    ),
-    FirestoreDeliveryStatusLookup.connect(database),
+    reservations,
+    FirestoreReservationOutcomes.connect(database),
     createJsonLogger("checkout"),
   );
 }
 
 export function createRuntimeApp(): FastifyInstance {
-  if (process.env.BODY_BUCKET) {
+  if (preferCloudRuntime()) {
     return createCloudApp();
   }
   return createLocalApp();
+}
+
+function preferCloudRuntime(): boolean {
+  const mode = process.env.RUNTIME_MODE;
+  if (mode === "cloud") {
+    return true;
+  }
+  if (mode === "local") {
+    return false;
+  }
+  return Boolean(process.env.BODY_BUCKET) || Boolean(process.env.FIRESTORE_DATABASE);
 }
 
 function requireEnv(name: string): string {

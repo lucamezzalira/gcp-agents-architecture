@@ -1,5 +1,10 @@
-import postgres from "postgres";
 import { z } from "zod";
+import {
+  databaseUrl,
+  postgresTarget,
+  withSqlRetry,
+  type Sql,
+} from "@health/postgres";
 import {
   CHARACTERISTIC_ORDER,
   type CharacteristicRead,
@@ -8,6 +13,9 @@ import {
   type ObservedRuntimeEdge,
   type ServiceRead,
 } from "./types.js";
+
+export { databaseUrl, postgresTarget };
+export type { PostgresTarget } from "@health/postgres";
 
 const runRowSchema = z.object({
   run_id: z.string(),
@@ -138,82 +146,6 @@ function toCharacteristic(row: {
     characteristic.suppressedBy = suppressedBy;
   }
   return characteristic;
-}
-
-export function databaseUrl(): string {
-  return (
-    process.env.DATABASE_URL ??
-    "postgresql://health:health@127.0.0.1:5433/health"
-  );
-}
-
-export type PostgresTarget =
-  | { kind: "url"; url: string }
-  | {
-      kind: "socket";
-      host: string;
-      database: string;
-      username: string;
-      password: string;
-    };
-
-export function postgresTarget(url: string): PostgresTarget {
-  const socketMatch = url.match(/[?&]host=(\/[^&]*)/);
-  if (socketMatch === null || socketMatch[1] === undefined) {
-    return { kind: "url", url };
-  }
-  const parsed = new URL(url.replace("@/", "@unused/"));
-  return {
-    kind: "socket",
-    host: decodeURIComponent(socketMatch[1]),
-    database: decodeURIComponent(parsed.pathname.replace(/^\//, "")),
-    username: decodeURIComponent(parsed.username),
-    password: decodeURIComponent(parsed.password),
-  };
-}
-
-type Sql = ReturnType<typeof postgres>;
-
-const clients = new Map<string, Sql>();
-
-function dropClient(url: string): void {
-  const existing = clients.get(url);
-  if (existing === undefined) {
-    return;
-  }
-  clients.delete(url);
-  void existing.end({ timeout: 1 }).catch(() => undefined);
-}
-
-function sqlClient(url: string): Sql {
-  const existing = clients.get(url);
-  if (existing !== undefined) {
-    return existing;
-  }
-  const options = {
-    max: 2,
-    idle_timeout: 10,
-    max_lifetime: 60,
-    connect_timeout: 5,
-    prepare: false,
-    connection: {
-      statement_timeout: 8000,
-      lock_timeout: 3000,
-    },
-  } as const;
-  const target = postgresTarget(url);
-  const sql =
-    target.kind === "url"
-      ? postgres(target.url, options)
-      : postgres({
-          host: target.host,
-          database: target.database,
-          username: target.username,
-          password: target.password,
-          ...options,
-        });
-  clients.set(url, sql);
-  return sql;
 }
 
 function attachCharacteristics(
@@ -372,16 +304,6 @@ async function hydrateDetail(
   return runs.map((run) => (run.runId === detailed.runId ? detailed : run));
 }
 
-function shouldRetry(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes("EPIPE") ||
-    message.includes("ECONNRESET") ||
-    message.includes("CONNECTION_CLOSED") ||
-    message.includes("connect")
-  );
-}
-
 export function createPostgresStore(url = databaseUrl()): HealthStore {
   return {
     async loadRuns(options?: {
@@ -389,20 +311,10 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
       detailRunId?: string;
     }): Promise<HealthRun[]> {
       const includeSuperseded = options?.includeSuperseded === true;
-      const load = async (): Promise<HealthRun[]> => {
-        const sql = sqlClient(url);
+      return withSqlRetry(url, async (sql) => {
         const { rows, runs } = await queryRuns(sql, includeSuperseded);
         return hydrateDetail(sql, rows, runs, options?.detailRunId);
-      };
-      try {
-        return await load();
-      } catch (error) {
-        dropClient(url);
-        if (!shouldRetry(error)) {
-          throw error;
-        }
-        return await load();
-      }
+      });
     },
   };
 }

@@ -15,6 +15,7 @@ import { InMemoryDeliveryStats } from "./infrastructure/in-memory-delivery-stats
 import { InMemoryDeliveryStore } from "./infrastructure/in-memory-delivery-store.js";
 import { InMemoryEmailProvider } from "./infrastructure/email-provider.js";
 import { FileBodyStore } from "./infrastructure/file-body-store.js";
+import { FileDeliveryStore } from "./infrastructure/file-delivery-store.js";
 import { FirestoreDeliveryStore } from "./infrastructure/firestore-delivery-store.js";
 import { GcsBodyStore } from "./infrastructure/gcs-body-store.js";
 import { LoggingEmailProvider } from "./infrastructure/logging-email-provider.js";
@@ -47,6 +48,11 @@ export type NotificationRuntime = {
   logger: Logger;
 };
 
+type BuildOptions = {
+  /** Process-local /sent and /metrics. Off in cloud (stub provider, multi-instance). */
+  exposeLocalDiagnostics?: boolean;
+};
+
 function buildApp(
   bodyStore: BodyStore,
   deliveryStore: DeliveryStore,
@@ -54,6 +60,7 @@ function buildApp(
   recorded: RecordedEmailProvider,
   logger: Logger,
   deliveryStats: InMemoryDeliveryStats,
+  options: BuildOptions = {},
 ): { server: FastifyInstance; handleInstruction: InstructionHandler } {
   const handleInstruction: InstructionHandler = (instruction) =>
     deliver(instruction, { bodyStore, deliveryStore, emailProvider, logger });
@@ -62,8 +69,10 @@ function buildApp(
   registerHealthRoute(server);
   registerInstructionRoute(server, handleInstruction, logger);
   registerPubSubPushRoute(server, handleInstruction, logger);
-  registerSentRoute(server, () => recorded.calls, logger);
-  registerMetricsRoute(server, deliveryStats, logger);
+  if (options.exposeLocalDiagnostics !== false) {
+    registerSentRoute(server, () => recorded.calls, logger);
+    registerMetricsRoute(server, deliveryStats, logger);
+  }
   return { server, handleInstruction };
 }
 
@@ -105,10 +114,9 @@ function retryingProvider(
 
 export function createLocalApp(): NotificationRuntime {
   const logger = createJsonLogger("notification");
-  const bodyStore = new FileBodyStore(
-    process.env.BODY_STORE_DIR ?? ".local/bodies",
-  );
-  const deliveryStore = new InMemoryDeliveryStore();
+  const bodyStoreDir = process.env.BODY_STORE_DIR ?? ".local/bodies";
+  const bodyStore = new FileBodyStore(bodyStoreDir);
+  const deliveryStore = FileDeliveryStore.besideBodyStore(bodyStoreDir);
   const recorded = new InMemoryEmailProvider();
   const deliveryStats = new InMemoryDeliveryStats();
   return {
@@ -119,6 +127,7 @@ export function createLocalApp(): NotificationRuntime {
       recorded,
       logger,
       deliveryStats,
+      { exposeLocalDiagnostics: true },
     ),
     logger,
   };
@@ -130,6 +139,7 @@ export function createCloudApp(): NotificationRuntime {
   const deliveryStore = FirestoreDeliveryStore.connect(
     requireEnv("FIRESTORE_DATABASE"),
   );
+  // Stub provider: logs email.stubbed. No real send; do not expose /sent or /metrics.
   const recorded = new LoggingEmailProvider();
   const deliveryStats = new InMemoryDeliveryStats();
   return {
@@ -140,16 +150,28 @@ export function createCloudApp(): NotificationRuntime {
       recorded,
       logger,
       deliveryStats,
+      { exposeLocalDiagnostics: false },
     ),
     logger,
   };
 }
 
 export function createRuntimeApp(): NotificationRuntime {
-  if (process.env.BODY_BUCKET) {
+  if (preferCloudRuntime()) {
     return createCloudApp();
   }
   return createLocalApp();
+}
+
+function preferCloudRuntime(): boolean {
+  const mode = process.env.RUNTIME_MODE;
+  if (mode === "cloud") {
+    return true;
+  }
+  if (mode === "local") {
+    return false;
+  }
+  return Boolean(process.env.BODY_BUCKET) || Boolean(process.env.FIRESTORE_DATABASE);
 }
 
 function requireEnv(name: string): string {

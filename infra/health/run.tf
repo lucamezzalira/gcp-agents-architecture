@@ -199,15 +199,8 @@ resource "google_cloud_run_v2_service" "agent" {
         cpu_idle = true
       }
       dynamic "env" {
-        for_each = local.receiver_mode == "legacy" ? {
-          HEALTH_REASONER           = "adk"
-          HEALTH_ADK_MODEL          = local.adk_model
-          GOOGLE_CLOUD_PROJECT      = var.project_id
-          GOOGLE_CLOUD_LOCATION     = var.memory_bank_location
-          GOOGLE_GENAI_USE_VERTEXAI = "true"
-          MEMORY_BANK_LOCATION      = var.memory_bank_location
-          AGENT_ENGINE_ID           = local.agent_engine_numeric_id
-          } : {
+        # Score-split path only. Legacy HEALTH_REASONER=adk on the receiver is gone.
+        for_each = {
           GOOGLE_CLOUD_PROJECT   = var.project_id
           AGENT_RUNTIME_ID       = try(google_vertex_ai_reasoning_engine.agent[0].name, "")
           AGENT_RUNTIME_LOCATION = var.region

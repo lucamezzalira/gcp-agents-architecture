@@ -8,6 +8,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from health_agent.host import hosted_in_cloud
+from health_agent.settings import TRACE_FORCE_FLUSH_MS
 
 _TRACER_NAME = "health-agent"
 _provider: TracerProvider | None = None
@@ -52,7 +53,7 @@ def _install_provider(provider: TracerProvider) -> None:
 
 def flush_traces() -> None:
     if _provider is not None:
-        _provider.force_flush(timeout_millis=10_000)
+        _provider.force_flush(timeout_millis=TRACE_FORCE_FLUSH_MS)
 
 
 def tracer() -> trace.Tracer:

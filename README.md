@@ -12,7 +12,7 @@ Illustrative: p95-latency, error-rate, and security signals. They arrive with `i
 
 ## Deployed on GCP
 
-Two projects in `europe-west1`. Checkout, the dashboard, and the health MCP are public. Notification and the Cloud Run receiver stay internal. Agent Runtime runs Gemini 2.5 Pro under Agent Identity. Only notification talks to the email provider.
+Two projects in `europe-west1`. The dashboard and health MCP are public (`allUsers`). Checkout, inventory, notification, and the Cloud Run receiver require authenticated invokers (not `allUsers`). Agent Runtime runs Gemini 2.5 Pro under Agent Identity. Notification owns the email boundary; the cloud adapter uses a stub provider that logs `email.stubbed` rather than calling a real mail API.
 
 Dashboard: https://health-dashboard-k3ljxa4a4q-ew.a.run.app
 Checkout: https://checkout-iqcdekwluq-ew.a.run.app
@@ -22,10 +22,10 @@ MCP: https://health-mcp-k3ljxa4a4q-ew.a.run.app/mcp
 flowchart LR
   cursor[Cursor]
   browser[Browser]
-  email[Email provider]
+  stub[Email stub log]
 
   subgraph svc["ga-services-mezzalab"]
-    checkout["checkout (public)"]
+    checkout["checkout (auth invoker)"]
     send["Pub/Sub send-instructions"]
     gcs["GCS email-bodies"]
     fsC[("Firestore checkout")]
@@ -55,7 +55,7 @@ flowchart LR
   send -->|pull| notif
   notif -->|read| gcs
   notif --> fsN
-  notif --> email
+  notif --> stub
   dash --> sql
   mcp --> sql
   gha -->|WIF services-ci| trace
@@ -83,7 +83,7 @@ pnpm dashboard                 # http://localhost:4321
 
 Cursor loads the Cloud Run MCP from `.cursor/mcp.json` (`https://health-mcp-k3ljxa4a4q-ew.a.run.app/mcp`). Enable **architecture-health** under Cursor Settings → MCP. `list_health_runs` is the trend. `get_health` is the current (or SHA-specific) read.
 
-Pay an order and inspect the in-memory send:
+Pay an order and inspect the process-local stub send list (`GET /sent` is in-memory on that notification instance; not available on the cloud image):
 
 ```
 curl -sS -X POST http://127.0.0.1:3000/orders \
@@ -93,7 +93,7 @@ curl -sS -X POST http://127.0.0.1:3000/orders/ord-1/pay
 curl -sS http://127.0.0.1:3001/sent
 ```
 
-Same loop as scripts, against local or the public checkout URL (default). Notification stays internal. Cloud outbox polling reads the notification Firestore `deliveries` doc with your `gcloud` credentials, not through checkout.
+Same loop as scripts, against local or the Cloud Run checkout URL (authenticated). Notification stays internal. Cloud outbox polling reads the notification Firestore `deliveries` doc with your `gcloud` credentials, not through checkout.
 
 ```
 ./scripts/demo-order.sh

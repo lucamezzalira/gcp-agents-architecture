@@ -1,12 +1,12 @@
 import type { Logger } from "@observability/runtime";
 import type { OrderStore } from "./ports/order-store.js";
-import type { StockReservationPublisher } from "./ports/stock-reservation-publisher.js";
+import type { ReservationPublisher } from "./ports/reservation-publisher.js";
 import type { Order } from "./order.js";
-import { reserveCommand } from "./stock-command.js";
+import { reserveCommand } from "./reservation-command.js";
 
 export type PlaceOrderDeps = {
   orderStore: OrderStore;
-  stockReservations: StockReservationPublisher;
+  reservations: ReservationPublisher;
   logger: Logger;
 };
 
@@ -16,6 +16,6 @@ export async function placeOrder(
 ): Promise<void> {
   const log = deps.logger.withCorrelation(order.id);
   await deps.orderStore.save(order);
-  await deps.stockReservations.publish(reserveCommand(order));
-  log.info("stock.reserve-published");
+  await deps.reservations.publish(reserveCommand(order));
+  log.info("reservation.reserve-published");
 }

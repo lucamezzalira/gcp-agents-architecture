@@ -18,6 +18,7 @@ import {
   DEP_ON_TEST_PENALTY,
   EFFERENT_COUPLING_PENALTY,
   INTERNAL_CLONE_PENALTY,
+  KNOWN_DEP_CRUISER_RULES,
   ORPHAN_PENALTY,
   PLATFORM_WEIGHTS,
   SERVICE_CHARACTERISTIC_ORDER,
@@ -25,6 +26,13 @@ import {
   SHARED_CLONE_PENALTY,
   UNRESOLVABLE_PENALTY,
 } from "./weights.js";
+
+export class UnknownScoringSignalError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnknownScoringSignalError";
+  }
+}
 
 type Finding = {
   ruleId: string;
@@ -86,7 +94,9 @@ function collectFindings(payload: AnalysisPayload): Finding[] {
     }
     const mapping = ARCH_PENALTIES[result.ruleId];
     if (mapping === undefined) {
-      continue;
+      throw new UnknownScoringSignalError(
+        `unknown archTests ruleId ${result.ruleId}; add it to ARCH_PENALTIES or fix the collector`,
+      );
     }
     for (const violation of result.violations) {
       const service = violation.service ?? serviceFromPath(violation.file);
@@ -135,18 +145,18 @@ function collectFindings(payload: AnalysisPayload): Finding[] {
   }
 
   for (const violation of payload.dependencyCruiser.violations) {
+    if (!KNOWN_DEP_CRUISER_RULES.has(violation.rule)) {
+      throw new UnknownScoringSignalError(
+        `unknown dependencyCruiser rule ${violation.rule}; add it to KNOWN_DEP_CRUISER_RULES or fix the collector`,
+      );
+    }
     if (violation.rule === "no-circular" || violation.rule === "no-orphans") {
       continue;
     }
     const penalty =
       violation.rule === "not-to-unresolvable"
         ? UNRESOLVABLE_PENALTY
-        : violation.rule === "no-dep-on-test"
-          ? DEP_ON_TEST_PENALTY
-          : undefined;
-    if (penalty === undefined) {
-      continue;
-    }
+        : DEP_ON_TEST_PENALTY;
     findings.push({
       ruleId: violation.rule,
       paths: [violation.from, violation.to],

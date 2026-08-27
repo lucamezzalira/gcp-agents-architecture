@@ -6,6 +6,7 @@ from health_agent.models import (
     Narrative,
     ScoreResult,
 )
+from health_agent.payload_checks import all_rules_passed
 
 
 class Reasoner:
@@ -64,10 +65,6 @@ def _runtime_note(payload: AnalysisPayload) -> str:
     elif payload.runtime.illustrative:
         parts.append(" Runtime signals are illustrative and were not scored.")
     return "".join(parts)
-
-
-def _all_rules_passed(payload: AnalysisPayload) -> bool:
-    return all(item.passed for item in payload.archTests)
 
 
 def _failed_rules(payload: AnalysisPayload) -> dict[str, ArchTestResult]:
@@ -153,7 +150,7 @@ class StubReasoner(Reasoner):
     ) -> list[Narrative]:
         priors = prior_reads or []
         narratives: list[Narrative] = []
-        rules_hold = _all_rules_passed(payload)
+        rules_hold = all_rules_passed(payload)
 
         def emit(char_id: str, score: int, signals: list[str]) -> Narrative:
             is_boundary = char_id == "boundary-integrity" or char_id.endswith(

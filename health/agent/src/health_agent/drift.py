@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import re
+
 from health_agent.models import AnalysisPayload, HealthRead, Narrative
+from health_agent.payload_checks import all_rules_passed
+
+_SERVICE_FROM_PATH = re.compile(r"(?:^|/)services/([^/]+)/")
 
 
 def _normalise(path: str) -> str:
@@ -8,11 +13,8 @@ def _normalise(path: str) -> str:
 
 
 def _service_name(path: str) -> str | None:
-    normalised = _normalise(path)
-    for name in ("checkout", "notification"):
-        if f"{name}/" in normalised or normalised.startswith(f"{name}/"):
-            return name
-    return None
+    match = _SERVICE_FROM_PATH.search(_normalise(path))
+    return match.group(1) if match else None
 
 
 def _within_service_clones(payload: AnalysisPayload) -> list[str]:
@@ -52,10 +54,6 @@ def _recent_subjects(payload: AnalysisPayload) -> list[str]:
     return []
 
 
-def _all_rules_passed(payload: AnalysisPayload) -> bool:
-    return all(item.passed for item in payload.archTests)
-
-
 def drift_narrative(
     characteristic_id: str,
     score: int,
@@ -71,7 +69,7 @@ def drift_narrative(
 
     if characteristic_id == "layering":
         parts.append(f"layering is {score}. No transport-to-infrastructure import was recorded.")
-        if history and _all_rules_passed(payload):
+        if history and all_rules_passed(payload):
             parts.append(
                 "Architecture tests do not inspect whether a domain method "
                 "decides anything or only forwards a query to storage, so a "
@@ -114,7 +112,7 @@ def drift_narrative(
             )
         elif _cross_service_clones(payload):
             parts.append(
-                "The remaining clones sit across checkout and notification "
+                "The remaining clones sit across services "
                 "(contracts, logger, body store). That split is deliberate."
             )
         else:
@@ -122,7 +120,7 @@ def drift_narrative(
 
     else:
         parts.append(f"{characteristic_id} is {score}. Architecture tests still pass.")
-        if history and _all_rules_passed(payload):
+        if history and all_rules_passed(payload):
             parts.append("The SendInstruction contract is still the only door.")
             joined = " ".join(subjects).lower()
             if any(

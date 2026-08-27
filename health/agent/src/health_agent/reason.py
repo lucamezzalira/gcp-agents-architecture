@@ -106,6 +106,8 @@ def reason_over_scores(
                     flush=True,
                 )
                 traceback.print_exc(file=sys.stderr)
+                if hosted_in_cloud():
+                    raise
         provenance = {
             "reasoner": name,
             "traceId": current_trace_id(),

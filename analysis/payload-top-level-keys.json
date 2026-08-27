@@ -1,0 +1,19 @@
+[
+  "runId",
+  "commitSha",
+  "commitMessage",
+  "timestamp",
+  "committedAt",
+  "services",
+  "archTests",
+  "dependencyCruiser",
+  "duplication",
+  "runtime",
+  "contracts",
+  "recentCommits",
+  "changedFiles",
+  "priorMetrics",
+  "priorServiceMetrics",
+  "priorDuplicationCounts",
+  "ruleSetVersion"
+]

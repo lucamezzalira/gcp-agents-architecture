@@ -65,6 +65,16 @@ export const CYCLE_PENALTY = 15;
 export const ORPHAN_PENALTY = 5;
 export const UNRESOLVABLE_PENALTY = 10;
 export const DEP_ON_TEST_PENALTY = 10;
+
+/** Dependency-cruiser rules that scoring understands. Anything else fails closed. */
+export const KNOWN_DEP_CRUISER_RULES = new Set([
+  "no-circular",
+  "no-orphans",
+  "not-to-unresolvable",
+  "no-dep-on-test",
+]);
+
+export const ARCH_RULE_IDS = Object.freeze(Object.keys(ARCH_PENALTIES));
 /** Penalty per current outgoing edge that leaves the service. Ce 0 is skipped. */
 export const EFFERENT_COUPLING_PENALTY = 10;
 export const INTERNAL_CLONE_PENALTY = 8;

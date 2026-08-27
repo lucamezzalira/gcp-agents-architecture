@@ -170,15 +170,29 @@ def test_insert_does_not_copy_created_at_and_marks_incomplete() -> None:
 
 def test_insert_reuses_incomplete_current_row() -> None:
     from health_agent.models import CharacteristicRead, HealthRead
-    from health_agent.persist import insert_health_read
+    from health_agent.persist import InsertResult, insert_health_read
 
     class FakeCursor:
-        def fetchone(self) -> tuple[str, str, bool]:
-            return ("sha:existing", "2026-08-14T17:00:00Z", True)
+        def __init__(self, statement: str) -> None:
+            self.statement = statement
+
+        def fetchone(self) -> object:
+            if "from health_run" in self.statement and "commit_sha" in self.statement:
+                return ("sha:existing", "2026-08-14T17:00:00Z", True)
+            if "overall_score" in self.statement:
+                return (93, {})
+            return None
+
+        def fetchall(self) -> list[tuple[object, ...]]:
+            if "from health_characteristic" in self.statement:
+                return [
+                    ("layering", 100, "", "[]", "[]", "[]"),
+                ]
+            return []
 
     class FakeConn:
         def execute(self, statement: str, _values: object = None) -> FakeCursor:
-            return FakeCursor()
+            return FakeCursor(statement)
 
         def commit(self) -> None:
             return None
@@ -198,5 +212,149 @@ def test_insert_reuses_incomplete_current_row() -> None:
         ],
         reasoner="",
     )
-    assert insert_health_read(FakeConn(), read, "msg") == "sha:existing"
+    assert insert_health_read(FakeConn(), read, "msg") == InsertResult(
+        "sha:existing", True
+    )
+
+
+def test_insert_supersedes_incomplete_when_scores_differ() -> None:
+    from health_agent.models import CharacteristicRead, HealthRead
+    from health_agent.persist import InsertResult, insert_health_read
+
+    statements: list[str] = []
+
+    class FakeCursor:
+        def __init__(self, statement: str) -> None:
+            self.statement = statement
+
+        def fetchone(self) -> object:
+            if "from health_run" in self.statement and "commit_sha" in self.statement:
+                return ("sha:existing", "2026-08-14T17:00:00Z", True)
+            if "overall_score" in self.statement:
+                return (55, {})
+            return None
+
+        def fetchall(self) -> list[tuple[object, ...]]:
+            if "from health_characteristic" in self.statement and "scope" in self.statement:
+                return [
+                    ("layering", 55, "", "[]", "[]", "[]"),
+                ]
+            return []
+
+    class FakeConn:
+        def execute(self, statement: str, _values: object = None) -> FakeCursor:
+            statements.append(statement)
+            return FakeCursor(statement)
+
+        def commit(self) -> None:
+            return None
+
+    read = HealthRead(
+        runId="r1",
+        commitSha="a" * 40,
+        overall=93,
+        characteristics=[
+            CharacteristicRead(
+                id="layering",
+                score=100,
+                reasoning="",
+                recommendations=[],
+                signalsUsed=[],
+            )
+        ],
+        reasoner="",
+    )
+    result = insert_health_read(FakeConn(), read, "msg")
+    assert result.reused_incomplete is False
+    assert result.run_id != "sha:existing"
+    assert any("state = 'superseded'" in item.replace("\n", " ") for item in statements)
+    assert any("insert into health_run" in item for item in statements)
+
+
+def test_load_recent_reads_uses_desc_then_reverses_to_asc() -> None:
+    from health_agent.persist import load_recent_reads
+
+    captured: dict[str, object] = {}
+
+    class FakeCursor:
+        def fetchall(self) -> list[tuple[object, ...]]:
+            # SQL returns newest first (desc). After reverse: oldest→newest.
+            return [
+                (
+                    "run-new",
+                    "b" * 40,
+                    90,
+                    "stub",
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    {},
+                    "current",
+                    1,
+                    None,
+                    None,
+                    None,
+                ),
+                (
+                    "run-old",
+                    "a" * 40,
+                    80,
+                    "stub",
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    {},
+                    "current",
+                    1,
+                    None,
+                    None,
+                    None,
+                ),
+            ]
+
+    class FakeConn:
+        def execute(self, statement: str, values: object = None) -> FakeCursor:
+            captured["sql"] = statement
+            captured["limit"] = values
+            return FakeCursor()
+
+    def fake_read(_conn, *row):
+        from health_agent.models import CharacteristicRead, HealthRead
+
+        return HealthRead(
+            runId=str(row[0]),
+            commitSha=str(row[1]),
+            overall=int(row[2]),
+            characteristics=[
+                CharacteristicRead(
+                    id="layering",
+                    score=100,
+                    reasoning="",
+                    recommendations=[],
+                    signalsUsed=[],
+                )
+            ],
+            reasoner="stub",
+        )
+
+    import health_agent.persist as persist_mod
+
+    original = persist_mod._read_from_run_row
+    persist_mod._read_from_run_row = fake_read
+    try:
+        reads = load_recent_reads(FakeConn(), limit=2)
+    finally:
+        persist_mod._read_from_run_row = original
+
+    sql = str(captured["sql"]).lower()
+    assert "order by coalesce(committed_at, created_at) desc" in sql
+    assert [item.runId for item in reads] == ["run-old", "run-new"]
 

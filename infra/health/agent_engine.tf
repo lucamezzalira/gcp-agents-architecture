@@ -1,6 +1,14 @@
 # Vertex Agent Engine is google_vertex_ai_reasoning_engine (google-beta ~> 7.37).
 # There is no separate google_* resource for Memory Bank or Agent Identity.
 #
+# Env roles (do not unify; they name different engines):
+# - Cloud Run receiver (run.tf): AGENT_RUNTIME_ID, AGENT_RUNTIME_LOCATION —
+#   invoke this reasoner. Never HEALTH_REASONER=adk on the receiver after score split.
+# - This runtime process: HEALTH_RUNTIME_LOCATION, HEALTH_RUNTIME_DISPLAY_NAME,
+#   HEALTH_RUNTIME_ENGINE_ID — identity lookup for the container itself.
+# - Memory Bank: AGENT_ENGINE_ID + MEMORY_BANK_LOCATION (us-central1). Different
+#   engine from Agent Runtime (europe-west1).
+#
 # Live layout (agent_score_split = true):
 # - memory: imported Memory Bank (health-memory-bank) in us-central1. No container.
 # - agent: Agent Runtime in europe-west1. Image is agent_reasoner_image.
@@ -220,6 +228,17 @@ resource "google_vertex_ai_reasoning_engine" "agent" {
       env {
         name  = "HEALTH_RUNTIME_DISPLAY_NAME"
         value = "health-agent"
+      }
+      # Engine numeric id is computed on create, so self-reference in env is
+      # impossible. After the first apply, pin HEALTH_RUNTIME_ENGINE_ID to
+      # terraform output agent_runtime_id (or leave unset and use display-name
+      # lookup). MEMORY_BANK_LOCATION must not be used as the runtime region.
+      dynamic "env" {
+        for_each = var.health_runtime_engine_id != "" ? [1] : []
+        content {
+          name  = "HEALTH_RUNTIME_ENGINE_ID"
+          value = var.health_runtime_engine_id
+        }
       }
       env {
         name  = "MEMORY_BANK_LOCATION"

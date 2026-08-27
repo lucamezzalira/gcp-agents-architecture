@@ -99,11 +99,6 @@ function currentService(): string | undefined {
   return value !== null && value.length > 0 ? value : undefined;
 }
 
-function serviceOverall(run: HealthRun, name: string): string {
-  const found = run.services.find((item) => item.service === name);
-  return found === undefined ? "n/a" : String(found.overall);
-}
-
 function paintTrend(runs: HealthRun[], service?: string): void {
   const heading = document.querySelector("[data-trend-heading]");
   if (heading) {
@@ -250,17 +245,53 @@ export function paintCopy(
     platformChip.classList.toggle("is-return", !onPlatform);
     platformChip.setAttribute("aria-pressed", onPlatform ? "true" : "false");
   }
-  const checkoutOverall = document.querySelector("[data-checkout-overall]");
-  if (checkoutOverall) checkoutOverall.textContent = serviceOverall(run, "checkout");
-  const notificationOverall = document.querySelector(
-    "[data-notification-overall]",
-  );
-  if (notificationOverall) {
-    notificationOverall.textContent = serviceOverall(run, "notification");
-  }
-  const inventoryOverall = document.querySelector("[data-inventory-overall]");
-  if (inventoryOverall) {
-    inventoryOverall.textContent = serviceOverall(run, "inventory");
+
+  const serviceMap = document.querySelector("[data-service-map]");
+  if (serviceMap instanceof HTMLElement) {
+    const params = new URLSearchParams(window.location.search);
+    const history = params.get("history") === "all" ? "&history=all" : "";
+    const commit = shortSha(run.commitSha);
+    const runId = encodeURIComponent(run.runId);
+    const platform = serviceMap.querySelector("[data-platform]");
+    const existing = new Map<string, HTMLAnchorElement>();
+    serviceMap.querySelectorAll("a[data-service]").forEach((node) => {
+      if (!(node instanceof HTMLAnchorElement)) {
+        return;
+      }
+      const name = node.getAttribute("data-service") ?? "";
+      if (name.length === 0) {
+        return;
+      }
+      existing.set(name, node);
+    });
+    for (const item of run.services) {
+      let chip = existing.get(item.service);
+      if (chip === undefined) {
+        chip = document.createElement("a");
+        chip.className = "svc";
+        chip.setAttribute("data-service", item.service);
+        const label = document.createTextNode(`${item.service} `);
+        const strong = document.createElement("strong");
+        strong.setAttribute("data-service-overall", "");
+        chip.append(label, strong);
+        serviceMap.append(chip);
+      } else {
+        existing.delete(item.service);
+      }
+      chip.href = `?commit=${commit}&run=${runId}&service=${encodeURIComponent(item.service)}${history}`;
+      const overall = chip.querySelector("[data-service-overall]");
+      if (overall) {
+        overall.textContent = String(item.overall);
+      }
+      const selected = item.service === service;
+      chip.classList.toggle("is-selected", selected);
+    }
+    for (const stale of existing.values()) {
+      stale.remove();
+    }
+    if (platform instanceof HTMLAnchorElement) {
+      platform.href = `?commit=${commit}&run=${runId}${history}`;
+    }
   }
 
   document.querySelectorAll("[data-service]").forEach((node) => {

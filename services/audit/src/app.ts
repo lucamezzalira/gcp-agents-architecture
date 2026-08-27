@@ -25,8 +25,19 @@ export function createCloudApp(): FastifyInstance {
 }
 
 export function createRuntimeApp(): FastifyInstance {
-  if (process.env.FIRESTORE_DATABASE) {
+  if (preferCloudRuntime()) {
     return createCloudApp();
   }
   return createLocalApp();
+}
+
+function preferCloudRuntime(): boolean {
+  const mode = process.env.RUNTIME_MODE;
+  if (mode === "cloud") {
+    return true;
+  }
+  if (mode === "local") {
+    return false;
+  }
+  return Boolean(process.env.BODY_BUCKET) || Boolean(process.env.FIRESTORE_DATABASE);
 }

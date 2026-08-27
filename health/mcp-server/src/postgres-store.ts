@@ -1,7 +1,15 @@
-import postgres from "postgres";
 import { z } from "zod";
+import {
+  databaseUrl,
+  postgresTarget,
+  withSqlRetry,
+  type Sql,
+} from "@health/postgres";
 import type { CharacteristicRead, HealthStore, LatestHealth, ServiceRead } from "./types.js";
 import { acceptedDecisionSchema } from "./schemas.js";
+
+export { databaseUrl, postgresTarget };
+export type { PostgresTarget } from "@health/postgres";
 
 const runRowSchema = z.object({
   run_id: z.string(),
@@ -78,82 +86,6 @@ function toCharacteristic(row: {
   return characteristic;
 }
 
-export function databaseUrl(): string {
-  return (
-    process.env.DATABASE_URL ??
-    "postgresql://health:health@127.0.0.1:5433/health"
-  );
-}
-
-export type PostgresTarget =
-  | { kind: "url"; url: string }
-  | {
-      kind: "socket";
-      host: string;
-      database: string;
-      username: string;
-      password: string;
-    };
-
-export function postgresTarget(url: string): PostgresTarget {
-  const socketMatch = url.match(/[?&]host=(\/[^&]*)/);
-  if (socketMatch === null || socketMatch[1] === undefined) {
-    return { kind: "url", url };
-  }
-  const parsed = new URL(url.replace("@/", "@unused/"));
-  return {
-    kind: "socket",
-    host: decodeURIComponent(socketMatch[1]),
-    database: decodeURIComponent(parsed.pathname.replace(/^\//, "")),
-    username: decodeURIComponent(parsed.username),
-    password: decodeURIComponent(parsed.password),
-  };
-}
-
-type Sql = ReturnType<typeof postgres>;
-
-const clients = new Map<string, Sql>();
-
-function dropClient(url: string): void {
-  const existing = clients.get(url);
-  if (existing === undefined) {
-    return;
-  }
-  clients.delete(url);
-  void existing.end({ timeout: 1 }).catch(() => undefined);
-}
-
-function sqlClient(url: string): Sql {
-  const existing = clients.get(url);
-  if (existing !== undefined) {
-    return existing;
-  }
-  const options = {
-    max: 2,
-    idle_timeout: 10,
-    max_lifetime: 60,
-    connect_timeout: 5,
-    prepare: false,
-    connection: {
-      statement_timeout: 8000,
-      lock_timeout: 3000,
-    },
-  } as const;
-  const target = postgresTarget(url);
-  const sql =
-    target.kind === "url"
-      ? postgres(target.url, options)
-      : postgres({
-          host: target.host,
-          database: target.database,
-          username: target.username,
-          password: target.password,
-          ...options,
-        });
-  clients.set(url, sql);
-  return sql;
-}
-
 function mapRun(
   run: z.infer<typeof runRowSchema>,
   platform: CharacteristicRead[],
@@ -226,8 +158,7 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
     return { platform, byService };
   };
 
-  const load = async (): Promise<LatestHealth[]> => {
-    const sql = sqlClient(url);
+  const load = async (sql: Sql): Promise<LatestHealth[]> => {
     const runRows = await sql`
       select run_id, commit_sha, commit_message, created_at, overall_score,
              reasoner, trace_id, model, host, agent_identity, rule_set_version,
@@ -262,8 +193,10 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
     );
   };
 
-  const loadDetailed = async (runId: string): Promise<LatestHealth | undefined> => {
-    const sql = sqlClient(url);
+  const loadDetailed = async (
+    sql: Sql,
+    runId: string,
+  ): Promise<LatestHealth | undefined> => {
     const runRows = await sql`
       select run_id, commit_sha, commit_message, created_at, overall_score,
              reasoner, trace_id, model, host, agent_identity, rule_set_version,
@@ -292,37 +225,11 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
 
   return {
     async loadRuns(): Promise<LatestHealth[]> {
-      try {
-        return await load();
-      } catch (error) {
-        dropClient(url);
-        const message = error instanceof Error ? error.message : String(error);
-        if (
-          message.includes("EPIPE") ||
-          message.includes("ECONNRESET") ||
-          message.includes("connect")
-        ) {
-          return await load();
-        }
-        throw error;
-      }
+      return withSqlRetry(url, (sql) => load(sql));
     },
 
     async loadDetailed(runId: string): Promise<LatestHealth | undefined> {
-      try {
-        return await loadDetailed(runId);
-      } catch (error) {
-        dropClient(url);
-        const message = error instanceof Error ? error.message : String(error);
-        if (
-          message.includes("EPIPE") ||
-          message.includes("ECONNRESET") ||
-          message.includes("connect")
-        ) {
-          return await loadDetailed(runId);
-        }
-        throw error;
-      }
+      return withSqlRetry(url, (sql) => loadDetailed(sql, runId));
     },
 
     async loadLatest(): Promise<LatestHealth | undefined> {
@@ -335,39 +242,40 @@ export function createPostgresStore(url = databaseUrl()): HealthStore {
     },
 
     async loadActiveDecisions() {
-      const sql = sqlClient(url);
-      const rows = await sql`
-        select id, rule_id, path_glob, decision, rationale, decided_by,
-               decided_at, active
-        from accepted_decision
-        where active = true
-      `;
-      return z
-        .array(
-          z.object({
-            id: z.string(),
-            rule_id: z.string(),
-            path_glob: z.string(),
-            decision: z.string(),
-            rationale: z.string(),
-            decided_by: z.string(),
-            decided_at: z.union([z.string(), z.date()]),
-            active: z.boolean(),
-          }),
-        )
-        .parse(rows)
-        .map((row) =>
-          acceptedDecisionSchema.parse({
-            id: row.id,
-            ruleId: row.rule_id,
-            pathGlob: row.path_glob,
-            decision: row.decision,
-            rationale: row.rationale,
-            decidedBy: row.decided_by,
-            decidedAt: asIso(row.decided_at),
-            active: row.active,
-          }),
-        );
+      return withSqlRetry(url, async (sql) => {
+        const rows = await sql`
+          select id, rule_id, path_glob, decision, rationale, decided_by,
+                 decided_at, active
+          from accepted_decision
+          where active = true
+        `;
+        return z
+          .array(
+            z.object({
+              id: z.string(),
+              rule_id: z.string(),
+              path_glob: z.string(),
+              decision: z.string(),
+              rationale: z.string(),
+              decided_by: z.string(),
+              decided_at: z.union([z.string(), z.date()]),
+              active: z.boolean(),
+            }),
+          )
+          .parse(rows)
+          .map((row) =>
+            acceptedDecisionSchema.parse({
+              id: row.id,
+              ruleId: row.rule_id,
+              pathGlob: row.path_glob,
+              decision: row.decision,
+              rationale: row.rationale,
+              decidedBy: row.decided_by,
+              decidedAt: asIso(row.decided_at),
+              active: row.active,
+            }),
+          );
+      });
     },
   };
 }

@@ -147,6 +147,47 @@ def test_cross_service_clones_stay_accepted() -> None:
     assert "single service" not in duplication.reasoning
 
 
+def test_inventory_within_service_clones_are_named() -> None:
+    payload = _payload(
+        duplication={
+            "percentage": 6.0,
+            "clones": [
+                {
+                    "files": [
+                        "services/inventory/src/domain/reserve.ts",
+                        "services/inventory/src/domain/release.ts",
+                    ],
+                    "lines": 12,
+                    "tokens": 40,
+                }
+            ],
+        }
+    )
+    duplication = _by_id(payload, _scores(duplication=85), [_prior()])["duplication"]
+    assert "single service" in duplication.reasoning
+    assert "inventory:" in duplication.reasoning
+
+
+def test_audit_path_is_a_service_for_cross_clone() -> None:
+    payload = _payload(
+        duplication={
+            "percentage": 4.0,
+            "clones": [
+                {
+                    "files": [
+                        "services/audit/src/domain/record.ts",
+                        "services/checkout/src/domain/record.ts",
+                    ],
+                    "lines": 8,
+                    "tokens": 30,
+                }
+            ],
+        }
+    )
+    duplication = _by_id(payload, _scores(), [_prior()])["duplication"]
+    assert "deliberate" in duplication.reasoning
+
+
 def test_refund_commit_calls_the_contract_under_pressure() -> None:
     payload = _payload(
         commitMessage="Send a refund confirmation through notification.",

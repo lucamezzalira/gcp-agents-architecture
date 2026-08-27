@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryBodyStore } from "../infrastructure/in-memory-body-store.js";
 import { InMemoryInstructionPublisher } from "../infrastructure/in-memory-instruction-publisher.js";
-import { MemoryStockLookup } from "../infrastructure/memory-stock-lookup.js";
-import { MemoryStockReservations } from "../infrastructure/memory-stock-reservations.js";
+import { MemoryReservationOutcomes } from "../infrastructure/memory-reservation-outcomes.js";
+import { MemoryReservationPublisher } from "../infrastructure/memory-reservation-publisher.js";
 import { InMemoryOrderStore } from "../infrastructure/in-memory-order-store.js";
 import { silentLogger } from "@observability/runtime";
 import { markPaid } from "./mark-paid.js";
 import { InvalidTransitionError } from "./invalid-transition.js";
 import { OrderNotFoundError } from "./order-not-found.js";
-import { StockUnavailableError } from "./stock-unavailable.js";
+import { ReservationNotReadyError } from "./reservation-not-ready.js";
 import type { Order } from "./order.js";
 import { confirmationBodyRef } from "./render-confirmation.js";
 
@@ -19,22 +19,24 @@ const order: Order = {
   shippingTier: "standard",
 };
 
-function setup(): {
+function setup(autoReserve = true): {
   orderStore: InMemoryOrderStore;
   bodyStore: InMemoryBodyStore;
   publisher: InMemoryInstructionPublisher;
-  stockReservations: MemoryStockReservations;
-  stockLookup: MemoryStockLookup;
+  reservations: MemoryReservationPublisher;
+  reservationOutcomes: MemoryReservationOutcomes;
   logger: ReturnType<typeof silentLogger>;
 } {
-  const stockLookup = new MemoryStockLookup();
-  stockLookup.set("standard-item", 10);
+  const reservationOutcomes = new MemoryReservationOutcomes();
+  const reservations = new MemoryReservationPublisher(
+    autoReserve ? reservationOutcomes : undefined,
+  );
   return {
     orderStore: new InMemoryOrderStore(),
     bodyStore: new InMemoryBodyStore(),
     publisher: new InMemoryInstructionPublisher(),
-    stockReservations: new MemoryStockReservations(),
-    stockLookup,
+    reservations,
+    reservationOutcomes,
     logger: silentLogger(),
   };
 }
@@ -43,6 +45,19 @@ describe("markPaid", () => {
   it("renders, stores HTML, and publishes an instruction whose bodyRef resolves", async () => {
     const deps = setup();
     await deps.orderStore.save(order);
+    await deps.reservations.publish({
+      action: "reserve",
+      orderId: order.id,
+      sku: "standard-item",
+      units: 1,
+      order: {
+        id: order.id,
+        email: order.email,
+        status: "pending",
+        shippingTier: "standard",
+        lineItems: [{ sku: "standard-item", units: 1, name: "Standard item" }],
+      },
+    });
 
     const result = await markPaid(order.id, deps);
 
@@ -50,23 +65,10 @@ describe("markPaid", () => {
     expect(result.instruction.to).toBe(order.email);
     expect(result.instruction.bodyRef).toBe(confirmationBodyRef(order.id));
     expect(deps.publisher.published).toEqual([result.instruction]);
-    expect(deps.stockReservations.published).toEqual([
-      {
-        action: "confirm",
-        orderId: order.id,
-        sku: "standard-item",
-        units: 1,
-        order: {
-          id: order.id,
-          email: order.email,
-          status: "paid",
-          shippingTier: "standard",
-          lineItems: [
-            { sku: "standard-item", units: 1, name: "Standard item" },
-          ],
-        },
-      },
-    ]);
+    expect(deps.reservations.published.at(-1)).toMatchObject({
+      action: "confirm",
+      orderId: order.id,
+    });
 
     const stored = await deps.bodyStore.get(result.instruction.bodyRef);
     expect(stored).toBeDefined();
@@ -77,6 +79,12 @@ describe("markPaid", () => {
   it("publishes an expedited confirmation with a 24 hour window", async () => {
     const deps = setup();
     await deps.orderStore.save({ ...order, shippingTier: "expedited" });
+    await deps.reservationOutcomes.record({
+      orderId: order.id,
+      result: "reserved",
+      sku: "standard-item",
+      units: 1,
+    });
 
     const result = await markPaid(order.id, deps);
 
@@ -90,6 +98,12 @@ describe("markPaid", () => {
   it("does not publish again when the order is already paid", async () => {
     const deps = setup();
     await deps.orderStore.save(order);
+    await deps.reservationOutcomes.record({
+      orderId: order.id,
+      result: "reserved",
+      sku: "standard-item",
+      units: 1,
+    });
     await markPaid(order.id, deps);
 
     await expect(markPaid(order.id, deps)).rejects.toBeInstanceOf(
@@ -102,6 +116,12 @@ describe("markPaid", () => {
   it("does not mark a cancelled order paid or publish a send instruction", async () => {
     const deps = setup();
     await deps.orderStore.save({ ...order, status: "cancelled" });
+    await deps.reservationOutcomes.record({
+      orderId: order.id,
+      result: "reserved",
+      sku: "standard-item",
+      units: 1,
+    });
 
     await expect(markPaid(order.id, deps)).rejects.toBeInstanceOf(
       InvalidTransitionError,
@@ -118,13 +138,12 @@ describe("markPaid", () => {
     expect(deps.publisher.published).toHaveLength(0);
   });
 
-  it("waits on stock lookup and refuses to pay when inventory has nothing", async () => {
-    const deps = setup();
-    deps.stockLookup.set("standard-item", 0);
+  it("refuses to pay when no reservation outcome is recorded", async () => {
+    const deps = setup(false);
     await deps.orderStore.save(order);
 
     await expect(markPaid(order.id, deps)).rejects.toBeInstanceOf(
-      StockUnavailableError,
+      ReservationNotReadyError,
     );
     expect(deps.publisher.published).toHaveLength(0);
     expect((await deps.orderStore.get(order.id))?.status).toBe("pending");
